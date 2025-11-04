@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 import requests
 
-from .config import KESTREL_API_URL
+from ..config import KESTREL_API_URL
 
 
 def link(entity: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,10 +1,10 @@
 import copy
 from typing import Dict, Any
 
-from .annotator import annotate
-from .normalizer import Normalizer
-from .linker import link
-from .resolver import resolve
+from .core.annotator import annotate
+from .core.normalizer import Normalizer
+from .core.linker import link
+from .core.resolver import resolve
 
 
 def map_to_kg(entity: Dict[str, Any]) -> Dict[str, Any]:

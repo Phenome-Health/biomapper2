@@ -8,7 +8,7 @@ from typing import Dict, Any, Callable, Optional, Tuple, Union, List
 import requests
 import yaml
 
-from .config import BIOLINK_VERSION
+from ..config import BIOLINK_VERSION
 
 
 # TODO: add in the string parsing and other bits necessary from the extractor module in phenome-kg
