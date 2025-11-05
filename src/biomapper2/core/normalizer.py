@@ -28,11 +28,12 @@ class Normalizer:
 
     def normalize(self, entity: Dict[str, Any]) -> Dict[str, Any]:
         # TODO: This is a placeholder - build out to consider all ID fields/to generally be smarter
+        logging.debug(f"Beginning ID normalization step..")
         curies = set()
         for property_name, value in entity.items():
             if property_name != 'name':
                 vocab_name = self.determine_vocab(property_name)
-                print(f"vocab name is: {vocab_name}")
+                logging.debug(f"Matching vocabs are: {vocab_name}")
                 curie, iri = self.construct_curie(entity[property_name], vocab_name)
                 if curie and curie != self.known_invalid:
                     curies.add(curie)
@@ -45,10 +46,11 @@ class Normalizer:
         """
         TODO: needs improvement! this is a bare-bones heuristic-based/hardcoded approach..
         """
+        logging.debug(f"Determining which vocab corresponds to column '{column_name}'")
         col_name_snakecase = column_name.lower().replace(' ', '_')
         col_name_words = col_name_snakecase.split('_')
         col_name_cleaned = ''.join([word for word in col_name_words if word not in {'id', 'ids', 'code', 'codes'}])
-        print(f"col name cleaned is: {col_name_cleaned}")
+        logging.debug(f"Column name cleaned is: {col_name_cleaned}")
 
         # If we have an exact match, return it
         if col_name_cleaned in self.vocab_validator_map:
@@ -191,15 +193,12 @@ class Normalizer:
     def _load_biolink_file(url: str, biolink_version: str) -> dict:
         """Load/cache a Biolink JSON or YAML file (downloaded from a URL)"""
         project_root = Path(__file__).parents[2]
-        logging.info(f"project root is: {project_root}")
 
         cache_dir = project_root / 'cache'
         file_name = url.split('/')[-1]
         file_name_json = file_name.split('.')[0] + f"_{biolink_version}" + '.json'
         local_path = cache_dir / file_name_json
-        logging.info(f"original file name is: {file_name}")
-        logging.info(f"json file name is: {file_name_json}")
-        logging.info(f"local path is: {local_path}")
+        logging.info(f"Local file path is: {local_path}")
 
         # Download the file if we don't already have it cached
         if not local_path.exists():
@@ -208,7 +207,6 @@ class Normalizer:
             response.raise_for_status()
             if file_name.endswith('.yaml'):
                 response_json = yaml.safe_load(response.text)
-                print(response_json)
             else:
                 response_json = response.json()
 

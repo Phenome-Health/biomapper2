@@ -7,3 +7,6 @@ KESTREL_API_URL = "https://kestrel.nathanpricelab.com/api"
 
 # Biolink model version
 BIOLINK_VERSION = "4.2.5"
+
+# Level of logging messages to display (DEBUG, INFO, WARNING, ERROR, or CRITICAL)
+LOG_LEVEL = "DEBUG"

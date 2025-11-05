@@ -5,6 +5,9 @@ from .core.annotator import annotate
 from .core.normalizer import Normalizer
 from .core.linker import link
 from .core.resolver import resolve
+from .utils import setup_logging
+
+setup_logging()
 
 
 def map_to_kg(entity: Dict[str, Any]) -> Dict[str, Any]:

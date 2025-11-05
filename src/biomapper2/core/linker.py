@@ -8,6 +8,7 @@ from ..config import KESTREL_API_URL
 
 
 def link(entity: Dict[str, Any]) -> Dict[str, Any]:
+    logging.debug(f"Beginning link step (curie-->KG)..")
     curies = entity['curies']
     if curies:
         # Get the canonical curies from the KG  # TODO: expose streamlined get_canonical_ids dict endpoint in kestrel

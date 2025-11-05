@@ -1,6 +1,6 @@
 """Tests for kg_mapper module."""
-
 import pytest
+
 from biomapper2.kg_mapper import map_to_kg
 
 
