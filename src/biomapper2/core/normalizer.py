@@ -45,9 +45,10 @@ class Normalizer:
         TODO: needs improvement! this is a bare-bones heuristic-based/hardcoded approach..
         """
         logging.debug(f"Determining which vocab corresponds to column '{column_name}'")
-        col_name_snakecase = column_name.lower().replace(' ', '_')
-        col_name_words = col_name_snakecase.split('_')
-        col_name_cleaned = ''.join([word for word in col_name_words if word not in {'id', 'ids', 'code', 'codes'}])
+        col_name_underscored = re.sub(r'[-\s]+', '_', column_name).lower()  # Replace spaces, hyphens with underscores
+        col_name_words = col_name_underscored.split('_')
+        col_name_rejoined = ''.join([word for word in col_name_words if word not in {'id', 'ids', 'code', 'codes', 'list'}])
+        col_name_cleaned = self.clean_vocab_prefix(col_name_rejoined)
         logging.debug(f"Column name cleaned is: {col_name_cleaned}")
 
         # If we have an exact match, return it
@@ -63,13 +64,68 @@ class Normalizer:
                 elif '.' in vocab and vocab.split('.')[0] == col_name_cleaned:
                     # This column matches implicitly, based on the 'root' vocab name (e.g., 'kegg' for 'kegg.compound')
                     matches_on_alias.add(vocab)
+                elif vocab.replace('.', '') == col_name_cleaned:
+                    # This column matches implicitly, after removing periods (e.g., 'keggcompound' for 'kegg.compound')
+                    matches_on_alias.add(vocab)
             if matches_on_alias:
                 return list(matches_on_alias)
             else:
+                valid_vocab_names = ', '.join([f"{vocab} (or: {', '.join(info[self.aliases_prop])})"
+                                               if info.get(self.aliases_prop) else vocab
+                                               for vocab, info in self.vocab_validator_map.items()])
                 error_message = (f"Could not determine vocab for column '{column_name}'. "
-                                 f"Valid vocab names are: {list(self.vocab_validator_map)}")
+                                 f"Valid vocab names are: {valid_vocab_names}")
                 logging.error(error_message)
                 raise ValueError(error_message)
+
+
+    def is_valid_id(self, local_id: str, vocab_name_cleaned: str) -> Tuple[bool, str]:
+        """
+        True means the local ID is valid for the specified vocab, False means it's not. Returns cleaned local ID as well.
+        """
+        # Grab the proper validation and cleaning functions
+        validator = self.vocab_validator_map[vocab_name_cleaned][self.validator_prop]
+        cleaner = self.vocab_validator_map[vocab_name_cleaned].get(self.cleaner_prop)
+
+        # Clean the local ID if necessary
+        if cleaner:
+            local_id = cleaner(local_id)
+
+        # Then determine whether it's valid for the specified vocabulary
+        return validator(local_id), local_id
+
+
+    def construct_curie(self, local_id: str, vocab_name_cleaned: Union[str, List[str]], stop_on_failure: bool = False) -> Tuple[str, str]:
+        # First, if this is a proper curie - remove its prefix
+        local_id = local_id.split(':')[1] if ':' in local_id and not local_id.startswith('http') else local_id
+        # Construct a standardized curie for the given local ID and vocabulary (or list of vocabularies; first valid kept)
+        prefixes_lowercase = [vocab_name_cleaned] if isinstance(vocab_name_cleaned, str) else vocab_name_cleaned
+        curie = ''
+        iri = ''
+        for prefix_lowercase in prefixes_lowercase:
+            is_valid_id, cleaned_local_id = self.is_valid_id(local_id, prefix_lowercase)
+            if is_valid_id:
+                # Return the standardized curie and its corresponding IRI
+                prefix_normalized = self.vocab_info_map[prefix_lowercase]['prefix']
+                iri_root = self.vocab_info_map[prefix_lowercase]['iri']
+                iri = f"{iri_root}{cleaned_local_id}" if iri_root else ""
+                curie = f"{prefix_normalized}:{cleaned_local_id}"
+                iri = iri
+            if curie:
+                break  # Stop at the first prefix we find that doesn't fail curie construction
+
+        if not curie:
+            # The local ID did not pass validation for its corresponding vocab(s)
+            if stop_on_failure:
+                logging.error(f"Local id '{local_id}' is invalid for {vocab_name_cleaned}")
+                sys.exit(1)
+            else:
+                logging.warning(f"Local id '{local_id}' is invalid for {vocab_name_cleaned}. Skipping.")
+
+        return curie, iri
+
+
+    # ------------------------------------------- INSTANTIATION HELPERS  --------------------------------------------- #
 
 
     def _load_prefix_info(self, biolink_version: str) -> Dict[str, Dict[str, str]]:
@@ -116,7 +172,8 @@ class Normalizer:
 
 
         # Return a mapping of lowercase prefixes to their normalized form (varying capitalization) and IRIs
-        vocab_info_map = {prefix.lower(): {'prefix': prefix, 'iri': iri} for prefix, iri in prefix_to_iri_map.items()}
+        vocab_info_map = {self.clean_vocab_prefix(prefix): {'prefix': prefix, 'iri': iri}
+                          for prefix, iri in prefix_to_iri_map.items()}
 
         return vocab_info_map
 
@@ -136,14 +193,14 @@ class Normalizer:
             'chembl.target': {validator: self.is_chembl_target_id},
             'chr': {validator: self.is_chr_id},
             'cl': {validator: self.is_cl_id},
-            'clo': {validator: self.is_clo_id},
+            'clo': {validator: self.is_clo_id, aliases: ['celllineontology']},
             'complexportal': {validator: self.is_complexportal_id},
             'cvcl': {validator: self.is_cellosaurus_id},
             'cytoband': {validator: self.is_cytoband_id},
             'dbsnp': {validator: self.is_dbsnp_id},
             'doid': {validator: self.is_doid_id},
             'drugbank': {validator: self.is_drugbank_id},
-            'ec': {validator: self.is_ec_id},
+            'ec': {validator: self.is_ec_id, aliases: ['explorenz']},
             'ensembl': {validator: self.is_ensembl_gene_id},
             'envo': {validator: self.is_envo_id},
             'fips.place': {validator: self.is_fips_compound_id},
@@ -167,8 +224,8 @@ class Normalizer:
             'metacyc.reaction': {validator: self.is_metacyc_reaction_id},
             'mirbase': {validator: self.is_mirbase_id},
             'mirdb': {validator: self.is_mirdb_id},
-            'ncbigene': {validator: self.is_ncbigene_id},
-            'ncbitaxon': {validator: self.is_ncbitaxon_id},
+            'ncbigene': {validator: self.is_ncbigene_id, aliases: ['entrez', 'entrezgene']},
+            'ncbitaxon': {validator: self.is_ncbitaxon_id, aliases: ['ncbitaxonomy']},
             'ndfrt': {validator: self.is_ndfrt_id},
             'nhanes': {validator: self.is_nhanes_id},
             'omim': {validator: self.is_omim_id},
@@ -220,54 +277,13 @@ class Normalizer:
             contents = json.load(cache_file)
             return contents
 
-    def is_valid_id(self, local_id: str, vocab_prefix_lowercase: str) -> Tuple[bool, str]:
-        """
-        True means the local ID is valid for the specified vocab, False means it's not. Returns cleaned local ID as well.
-        """
-        # Grab the proper validation and cleaning functions
-        validator = self.vocab_validator_map[vocab_prefix_lowercase][self.validator_prop]
-        cleaner = self.vocab_validator_map[vocab_prefix_lowercase].get(self.cleaner_prop)
 
-        # Clean the local ID if necessary
-        if cleaner:
-            local_id = cleaner(local_id)
+    # -------------------------------------------------- CLEANERS ---------------------------------------------------- #
 
-        # Then determine whether it's valid for the specified vocabulary
-        return validator(local_id), local_id
-
-
-    def construct_curie(self, local_id: str, vocab_prefix_lowercase: Union[str, List[str]], stop_on_failure: bool = False) -> Tuple[str, str]:
-        # First, if this is a proper curie - remove its prefix
-        local_id = local_id.split(':')[1] if ':' in local_id and not local_id.startswith('http') else local_id
-        # Construct a standardized curie for the given local ID and vocabulary (or list of vocabularies; first valid kept)
-        prefixes_lowercase = [vocab_prefix_lowercase] if isinstance(vocab_prefix_lowercase, str) else vocab_prefix_lowercase
-        curie = ''
-        iri = ''
-        for prefix_lowercase in prefixes_lowercase:
-            is_valid_id, cleaned_local_id = self.is_valid_id(local_id, prefix_lowercase)
-            if is_valid_id:
-                # Return the standardized curie and its corresponding IRI
-                prefix_normalized = self.vocab_info_map[prefix_lowercase]['prefix']
-                iri_root = self.vocab_info_map[prefix_lowercase]['iri']
-                iri = f"{iri_root}{cleaned_local_id}" if iri_root else ""
-                curie = f"{prefix_normalized}:{cleaned_local_id}"
-                iri = iri
-            if curie:
-                break  # Stop at the first prefix we find that doesn't fail curie construction
-
-        if not curie:
-            # The local ID did not pass validation for its corresponding vocab(s)
-            if stop_on_failure:
-                logging.error(f"Local id '{local_id}' is invalid for {vocab_prefix_lowercase}")
-                sys.exit(1)
-            else:
-                logging.warning(f"Local id '{local_id}' is invalid for {vocab_prefix_lowercase}. Skipping.")
-
-        return curie, iri
-
-
-
-    # -------------------------------------------------- CLEANERS ----------------------------------------------------- #
+    @staticmethod
+    def clean_vocab_prefix(vocab: str) -> str:
+        # Get rid of all chars that are not alphanumeric or a period
+        return re.sub(r'[^a-z0-9.]', '', vocab.lower())
 
     @staticmethod
     def convert_float_to_int_str(local_id: str) -> str:
