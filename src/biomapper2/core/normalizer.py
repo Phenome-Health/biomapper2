@@ -13,7 +13,6 @@ from ..config import BIOLINK_VERSION
 
 # TODO: add in the string parsing and other bits necessary from the extractor module in phenome-kg
 # TODO: handle fuzzy id prop names (figure out best match)
-# TODO: get rid of the known_invalid situation (move that stuff fully to spoke id utils for kraken)
 
 
 class Normalizer:
@@ -21,12 +20,11 @@ class Normalizer:
         self.validator_prop = 'validator'
         self.cleaner_prop = 'cleaner'
         self.aliases_prop = 'aliases'
-        self.known_invalid = 'KNOWN_INVALID'
         self.vocab_info_map = self._load_prefix_info(BIOLINK_VERSION)
         self.vocab_validator_map = self._load_validator_map()
 
 
-    def normalize(self, entity: Dict[str, Any]) -> Dict[str, Any]:
+    def normalize(self, entity: Dict[str, Any], stop_on_failure: bool = False) -> Dict[str, Any]:
         # TODO: This is a placeholder - build out to consider all ID fields/to generally be smarter
         logging.debug(f"Beginning ID normalization step..")
         curies = set()
@@ -34,8 +32,8 @@ class Normalizer:
             if property_name != 'name':
                 vocab_name = self.determine_vocab(property_name)
                 logging.debug(f"Matching vocabs are: {vocab_name}")
-                curie, iri = self.construct_curie(entity[property_name], vocab_name)
-                if curie and curie != self.known_invalid:
+                curie, iri = self.construct_curie(entity[property_name], vocab_name, stop_on_failure=stop_on_failure)
+                if curie:
                     curies.add(curie)
 
         entity['curies'] = list(curies)
@@ -68,8 +66,10 @@ class Normalizer:
             if matches_on_alias:
                 return list(matches_on_alias)
             else:
-                raise ValueError(f"Could not determine vocab for column '{column_name}'. "
+                error_message = (f"Could not determine vocab for column '{column_name}'. "
                                  f"Valid vocab names are: {list(self.vocab_validator_map)}")
+                logging.error(error_message)
+                raise ValueError(error_message)
 
 
     def _load_prefix_info(self, biolink_version: str) -> Dict[str, Dict[str, str]]:
@@ -220,11 +220,9 @@ class Normalizer:
             contents = json.load(cache_file)
             return contents
 
-    def is_valid_id(self, local_id: str, vocab_prefix_lowercase: str) -> Tuple[Optional[bool], str]:
+    def is_valid_id(self, local_id: str, vocab_prefix_lowercase: str) -> Tuple[bool, str]:
         """
-        True means it's valid for the specified vocab, False means it's not, and None means it's not valid, but
-        it's an invalid form we're aware of (calling code may choose to skip such nodes). Returns cleaned local ID
-        as well.
+        True means the local ID is valid for the specified vocab, False means it's not. Returns cleaned local ID as well.
         """
         # Grab the proper validation and cleaning functions
         validator = self.vocab_validator_map[vocab_prefix_lowercase][self.validator_prop]
@@ -241,7 +239,7 @@ class Normalizer:
     def construct_curie(self, local_id: str, vocab_prefix_lowercase: Union[str, List[str]], stop_on_failure: bool = False) -> Tuple[str, str]:
         # First, if this is a proper curie - remove its prefix
         local_id = local_id.split(':')[1] if ':' in local_id and not local_id.startswith('http') else local_id
-        # Constructs a standardized curie for the given local ID and vocabulary (or list of vocabularies; first valid kept)
+        # Construct a standardized curie for the given local ID and vocabulary (or list of vocabularies; first valid kept)
         prefixes_lowercase = [vocab_prefix_lowercase] if isinstance(vocab_prefix_lowercase, str) else vocab_prefix_lowercase
         curie = ''
         iri = ''
@@ -254,18 +252,16 @@ class Normalizer:
                 iri = f"{iri_root}{cleaned_local_id}" if iri_root else ""
                 curie = f"{prefix_normalized}:{cleaned_local_id}"
                 iri = iri
-            elif is_valid_id is None:
-                # Indicates this is a known invalid ID format for this node_type, source pair; give warning
-                logging.warning(f"Local id '{local_id}' is invalid for {prefix_lowercase} (known invalid format)")
-                curie = self.known_invalid
             if curie:
                 break  # Stop at the first prefix we find that doesn't fail curie construction
 
         if not curie:
-            # This is an unknown invalid ID format; handle it as requested
-            logging.error(f"Local id '{local_id}' is invalid for {vocab_prefix_lowercase} (UNKNOWN invalid format)")
+            # The local ID did not pass validation for its corresponding vocab(s)
             if stop_on_failure:
+                logging.error(f"Local id '{local_id}' is invalid for {vocab_prefix_lowercase}")
                 sys.exit(1)
+            else:
+                logging.warning(f"Local id '{local_id}' is invalid for {vocab_prefix_lowercase}. Skipping.")
 
         return curie, iri
 
@@ -323,11 +319,9 @@ class Normalizer:
         return bool(re.match(r'^[A-Z]{3}\d{4}$', local_id))
 
     @staticmethod
-    def is_lipidmaps_id(local_id: str) -> Optional[bool]:
+    def is_lipidmaps_id(local_id: str) -> bool:
         # Allows: 2 uppercase letters followed by a mix of uppercase letters and digits
         # Examples: ST02030282, PR0103110003, SP0501AA01
-        if local_id == 'GP0202a9AAA':  # One weird LM id in refmet (only one with a lowercase letter)
-            return None
         return bool(re.match(r'^[A-Z]{2}[A-Z0-9]+$', local_id))
 
     @staticmethod
@@ -351,24 +345,19 @@ class Normalizer:
         return has_valid_chars and has_proper_capitalization and 'RXN' in local_id
 
     @staticmethod
-    def is_metacyc_pathway_id(local_id: str) -> Optional[bool]:
+    def is_metacyc_pathway_id(local_id: str) -> bool:
         # MetaCyc pathway IDs: examples: PWY-#### or PWY0-#### or DESCRIPTIVE-NAME-PWY or PWY18C3-9
         has_valid_chars = bool(re.match(r'^[A-Z0-9-+]+$', local_id))
         is_metacyc_id = has_valid_chars and local_id.isupper()
         if is_metacyc_id:
             return True
-        elif any(char.isalpha() for char in local_id):
-            return None  # Meant to catch english names given as identifiers, like Glycan biosynthesis - 2
         else:
             return False
 
     @staticmethod
-    def is_snomedct_id(local_id: str) -> Optional[bool]:
+    def is_snomedct_id(local_id: str) -> bool:
         # SNOMED CT IDs are numeric strings
-        if 'e+' in local_id:  # Known spoke bug where some snomed ct IDs are in scientific notation, like '1.62248710001191e+16'
-            return None
-        else:
-            return local_id.isdigit()
+        return local_id.isdigit()
 
     @staticmethod
     def is_cellosaurus_id(local_id: str) -> bool:
@@ -396,15 +385,8 @@ class Normalizer:
         return bool(re.match(r'^[0-9]+$', local_id))
 
     @staticmethod
-    def is_dbsnp_id(local_id: str) -> Optional[bool]:
+    def is_dbsnp_id(local_id: str) -> bool:
         # Allows: rs followed by digits, with an optional version suffix (e.g., .1)
-        if local_id == '-':  # Some identifiers are just a hyphen; think it's like a null value
-            return None
-        elif ',' in local_id:
-            # Detect when multiple dbsnp IDs are concatenated into one ID (skip these for now)
-            parts = local_id.split(',')
-            if bool(re.match(r'^rs[0-9]+(\.\d+)?$', parts[0].strip())):
-                return None
         return bool(re.match(r'^rs[0-9]+(\.\d+)?$', local_id))
 
     @staticmethod
@@ -443,12 +425,9 @@ class Normalizer:
         return bool(re.match(r'^\d{5}$', local_id))
 
     @staticmethod
-    def is_reactome_id(local_id: str) -> Optional[bool]:
+    def is_reactome_id(local_id: str) -> bool:
         # Allows: R-HSA-digits (e.g., R-HSA-162582)
-        if local_id == 'root':
-            return None
-        else:
-            return bool(re.match(r'^R-[A-Z]{3}-[0-9]+$', local_id))
+        return bool(re.match(r'^R-[A-Z]{3}-[0-9]+$', local_id))
 
     @staticmethod
     def is_refmet_id(local_id: str) -> bool:
@@ -596,11 +575,9 @@ class Normalizer:
         return bool(re.match(r'^\d{7}$', local_id))
 
     @staticmethod
-    def is_hmdb_id(local_id: str) -> Optional[bool]:
+    def is_hmdb_id(local_id: str) -> bool:
         # Allows: HMDB followed by 5 or 7 digits
         # Examples: HMDB10418, HMDB0046334
-        if local_id.startswith('HMS'):
-            return None
         return bool(re.match(r'^HMDB(\d{5}|\d{7})$', local_id))
 
     @staticmethod
@@ -633,12 +610,9 @@ class Normalizer:
         return bool(re.match(r'^[0-9]+$', local_id))
 
     @staticmethod
-    def is_clo_id(local_id: str) -> Optional[bool]:
+    def is_clo_id(local_id: str) -> bool:
         # Allows: Exactly 7 digits
-        if local_id.startswith('http://'):
-            return None  # A couple nodes have old URLs as IDs
-        else:
-            return bool(re.match(r'^\d{7}$', local_id))
+        return bool(re.match(r'^\d{7}$', local_id))
 
     @staticmethod
     def is_complexportal_id(local_id: str) -> bool:
@@ -672,12 +646,9 @@ class Normalizer:
         return bool(re.match(r'^[A-Z]+$', local_id))
 
     @staticmethod
-    def is_chebi_id(local_id: str) -> Optional[bool]:
+    def is_chebi_id(local_id: str) -> bool:
         # ChEBI IDs are positive integers
-        if local_id == 'root':
-            return None
-        else:
-            return local_id.isdigit() and int(local_id) > 0
+        return local_id.isdigit() and int(local_id) > 0
 
     @staticmethod
     def is_chembl_compound_id(local_id: str) -> bool:

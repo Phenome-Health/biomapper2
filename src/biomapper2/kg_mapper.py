@@ -10,13 +10,13 @@ from .utils import setup_logging
 setup_logging()
 
 
-def map_to_kg(entity: Dict[str, Any]) -> Dict[str, Any]:
+def map_to_kg(entity: Dict[str, Any], stop_on_failure: bool = False) -> Dict[str, Any]:
     entity = copy.deepcopy(entity)  # Use a copy to avoid editing input item
     normalizer = Normalizer()  # Instantiate the ID normalizer (should only be done once, up front)
 
     # Perform all mapping steps
     annotate(entity)
-    normalizer.normalize(entity)
+    normalizer.normalize(entity, stop_on_failure=stop_on_failure)
     link(entity)
     resolve(entity)
 
