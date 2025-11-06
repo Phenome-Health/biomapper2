@@ -2,11 +2,13 @@ import json
 import logging
 import re
 import sys
+from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Any, Callable, Optional, Tuple, Union, List
+from typing import Dict, Any, Callable, Optional, Tuple, Union, List, Set
 
 import requests
 import yaml
+import pandas as pd
 
 from ..config import BIOLINK_VERSION
 
@@ -24,20 +26,52 @@ class Normalizer:
         self.vocab_validator_map = self._load_validator_map()
 
 
-    def normalize(self, entity: Dict[str, Any], stop_on_failure: bool = False) -> Dict[str, Any]:
-        # TODO: This is a placeholder - build out to consider all ID fields/to generally be smarter
+    def normalize(self,
+                  item: pd.Series | Dict[str, Any],
+                  provided_id_fields: List[str],
+                  array_delimiters: List[str],
+                  stop_on_invalid_id: bool = False) -> Tuple[List[str], List[str], List[str], Dict[str, list], Dict[str, list], Dict[str, list]]:
         logging.debug(f"Beginning ID normalization step..")
+        # Load/clean the provided and assigned local IDs for this item
+        if array_delimiters:
+            # Parse any delimited strings (multiple identifiers in one string)
+            provided_ids = {id_field: [local_id for local_id in re.split(f"[{''.join(array_delimiters)}]", item[id_field])]
+                             for id_field in provided_id_fields if pd.notnull(item[id_field])}
+        else:
+            provided_ids = {id_field: item[id_field] for id_field in provided_id_fields if pd.notnull(item[id_field])}
+        assigned_ids = item['assigned_ids']
+
+        # Get curies for the provided/assigned IDs
+        curies_provided, invalid_ids_provided = self.get_curies(provided_ids, stop_on_invalid_id)
+        curies_assigned, invalid_ids_assigned = self.get_curies(assigned_ids, stop_on_invalid_id)
+
+        # Form final result
+        curies = list(curies_provided | curies_assigned)
+        curies_provided = list(curies_provided)
+        curies_assigned = list(curies_assigned)
+        invalid_ids = {id_field: invalid_ids_provided.get(id_field, []) + invalid_ids_assigned.get(id_field, [])
+                       for id_field in set(invalid_ids_provided) | set(invalid_ids_assigned)}
+
+        return curies, curies_provided, curies_assigned, invalid_ids, invalid_ids_provided, invalid_ids_assigned
+
+
+    def get_curies(self, local_ids_dict: Dict[str, Any], stop_on_invalid_id: bool = False) -> Tuple[Set[str], Dict[str, Any]]:
         curies = set()
-        for property_name, value in entity.items():
-            if property_name != 'name':
-                vocab_name = self.determine_vocab(property_name)
-                logging.debug(f"Matching vocabs are: {vocab_name}")
-                curie, iri = self.construct_curie(entity[property_name], vocab_name, stop_on_failure=stop_on_failure)
+        invalid_ids = defaultdict(list)
+        for id_field_name, local_ids_entry in local_ids_dict.items():
+            local_ids = local_ids_entry if isinstance(local_ids_entry, list) else [local_ids_entry]
+            vocab_names = self.determine_vocab(id_field_name)
+            logging.debug(f"Matching vocabs are: {vocab_names}")
+            for local_id in local_ids:
+                # Make sure the local ID is a nice clean string
+                local_id = self.clean_numeric_id(local_id)
+                # Get the curie for this local ID
+                curie, iri = self.construct_curie(local_id, vocab_names, stop_on_failure=stop_on_invalid_id)
                 if curie:
                     curies.add(curie)
-
-        entity['curies'] = list(curies)
-        return entity
+                else:
+                    invalid_ids[id_field_name].append(local_id)
+        return curies, dict(invalid_ids)
 
 
     def determine_vocab(self, column_name: str, entity_type: str = None) -> List[str]:
@@ -130,7 +164,7 @@ class Normalizer:
 
     def _load_prefix_info(self, biolink_version: str) -> Dict[str, Dict[str, str]]:
         """Load Biolink model prefix map and add additional entries as needed"""
-        logging.info(f"Grabbing biolink prefix map for version: {biolink_version}")
+        logging.debug(f"Grabbing biolink prefix map for version: {biolink_version}")
         url = f"https://raw.githubusercontent.com/biolink/biolink-model/refs/tags/v{biolink_version}/project/prefixmap/biolink-model-prefix-map.json"
         prefix_to_iri_map = self._load_biolink_file(url, biolink_version)
 
@@ -255,7 +289,7 @@ class Normalizer:
         file_name = url.split('/')[-1]
         file_name_json = file_name.split('.')[0] + f"_{biolink_version}" + '.json'
         local_path = cache_dir / file_name_json
-        logging.info(f"Local file path is: {local_path}")
+        logging.debug(f"Local file path is: {local_path}")
 
         # Download the file if we don't already have it cached
         if not local_path.exists():
@@ -286,14 +320,20 @@ class Normalizer:
         return re.sub(r'[^a-z0-9.]', '', vocab.lower())
 
     @staticmethod
-    def convert_float_to_int_str(local_id: str) -> str:
-        if local_id.endswith('.0'):
-            return str(int(float(local_id)))
-        else:
-            return local_id
+    def clean_numeric_id(local_id: str | float | int) -> str:
+        """Convert numeric IDs to strings, removing trailing .0 for whole numbers."""
+        try:
+            float_val = float(local_id)
+            # If it's a whole number, return as int string (removes .0)
+            if float_val == int(float_val):
+                return str(int(float_val))
+        except (ValueError, TypeError):
+            pass
+        # Return as-is for non-numeric or decimal values
+        return str(local_id)
 
     def clean_snomed_id(self, local_id: str) -> str:
-        return self.convert_float_to_int_str(local_id)
+        return self.clean_numeric_id(local_id)
 
     @staticmethod
     def clean_zipcode(local_id: str) -> str:

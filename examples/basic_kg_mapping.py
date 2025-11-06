@@ -1,22 +1,27 @@
 import json
 
-from biomapper2.kg_mapper import map_to_kg
+from biomapper2.mapper import Mapper
 
 
-# Define an entity with a name and local identifier
-entity = {
+mapper = Mapper()
+
+# Define an entity with a name and local identifiers
+item = {
     'name': 'carnitine',
-    'kegg': 'C00487',
+    'kegg': ['C00487'],
     'pubchem': '10917'
 }
 
 # Print out the original entity
 print(f"\nOriginal entity:")
-print(json.dumps(entity, indent=2))
+print(json.dumps(item, indent=2))
 
 # Run through the full KG mapping pipeline
-mapped_entity = map_to_kg(entity)
+mapped_item = mapper.map_entity_to_kg(item=item,
+                                      name_field='name',
+                                      provided_id_fields=['kegg', 'pubchem'],
+                                      entity_type='metabolite')
 
 # Print the final mapped entity
 print(f"\nMapped entity:")
-print(json.dumps(mapped_entity, indent=2))
+print(json.dumps(mapped_item, indent=2))

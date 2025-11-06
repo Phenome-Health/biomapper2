@@ -2,3 +2,6 @@
 __pycache__/
 
 cache/
+
+# Ignore results files..
+*_MAPPED.tsv
