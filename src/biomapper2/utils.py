@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from .config import LOG_LEVEL
 
@@ -19,7 +20,7 @@ def setup_logging():
         )
 
 
-def safe_divide(numerator, denominator):
+def safe_divide(numerator, denominator) -> Optional[float]:
     """
     Performs division, returning None if the denominator is zero.
     This avoids division-by-zero warnings and ensures JSON-compatible output.
@@ -36,3 +37,10 @@ def safe_divide(numerator, denominator):
 
     result = numerator / denominator
     return result
+
+
+def calculate_f1_score(precision: Optional[float], recall: Optional[float]) -> Optional[float]:
+    if precision is None or recall is None:
+        return None
+    else:
+        return safe_divide(2 * (precision * recall), (precision + recall))

@@ -3,7 +3,7 @@ import copy
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, List, Union, Optional
+from typing import Dict, Any, List, Union, Optional, Tuple
 
 import pandas as pd
 import numpy as np
@@ -12,8 +12,7 @@ from .core.normalizer import Normalizer
 from .core.annotator import annotate
 from .core.linker import link, get_kg_ids, get_kg_id_fields
 from .core.resolver import resolve
-from .utils import setup_logging, safe_divide
-
+from .utils import setup_logging, safe_divide, calculate_f1_score
 
 setup_logging()
 
@@ -69,51 +68,57 @@ class Mapper:
                           entity_type: str,
                           name_column: str,
                           provided_id_columns: List[str],
-                          array_delimiters: Optional[List[str]] = None) -> str:
+                          array_delimiters: Optional[List[str]] = None) -> Tuple[str, Dict[str, Any]]:
         logging.info(f"Beginning to map dataset to KG ({dataset_tsv_path})")
         array_delimiters = array_delimiters if array_delimiters is not None else [',', ';']
 
         # TODO: Optionally allow people to input a Dataframe directly, as opposed to TSV path?
 
-        # Load tsv into pandas, skipping comment lines (Arivale uses '#' comments)
-        df = pd.read_csv(dataset_tsv_path, sep='\t', comment='#')
+        # Load tsv into pandas
+        df = pd.read_csv(dataset_tsv_path, sep='\t')
 
         # Do some basic cleanup to try to ensure empty cells are represented consistently
         df[provided_id_columns] = df[provided_id_columns].replace('-', np.nan)
         df[provided_id_columns] = df[provided_id_columns].replace('NO_MATCH', np.nan)
 
         # Do Step 1: annotate all rows with IDs
-        df['assigned_ids'] = df.apply(lambda row: annotate(item=row,
-                                                           name_field=name_column,
-                                                           provided_id_fields=provided_id_columns,
-                                                           entity_type=entity_type),
-                                      axis=1)
+        df['assigned_ids'] = df.apply(
+            lambda row: annotate(item=row,
+                                 name_field=name_column,
+                                 provided_id_fields=provided_id_columns,
+                                 entity_type=entity_type),
+            axis=1
+        )
         logging.info(f"After step 1 (annotation), df is: \n{df}")
 
         # Do Step 2: normalize IDs in all rows to form proper curies
-        df[['curies', 'curies_provided', 'curies_assigned', 'invalid_ids', 'invalid_ids_provided',
-            'invalid_ids_assigned']] = df.apply(lambda row: self.normalizer.normalize(item=row,
-                                                                                      provided_id_fields=provided_id_columns,
-                                                                                      array_delimiters=array_delimiters),
-                                                axis=1,
-                                                result_type='expand')
+        df[['curies', 'curies_provided', 'curies_assigned', 'invalid_ids', 'invalid_ids_provided', 'invalid_ids_assigned']] = df.apply(
+            lambda row: self.normalizer.normalize(item=row,
+                                                  provided_id_fields=provided_id_columns,
+                                                  array_delimiters=array_delimiters),
+            axis=1,
+            result_type='expand'
+        )
         logging.info(f"After step 2 (normalization), df is: \n{df}")
 
         # Do Step 3: link curies to KG nodes
         # First look up all curies in bulk (way more efficient than sending in separate requests)
         curie_to_kg_id_map = get_kg_ids(list(set(df.curies.explode().dropna())))
         # Then form our new columns using that curie-->kg id map
-        df[['kg_ids', 'kg_ids_provided',
-            'kg_ids_assigned']] = df.apply(lambda row: get_kg_id_fields(item=row,
-                                                                        curie_to_kg_id_map=curie_to_kg_id_map),
-                                                                        axis=1,
-                                                                        result_type='expand')
+        df[['kg_ids', 'kg_ids_provided', 'kg_ids_assigned']] = df.apply(
+            lambda row: get_kg_id_fields(item=row,
+                                         curie_to_kg_id_map=curie_to_kg_id_map),
+            axis=1,
+            result_type='expand'
+        )
         logging.info(f"After step 3 (linking), df is: \n{df}")
 
         # Do Step 4: resolve one-to-many KG matches
-        df[['chosen_kg_id', 'chosen_kg_id_provided', 'chosen_kg_id_assigned']] = df.apply(lambda row: resolve(item=row),
-                                                                                          axis=1,
-                                                                                          result_type='expand')
+        df[['chosen_kg_id', 'chosen_kg_id_provided', 'chosen_kg_id_assigned']] = df.apply(
+            lambda row: resolve(item=row),
+            axis=1,
+            result_type='expand'
+        )
         logging.info(f"After step 4 (resolution), df is: \n{df}")
 
         # Dump the final dataframe to a TSV
@@ -121,14 +126,13 @@ class Mapper:
         logging.info(f"Dumping output TSV to {output_tsv_path}")
         df.to_csv(output_tsv_path, sep='\t', index=False)
 
-        # TODO: Make this optional?
-        self.analyze_dataset_mapping(output_tsv_path)
+        stats_summary = self.analyze_dataset_mapping(output_tsv_path)
 
-        return output_tsv_path
+        return output_tsv_path, stats_summary
 
 
     @staticmethod
-    def analyze_dataset_mapping(results_tsv_path: str):
+    def analyze_dataset_mapping(results_tsv_path: str) -> Dict[str, Any]:
         logging.info(f"Analyzing dataset KG mapping in {results_tsv_path}")
 
         cols_to_literal_eval = [
@@ -138,6 +142,10 @@ class Mapper:
         ]
         converters = {col: ast.literal_eval for col in cols_to_literal_eval}
         df = pd.read_table(results_tsv_path, converters=converters)
+
+        # Make sure we load any groundtruth column properly
+        if 'kg_ids_groundtruth' in df.columns:
+            df.kg_ids_groundtruth = df.kg_ids_groundtruth.apply(ast.literal_eval)
 
         # Calculate some summary stats
         total_items = len(df)
@@ -177,19 +185,21 @@ class Mapper:
         assert has_only_provided_ids + has_only_assigned_ids + has_both_provided_and_assigned_ids == has_valid_ids
         assert assigned_mappings_correct_per_provided <= mapped_to_kg_provided
 
+        # Calculate performance stats for 'assigned' ids vs. provided
+        precision_per_provided = safe_divide(assigned_mappings_correct_per_provided, mapped_to_kg_provided_and_assigned)
+        recall_per_provided = safe_divide(assigned_mappings_correct_per_provided, mapped_to_kg_provided)
+        precision_per_provided_chosen = safe_divide(assigned_mappings_correct_per_provided_chosen, mapped_to_kg_provided_and_assigned)
+        recall_per_provided_chosen = safe_divide(assigned_mappings_correct_per_provided_chosen, mapped_to_kg_provided)
+
+        # Compile final stats summary
         stats = {
-            'dataset': results_tsv_path,
+            'mapped_dataset': results_tsv_path,
             'total_items': total_items,
             'mapped_to_kg': int(mapped_to_kg),
-            'coverage': safe_divide(mapped_to_kg, total_items),
 
             'mapped_to_kg_provided': int(mapped_to_kg_provided),
             'mapped_to_kg_assigned': int(mapped_to_kg_assigned),
             'mapped_to_kg_provided_and_assigned': int(mapped_to_kg_provided_and_assigned),
-
-            'coverage_assigned': safe_divide(mapped_to_kg_assigned, total_items),
-            'accuracy_assigned_per_provided': safe_divide(assigned_mappings_correct_per_provided, mapped_to_kg_provided_and_assigned),
-            'accuracy_assigned_per_provided_chosen': safe_divide(assigned_mappings_correct_per_provided_chosen, mapped_to_kg_provided_and_assigned),
 
             'one_to_one_mappings': int(one_to_one_mappings),
             'multi_mappings': int(multi_mappings),
@@ -210,8 +220,51 @@ class Mapper:
             'has_invalid_ids_provided': int(has_invalid_ids_provided),
             'has_invalid_ids_assigned': int(has_invalid_ids_assigned),
             'has_no_ids': int(has_no_ids),
-            'has_invalid_ids_and_not_mapped_to_kg': int(has_invalid_ids_and_not_mapped_to_kg)
+            'has_invalid_ids_and_not_mapped_to_kg': int(has_invalid_ids_and_not_mapped_to_kg),
         }
+
+        performance = {
+            'overall': {
+                'coverage': safe_divide(mapped_to_kg, total_items),
+            },
+            'assigned_ids': {
+                'coverage': safe_divide(mapped_to_kg_assigned, total_items),
+                'per_provided_ids': {
+                    'precision': precision_per_provided,
+                    'recall': recall_per_provided,
+                    'f1_score': calculate_f1_score(precision_per_provided, recall_per_provided),
+                    'after_resolving_one_to_manys': {
+                        'precision': precision_per_provided_chosen,
+                        'recall': recall_per_provided_chosen,
+                        'f1_score': calculate_f1_score(precision_per_provided_chosen, recall_per_provided_chosen)
+                    }
+                }
+            }
+        }
+
+        # Do evaluation vs. groundtruth, if available
+        if 'kg_ids_groundtruth' in df:
+            assert df.kg_ids_groundtruth.notnull().all()  # TODO: adjust later so we don't have to enforce this.. (just use rows w/ groundtruth mappings available)
+            canonical_map = get_kg_ids(list(set(df.kg_ids_groundtruth.explode().dropna())))
+            df['kg_ids_groundtruth_canonical'] = df.apply(lambda r: [canonical_map[kg_id] for kg_id in r.kg_ids_groundtruth],
+                                                          axis=1)
+
+            # TODO: can we require more than set intersection to count this as 'correct'? requiring equivalence might be complicated..
+            mappings_correct_per_groundtruth = df.apply(lambda r: len(set(r.kg_ids) & set(r.kg_ids_groundtruth_canonical)) > 0,
+                                                        axis=1).sum()
+            precision = safe_divide(mappings_correct_per_groundtruth, mapped_to_kg)
+            recall = safe_divide(mappings_correct_per_groundtruth, total_items)
+
+            # Tack these metrics onto our stats
+            stats['mappings_correct_per_groundtruth'] = int(mappings_correct_per_groundtruth)
+            performance['overall']['per_groundtruth'] = {
+                'precision': precision,
+                'recall': recall,
+                'f1_score': calculate_f1_score(precision, recall)
+            }
+
+        # Tack the performance metrics onto our other stats
+        stats['performance'] = performance
 
         # Save the result stats
         logging.info(f"Dataset summary stats are: {json.dumps(stats, indent=2)}")
@@ -242,3 +295,6 @@ class Mapper:
         # Record the many-to-one items, for easy reference
         many_to_one_items = df[df.chosen_kg_id.notna() & df.chosen_kg_id.duplicated(keep=False)]
         many_to_one_items.to_csv(f"{results_filepath_root}_g_many_to_one.tsv", sep='\t')
+
+        return stats
+
