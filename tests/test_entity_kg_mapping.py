@@ -2,7 +2,7 @@
 from biomapper2.mapper import Mapper
 
 
-def test_map_to_kg_basic(shared_mapper: Mapper):
+def test_map_entity_basic(shared_mapper: Mapper):
     """Test basic entity mapping to KG."""
     entity = {
         'name': 'creatinine',
@@ -24,7 +24,7 @@ def test_map_to_kg_basic(shared_mapper: Mapper):
     assert 'kg_ids' in mapped_entity
 
 
-def test_map_to_kg_preserves_input(shared_mapper: Mapper):
+def test_map_entity_preserves_input(shared_mapper: Mapper):
     """Test that input entity is not modified."""
     entity = {'name': 'glucose', 'kegg': 'C00031'}
     original = entity.copy()
@@ -38,7 +38,7 @@ def test_map_to_kg_preserves_input(shared_mapper: Mapper):
     assert mapped_entity != entity  # Different object
 
 
-def test_map_to_kg_name_only(shared_mapper: Mapper):
+def test_map_entity_name_only(shared_mapper: Mapper):
     """Test handling of minimal entity."""
     entity = {'chemical_name': 'carnitine'}
 
@@ -52,7 +52,7 @@ def test_map_to_kg_name_only(shared_mapper: Mapper):
     # TODO: once have lexical mappings handled, check that mapping is there
 
 
-def test_map_to_kg_multiple_identifiers(shared_mapper: Mapper):
+def test_map_entity_multiple_identifiers(shared_mapper: Mapper):
     """Test entity with multiple identifier types."""
     entity = {
         'name': 'aspirin',

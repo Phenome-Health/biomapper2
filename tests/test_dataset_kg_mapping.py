@@ -7,7 +7,7 @@ from biomapper2.mapper import Mapper
 PROJECT_ROOT_PATH = Path(__file__).parents[1]
 
 
-def test_map_to_kg_metabolon_groundtruth(shared_mapper: Mapper):
+def test_map_dataset_metabolon_groundtruth(shared_mapper: Mapper):
 
     # Map the dataset
     results_tsv_path = shared_mapper.map_dataset_to_kg(
