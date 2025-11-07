@@ -185,12 +185,6 @@ class Mapper:
         assert has_only_provided_ids + has_only_assigned_ids + has_both_provided_and_assigned_ids == has_valid_ids
         assert assigned_mappings_correct_per_provided <= mapped_to_kg_provided
 
-        # Calculate performance stats for 'assigned' ids vs. provided
-        precision_per_provided = safe_divide(assigned_mappings_correct_per_provided, mapped_to_kg_provided_and_assigned)
-        recall_per_provided = safe_divide(assigned_mappings_correct_per_provided, mapped_to_kg_provided)
-        precision_per_provided_chosen = safe_divide(assigned_mappings_correct_per_provided_chosen, mapped_to_kg_provided_and_assigned)
-        recall_per_provided_chosen = safe_divide(assigned_mappings_correct_per_provided_chosen, mapped_to_kg_provided)
-
         # Compile final stats summary
         stats = {
             'mapped_dataset': results_tsv_path,
@@ -223,19 +217,31 @@ class Mapper:
             'has_invalid_ids_and_not_mapped_to_kg': int(has_invalid_ids_and_not_mapped_to_kg),
         }
 
+        # Calculate performance stats for 'assigned' ids vs. provided
+        precision_per_provided = safe_divide(assigned_mappings_correct_per_provided, mapped_to_kg_provided_and_assigned)
+        recall_per_provided = safe_divide(assigned_mappings_correct_per_provided, mapped_to_kg_provided)
+        precision_per_provided_chosen = safe_divide(assigned_mappings_correct_per_provided_chosen, mapped_to_kg_provided_and_assigned)
+        recall_per_provided_chosen = safe_divide(assigned_mappings_correct_per_provided_chosen, mapped_to_kg_provided)
+
+        # Compile performance stats
         performance = {
             'overall': {
                 'coverage': safe_divide(mapped_to_kg, total_items),
+                'coverage_explanation': f"{mapped_to_kg} / {total_items}"
             },
             'assigned_ids': {
                 'coverage': safe_divide(mapped_to_kg_assigned, total_items),
                 'per_provided_ids': {
                     'precision': precision_per_provided,
+                    'precision_explanation': f"{assigned_mappings_correct_per_provided} / {mapped_to_kg_provided_and_assigned}",
                     'recall': recall_per_provided,
+                    'recall_explanation': f"{assigned_mappings_correct_per_provided} / {mapped_to_kg_provided}",
                     'f1_score': calculate_f1_score(precision_per_provided, recall_per_provided),
                     'after_resolving_one_to_manys': {
                         'precision': precision_per_provided_chosen,
+                        'precision_explanation': f"{assigned_mappings_correct_per_provided_chosen} / {mapped_to_kg_provided_and_assigned}",
                         'recall': recall_per_provided_chosen,
+                        'recall_explanation': f"{assigned_mappings_correct_per_provided_chosen} / {mapped_to_kg_provided}",
                         'f1_score': calculate_f1_score(precision_per_provided_chosen, recall_per_provided_chosen)
                     }
                 }
@@ -259,14 +265,16 @@ class Mapper:
             stats['mappings_correct_per_groundtruth'] = int(mappings_correct_per_groundtruth)
             performance['overall']['per_groundtruth'] = {
                 'precision': precision,
+                'precision_explanation': f"{mappings_correct_per_groundtruth} / {mapped_to_kg}",
                 'recall': recall,
+                'recall_explanation': f"{mappings_correct_per_groundtruth} / {total_items}",
                 'f1_score': calculate_f1_score(precision, recall)
             }
 
         # Tack the performance metrics onto our other stats
         stats['performance'] = performance
 
-        # Save the result stats
+        # Save all result stats
         logging.info(f"Dataset summary stats are: {json.dumps(stats, indent=2)}")
         results_filepath_root = results_tsv_path.replace('.tsv', '')
         with open(f"{results_filepath_root}_a_summary_stats.json", 'w+') as stats_file:

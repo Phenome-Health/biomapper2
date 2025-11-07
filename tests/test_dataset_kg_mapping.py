@@ -7,7 +7,7 @@ from biomapper2.mapper import Mapper
 PROJECT_ROOT_PATH = Path(__file__).parents[1]
 
 
-def test_map_dataset_metabolon_groundtruth(shared_mapper: Mapper):
+def test_map_dataset_metabolon_groundtruth_with_provided_ids(shared_mapper: Mapper):
 
     # Map the dataset
     results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
@@ -25,3 +25,16 @@ def test_map_dataset_metabolon_groundtruth(shared_mapper: Mapper):
     assert stats['performance']['overall']['per_groundtruth']['recall'] == 1.0
     assert stats['performance']['overall']['per_groundtruth']['f1_score'] == 1.0
 
+
+def test_map_dataset_olink_proteins(shared_mapper: Mapper):
+
+    # Map the dataset
+    results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
+        dataset_tsv_path=str(PROJECT_ROOT_PATH / 'data' / 'examples' / 'olink_protein_metadata.tsv'),
+        entity_type='protein',
+        name_column='Assay',
+        provided_id_columns=['UniProt'],
+        array_delimiters=['_'])
+
+    # Based on provided ids alone, we get 2922 / 2923 proteins in this dataset
+    assert stats['performance']['overall']['coverage'] > 0.999
