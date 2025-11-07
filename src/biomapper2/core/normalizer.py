@@ -307,6 +307,7 @@ class Normalizer:
             'doid': {validator: self.is_doid_id},
             'drugbank': {validator: self.is_drugbank_id},
             'ec': {validator: self.is_ec_id, aliases: ['explorenz']},
+            'efo': {validator: self.is_efo_id},
             'ensembl': {validator: self.is_ensembl_gene_id},
             'envo': {validator: self.is_envo_id},
             'fips.place': {validator: self.is_fips_compound_id},
@@ -330,6 +331,7 @@ class Normalizer:
             'metacyc.reaction': {validator: self.is_metacyc_reaction_id},
             'mirbase': {validator: self.is_mirbase_id},
             'mirdb': {validator: self.is_mirdb_id},
+            'mondo': {validator: self.is_mondo_id},
             'ncbigene': {validator: self.is_ncbigene_id, aliases: ['entrez', 'entrezgene']},
             'ncbitaxon': {validator: self.is_ncbitaxon_id, aliases: ['ncbitaxonomy']},
             'ndfrt': {validator: self.is_ndfrt_id},
@@ -517,6 +519,11 @@ class Normalizer:
         return bool(re.match(r'^[a-z]{3}-(miR-)?[-a-z0-9]+$', local_id))
 
     @staticmethod
+    def is_mondo_id(local_id: str) -> bool:
+        # MONDO local IDs (e.g., 0005070 from MONDO:0005070) are 7 digits
+        return bool(re.match(r'^[0-9]{7}$', local_id))
+
+    @staticmethod
     def is_uberon_id(local_id: str) -> bool:
         # Allows: digits only (e.g., 0003233 from UBERON:0003233)
         return bool(re.match(r'^[0-9]+$', local_id))
@@ -543,6 +550,11 @@ class Normalizer:
                 return False
 
         return True
+
+    @staticmethod
+    def is_efo_id(local_id: str) -> bool:
+        # EFO local IDs (e.g., 0000400 from EFO:0000400) are 7 digits
+        return bool(re.match(r'^[0-9]{7}$', local_id))
 
     @staticmethod
     def is_ensembl_gene_id(local_id: str) -> bool:

@@ -38,3 +38,17 @@ def test_map_dataset_olink_proteins(shared_mapper: Mapper):
 
     # Based on provided ids alone, we get 2922 / 2923 proteins in this dataset
     assert stats['performance']['overall']['coverage'] > 0.999
+
+
+def test_map_dataset_diseases_groundtruth(shared_mapper: Mapper):
+
+    # Map the dataset
+    results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
+        dataset_tsv_path=str(PROJECT_ROOT_PATH / 'data' / 'groundtruth' / 'diseases_handcrafted.tsv'),
+        entity_type='disease',
+        name_column='name',
+        provided_id_columns=[],
+        array_delimiters=[])
+
+    assert stats['performance']['overall']['coverage'] > 0.8
+    # TODO: assert some level of precision/recall/f1-score?
