@@ -1,19 +1,5 @@
-"""Tests for kg_mapper module."""
-import pytest
-
+"""Tests for mapping individual entities to the KG."""
 from biomapper2.mapper import Mapper
-
-
-@pytest.fixture(scope="module")
-def shared_mapper() -> Mapper:
-    """
-    This fixture creates a single Mapper instance that all tests
-    in this module will share.
-    """
-    # This print statement will show you it only runs once per module
-    print("\n--- Creating Mapper instance ---")
-    mapper = Mapper()
-    yield mapper
 
 
 def test_map_to_kg_basic(shared_mapper: Mapper):

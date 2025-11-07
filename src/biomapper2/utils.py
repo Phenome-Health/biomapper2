@@ -17,3 +17,22 @@ def setup_logging():
             level=getattr(logging, level),
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
+
+
+def safe_divide(numerator, denominator):
+    """
+    Performs division, returning None if the denominator is zero.
+    This avoids division-by-zero warnings and ensures JSON-compatible output.
+    """
+    # Cast to float to handle potential numpy types
+    numerator = float(numerator)
+    denominator = float(denominator)
+
+    if denominator == 0.0:
+        # Return None, which will be serialized as 'null' in JSON.
+        # This is more accurate for metrics like 'accuracy'
+        # where a 0 denominator means 'not applicable'.
+        return None
+
+    result = numerator / denominator
+    return result

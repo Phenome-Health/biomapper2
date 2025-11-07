@@ -1,4 +1,6 @@
+import ast
 import copy
+import json
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Union, Optional
@@ -10,7 +12,7 @@ from .core.normalizer import Normalizer
 from .core.annotator import annotate
 from .core.linker import link, get_kg_ids, get_kg_id_fields
 from .core.resolver import resolve
-from .utils import setup_logging
+from .utils import setup_logging, safe_divide
 
 
 setup_logging()
@@ -38,7 +40,7 @@ class Mapper:
         mapped_item['assigned_ids'] = assigned_ids
 
         # Do Step 2: normalization of IDs (curie formation)
-        normalizer_result_tuple = self.normalizer.normalize(mapped_item, provided_id_fields, stop_on_invalid_id)
+        normalizer_result_tuple = self.normalizer.normalize(mapped_item, provided_id_fields, array_delimiters, stop_on_invalid_id)
         curies, curies_provided, curies_assigned, invalid_ids, invalid_ids_provided, invalid_ids_assigned = normalizer_result_tuple
         mapped_item['curies'] = curies
         mapped_item['curies_provided'] = curies_provided
@@ -67,7 +69,7 @@ class Mapper:
                           entity_type: str,
                           name_column: str,
                           provided_id_columns: List[str],
-                          array_delimiters: Optional[List[str]] = None) -> pd.DataFrame:
+                          array_delimiters: Optional[List[str]] = None) -> str:
         logging.info(f"Beginning to map dataset to KG ({dataset_tsv_path})")
         array_delimiters = array_delimiters if array_delimiters is not None else [',', ';']
 
@@ -118,3 +120,125 @@ class Mapper:
         output_tsv_path = dataset_tsv_path.replace('.tsv', '_MAPPED.tsv')  # TODO: let this be configurable?
         logging.info(f"Dumping output TSV to {output_tsv_path}")
         df.to_csv(output_tsv_path, sep='\t', index=False)
+
+        # TODO: Make this optional?
+        self.analyze_dataset_mapping(output_tsv_path)
+
+        return output_tsv_path
+
+
+    @staticmethod
+    def analyze_dataset_mapping(results_tsv_path: str):
+        logging.info(f"Analyzing dataset KG mapping in {results_tsv_path}")
+
+        cols_to_literal_eval = [
+            'curies', 'curies_provided', 'curies_assigned',
+            'invalid_ids', 'invalid_ids_provided', 'invalid_ids_assigned',
+            'kg_ids', 'kg_ids_provided', 'kg_ids_assigned'
+        ]
+        converters = {col: ast.literal_eval for col in cols_to_literal_eval}
+        df = pd.read_table(results_tsv_path, converters=converters)
+
+        # Calculate some summary stats
+        total_items = len(df)
+        has_valid_ids = df.curies.apply(lambda x: len(x) > 0).sum()
+        has_valid_ids_provided = df.curies_provided.apply(lambda x: len(x) > 0).sum()
+        has_valid_ids_assigned = df.curies_assigned.apply(lambda x: len(x) > 0).sum()
+        has_only_provided_ids = has_valid_ids - has_valid_ids_assigned
+        has_only_assigned_ids = has_valid_ids - has_valid_ids_provided
+        has_both_provided_and_assigned_ids = has_valid_ids - has_only_provided_ids - has_only_assigned_ids
+        has_no_ids = ((df.curies.apply(len) == 0) & (df.invalid_ids.apply(len) == 0)).sum()
+        has_invalid_ids = df.invalid_ids.apply(lambda x: len(x) > 0).sum()
+        has_invalid_ids_provided = df.invalid_ids_provided.apply(lambda x: len(x) > 0).sum()
+        has_invalid_ids_assigned = df.invalid_ids_assigned.apply(lambda x: len(x) > 0).sum()
+        mapped_to_kg = df.kg_ids.apply(lambda x: len(x) > 0).sum()
+        mapped_to_kg_provided = df.kg_ids_provided.apply(lambda x: len(x) > 0).sum()
+        mapped_to_kg_assigned = df.kg_ids_assigned.apply(lambda x: len(x) > 0).sum()
+        mapped_to_kg_provided_and_assigned = df.apply(
+            lambda r: (len(r.kg_ids_provided) > 0) & (len(r.kg_ids_assigned) > 0),
+            axis=1).sum()
+        assigned_mappings_correct_per_provided = df.apply(
+            lambda r: len(set(r.kg_ids_provided) & set(r.kg_ids_assigned)) > 0,
+            axis=1).sum()
+        assigned_mappings_correct_per_provided_chosen = ((df.chosen_kg_id_provided == df.chosen_kg_id_assigned) & df.chosen_kg_id_provided.notna() & df.chosen_kg_id_assigned.notna()).sum()
+        has_invalid_ids_and_not_mapped_to_kg = ((df.invalid_ids.apply(len) > 0) & (df.kg_ids.apply(len) == 0)).sum()
+        one_to_many_mask = df.kg_ids.apply(lambda x: len(x) > 1)
+        many_to_one_mask = df.chosen_kg_id.notna() & df.chosen_kg_id.duplicated(keep=False)
+        one_to_many_mappings = one_to_many_mask.sum()
+        many_to_one_mappings = many_to_one_mask.sum()
+        multi_mappings = (one_to_many_mask | many_to_one_mask).sum()
+        one_to_one_mappings = mapped_to_kg - multi_mappings
+
+        # Do some sanity checks
+        assert multi_mappings <= mapped_to_kg
+        assert one_to_many_mappings <= multi_mappings
+        assert many_to_one_mappings <= multi_mappings
+        assert multi_mappings + one_to_one_mappings == mapped_to_kg
+        assert has_only_provided_ids + has_only_assigned_ids + has_both_provided_and_assigned_ids == has_valid_ids
+        assert assigned_mappings_correct_per_provided <= mapped_to_kg_provided
+
+        stats = {
+            'dataset': results_tsv_path,
+            'total_items': total_items,
+            'mapped_to_kg': int(mapped_to_kg),
+            'coverage': safe_divide(mapped_to_kg, total_items),
+
+            'mapped_to_kg_provided': int(mapped_to_kg_provided),
+            'mapped_to_kg_assigned': int(mapped_to_kg_assigned),
+            'mapped_to_kg_provided_and_assigned': int(mapped_to_kg_provided_and_assigned),
+
+            'coverage_assigned': safe_divide(mapped_to_kg_assigned, total_items),
+            'accuracy_assigned_per_provided': safe_divide(assigned_mappings_correct_per_provided, mapped_to_kg_provided_and_assigned),
+            'accuracy_assigned_per_provided_chosen': safe_divide(assigned_mappings_correct_per_provided_chosen, mapped_to_kg_provided_and_assigned),
+
+            'one_to_one_mappings': int(one_to_one_mappings),
+            'multi_mappings': int(multi_mappings),
+            'one_to_many_mappings': int(one_to_many_mappings),
+            'many_to_one_mappings': int(many_to_one_mappings),
+
+            'has_valid_ids': int(has_valid_ids),
+            'has_valid_ids_provided': int(has_valid_ids_provided),
+            'has_valid_ids_assigned': int(has_valid_ids_assigned),
+            'has_only_provided_ids': int(has_only_provided_ids),
+            'has_only_assigned_ids': int(has_only_assigned_ids),
+            'has_both_provided_and_assigned_ids': int(has_both_provided_and_assigned_ids),
+
+            'assigned_mappings_correct_per_provided': int(assigned_mappings_correct_per_provided),
+            'assigned_mappings_correct_per_provided_chosen': int(assigned_mappings_correct_per_provided_chosen),
+
+            'has_invalid_ids': int(has_invalid_ids),
+            'has_invalid_ids_provided': int(has_invalid_ids_provided),
+            'has_invalid_ids_assigned': int(has_invalid_ids_assigned),
+            'has_no_ids': int(has_no_ids),
+            'has_invalid_ids_and_not_mapped_to_kg': int(has_invalid_ids_and_not_mapped_to_kg)
+        }
+
+        # Save the result stats
+        logging.info(f"Dataset summary stats are: {json.dumps(stats, indent=2)}")
+        results_filepath_root = results_tsv_path.replace('.tsv', '')
+        with open(f"{results_filepath_root}_a_summary_stats.json", 'w+') as stats_file:
+            json.dump(stats, stats_file, indent=2)
+
+        # Record the items that had valid curies but that weren't in the KG, for easy reference
+        kg_misses = df[(df.curies.apply(len) > 0) & (df.kg_ids.apply(len) == 0)]
+        kg_misses.to_csv(f"{results_filepath_root}_b_curie_misses.tsv", sep='\t')
+
+        # Record the items that didn't get mapped to the KG, for easy reference
+        unmapped = df[df.kg_ids.apply(len) == 0]
+        unmapped.to_csv(f"{results_filepath_root}_c_unmapped.tsv", sep='\t')
+
+        # Record the items that DID map to the KG, for easy reference
+        mapped = df[df.kg_ids.apply(len) > 0]
+        mapped.to_csv(f"{results_filepath_root}_d_mapped.tsv", sep='\t')
+
+        # Record the items with invalid IDs, for easy reference
+        invalid_ids = df[df.invalid_ids.apply(lambda x: len(x) > 0)]
+        invalid_ids.to_csv(f"{results_filepath_root}_e_invalid_ids.tsv", sep='\t')
+
+        # Record the one-to-many items, for easy reference
+        one_to_many_items = df[df.kg_ids.apply(lambda x: len(x) > 1)]
+        one_to_many_items.to_csv(f"{results_filepath_root}_f_one_to_many.tsv", sep='\t')
+
+        # Record the many-to-one items, for easy reference
+        many_to_one_items = df[df.chosen_kg_id.notna() & df.chosen_kg_id.duplicated(keep=False)]
+        many_to_one_items.to_csv(f"{results_filepath_root}_g_many_to_one.tsv", sep='\t')
