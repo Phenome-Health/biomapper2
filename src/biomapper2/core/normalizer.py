@@ -9,7 +9,7 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Any, Callable, Optional, Tuple, Union, List, Set
+from typing import Dict, Any, Callable, Optional, Tuple, List, Set
 
 import requests
 import yaml
@@ -69,13 +69,11 @@ class Normalizer:
         curies_assigned, invalid_ids_assigned = self.get_curies(assigned_ids, stop_on_invalid_id)
 
         # Form final result
-        curies = list(curies_provided | curies_assigned)
-        curies_provided = list(curies_provided)
-        curies_assigned = list(curies_assigned)
+        curies = curies_provided | curies_assigned
         invalid_ids = {id_field: invalid_ids_provided.get(id_field, []) + invalid_ids_assigned.get(id_field, [])
                        for id_field in set(invalid_ids_provided) | set(invalid_ids_assigned)}
 
-        return curies, curies_provided, curies_assigned, invalid_ids, invalid_ids_provided, invalid_ids_assigned
+        return list(curies), list(curies_provided), list(curies_assigned), invalid_ids, invalid_ids_provided, invalid_ids_assigned
 
 
     def get_curies(self, local_ids_dict: Dict[str, Any], stop_on_invalid_id: bool = False) -> Tuple[Set[str], Dict[str, Any]]:
@@ -107,7 +105,7 @@ class Normalizer:
         return curies, dict(invalid_ids)
 
 
-    def determine_vocab(self, column_name: str, entity_type: str = None) -> List[str]:
+    def determine_vocab(self, column_name: str, entity_type: Optional[str] = None) -> List[str]:
         """
         Determine which vocabulary/prefix corresponds to a column name.
 
@@ -178,7 +176,7 @@ class Normalizer:
         return validator(local_id), local_id
 
 
-    def construct_curie(self, local_id: str, vocab_name_cleaned: Union[str, List[str]], stop_on_failure: bool = False) -> Tuple[str, str]:
+    def construct_curie(self, local_id: str, vocab_name_cleaned: str | List[str], stop_on_failure: bool = False) -> Tuple[str, str]:
         """
         Construct standardized curie from local ID and vocabulary.
 
@@ -280,7 +278,7 @@ class Normalizer:
         return vocab_info_map
 
 
-    def _load_validator_map(self) -> Dict[str, Dict[str, Union[Callable, List[str]]]]:
+    def _load_validator_map(self) -> Dict[str, Dict[str, Callable | List[str]]]:
         """
         Load vocabulary validator/cleaner function mappings.
 

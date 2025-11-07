@@ -9,7 +9,7 @@ import copy
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, List, Union, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 
 import pandas as pd
 import numpy as np
@@ -44,7 +44,7 @@ class Mapper:
                          provided_id_fields: List[str],
                          entity_type: str,
                          array_delimiters: Optional[List[str]] = None,
-                         stop_on_invalid_id: bool = False) -> Dict[str, Any]:
+                         stop_on_invalid_id: bool = False) -> pd.Series | Dict[str, Any]:
         """
         Map a single entity to knowledge graph nodes.
 
@@ -275,7 +275,7 @@ class Mapper:
         recall_per_provided_chosen = safe_divide(assigned_mappings_correct_per_provided_chosen, mapped_to_kg_provided)
 
         # Compile performance stats
-        performance = {
+        performance: Dict[str, Any] = {
             'overall': {
                 'coverage': safe_divide(mapped_to_kg, total_items),
                 'coverage_explanation': f"{mapped_to_kg} / {total_items}"
