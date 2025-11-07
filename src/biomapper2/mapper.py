@@ -1,3 +1,9 @@
+"""
+Main mapper module for entity and dataset knowledge graph mapping.
+
+Provides the Mapper class for harmonizing biological entities to knowledge graphs
+through annotation, normalization, linking, and resolution steps.
+"""
 import ast
 import copy
 import json
@@ -18,6 +24,15 @@ setup_logging()
 
 
 class Mapper:
+    """
+    Maps biological entities and datasets to knowledge graph nodes.
+
+    Performs four-step mapping pipeline:
+    1. Annotation - assign additional IDs via external APIs
+    2. Normalization - convert local IDs to Biolink-standard curies
+    3. Linking - map curies to knowledge graph nodes
+    4. Resolution - resolve one-to-many mappings
+    """
 
     def __init__(self):
         self.normalizer = Normalizer()  # Instantiate the ID normalizer (should only be done once, up front)
@@ -30,6 +45,20 @@ class Mapper:
                          entity_type: str,
                          array_delimiters: Optional[List[str]] = None,
                          stop_on_invalid_id: bool = False) -> Dict[str, Any]:
+        """
+        Map a single entity to knowledge graph nodes.
+
+        Args:
+            item: Entity with name and ID fields
+            name_field: Field containing entity name
+            provided_id_fields: List of fields containing local identifiers
+            entity_type: Type of entity (e.g., 'metabolite', 'protein')
+            array_delimiters: Characters used to split delimited ID strings (default: [',', ';'])
+            stop_on_invalid_id: Halt execution on invalid IDs (default: False)
+
+        Returns:
+            Mapped entity with added fields: curies, kg_ids, chosen_kg_id, etc.
+        """
         logging.debug(f"Item at beginning of map_entity_to_kg() is {item}")
         array_delimiters = array_delimiters if array_delimiters is not None else [',', ';']
         mapped_item = copy.deepcopy(item)  # Use a copy to avoid editing input item
@@ -69,6 +98,19 @@ class Mapper:
                           name_column: str,
                           provided_id_columns: List[str],
                           array_delimiters: Optional[List[str]] = None) -> Tuple[str, Dict[str, Any]]:
+        """
+        Map all entities in a dataset to knowledge graph nodes.
+
+        Args:
+            dataset_tsv_path: Path to TSV file containing dataset
+            entity_type: Type of entities (e.g., 'metabolite', 'protein')
+            name_column: Column containing entity names
+            provided_id_columns: Columns containing local identifiers
+            array_delimiters: Characters used to split delimited ID strings (default: [',', ';'])
+
+        Returns:
+            Tuple of (output_tsv_path, stats_summary)
+        """
         logging.info(f"Beginning to map dataset to KG ({dataset_tsv_path})")
         array_delimiters = array_delimiters if array_delimiters is not None else [',', ';']
 
@@ -133,6 +175,15 @@ class Mapper:
 
     @staticmethod
     def analyze_dataset_mapping(results_tsv_path: str) -> Dict[str, Any]:
+        """
+        Analyze dataset mapping results and generate summary statistics.
+
+        Args:
+            results_tsv_path: Path to mapped dataset TSV
+
+        Returns:
+            Dictionary containing coverage, precision, recall, and F1 metrics
+        """
         logging.info(f"Analyzing dataset KG mapping in {results_tsv_path}")
 
         cols_to_literal_eval = [

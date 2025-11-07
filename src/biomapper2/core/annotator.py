@@ -1,3 +1,8 @@
+"""
+Entity annotation module for assigning ontology local IDs.
+
+Queries external APIs or uses other creative approaches to retrieve additional identifiers for biological entities.
+"""
 import logging
 from typing import Dict, Any, List, Set
 
@@ -8,6 +13,18 @@ def annotate(item: pd.Series | Dict[str, Any],
              name_field: str,
              provided_id_fields: List[str],
              entity_type: str) -> Dict[str, str]:
+    """
+    Annotate entity with additional local IDs, obtained using various internal or external methods.
+
+    Args:
+        item: Entity to annotate
+        name_field: Field containing entity name
+        provided_id_fields: Fields containing existing IDs
+        entity_type: Type of entity (e.g., 'metabolite', 'protein')
+
+    Returns:
+        Dictionary of assigned identifiers by source
+    """
     logging.debug(f"Beginning annotation step..")
     entity_type_cleaned = ''.join(c for c in entity_type.lower() if c.isalpha())
 

@@ -1,4 +1,8 @@
-"""Configuration for biomapper2"""
+"""
+Configuration settings for biomapper2.
+
+Customize these values to change API endpoints, model versions, and logging behavior.
+"""
 
 # KG API configuration
 # Set to https://kestrel.nathanpricelab.com/api to use 'production' KESTREL hosting KRAKEN

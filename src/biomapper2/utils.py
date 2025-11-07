@@ -1,3 +1,8 @@
+"""
+Utility functions for biomapper2.
+
+Provides logging setup and mathematical helpers for metric calculations.
+"""
 import logging
 from typing import Optional
 
@@ -5,7 +10,7 @@ from .config import LOG_LEVEL
 
 
 def setup_logging():
-    """Setup logging with the level specified in config.py"""
+    """Configure logging based on LOG_LEVEL in config.py."""
     if not logging.getLogger().hasHandlers():  # Skip setup if it's already been done
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         level = LOG_LEVEL.upper()
@@ -22,8 +27,14 @@ def setup_logging():
 
 def safe_divide(numerator, denominator) -> Optional[float]:
     """
-    Performs division, returning None if the denominator is zero.
-    This avoids division-by-zero warnings and ensures JSON-compatible output.
+    Divide two numbers, returning None if denominator is zero.
+
+    Args:
+        numerator: Numerator value
+        denominator: Denominator value
+
+    Returns:
+        Result of division, or None if denominator is zero
     """
     # Cast to float to handle potential numpy types
     numerator = float(numerator)
@@ -40,6 +51,16 @@ def safe_divide(numerator, denominator) -> Optional[float]:
 
 
 def calculate_f1_score(precision: Optional[float], recall: Optional[float]) -> Optional[float]:
+    """
+    Calculate F1 score from precision and recall.
+
+    Args:
+        precision: Precision value
+        recall: Recall value
+
+    Returns:
+        F1 score, or None if either input is None
+    """
     if precision is None or recall is None:
         return None
     else:

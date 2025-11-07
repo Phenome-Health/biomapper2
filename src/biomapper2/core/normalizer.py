@@ -1,3 +1,8 @@
+"""
+ID normalization module for converting local IDs to Biolink-standard curies.
+
+Validates local identifiers and constructs standardized curies using Biolink model prefixes.
+"""
 import json
 import logging
 import re
@@ -18,6 +23,12 @@ from ..config import BIOLINK_VERSION
 
 
 class Normalizer:
+    """
+    Normalizes local identifiers to Biolink-standard curies.
+
+    Validates IDs against regex patterns and constructs properly formatted curies
+    using Biolink model prefix mappings.
+    """
     def __init__(self):
         self.validator_prop = 'validator'
         self.cleaner_prop = 'cleaner'
@@ -31,6 +42,18 @@ class Normalizer:
                   provided_id_fields: List[str],
                   array_delimiters: List[str],
                   stop_on_invalid_id: bool = False) -> Tuple[List[str], List[str], List[str], Dict[str, list], Dict[str, list], Dict[str, list]]:
+        """
+        Normalize local IDs to Biolink-standard curies.
+
+        Args:
+            item: Entity containing local IDs
+            provided_id_fields: Fields with user-provided IDs
+            array_delimiters: Characters for splitting delimited ID strings
+            stop_on_invalid_id: Halt on invalid IDs (default: False)
+
+        Returns:
+            Tuple of (curies, curies_provided, curies_assigned, invalid_ids, invalid_ids_provided, invalid_ids_assigned)
+        """
         logging.debug(f"Beginning ID normalization step..")
         # Load/clean the provided and assigned local IDs for this item
         if array_delimiters:
@@ -56,6 +79,16 @@ class Normalizer:
 
 
     def get_curies(self, local_ids_dict: Dict[str, Any], stop_on_invalid_id: bool = False) -> Tuple[Set[str], Dict[str, Any]]:
+        """
+        Convert local IDs to curies for all fields in dictionary.
+
+        Args:
+            local_ids_dict: Dictionary mapping field names to local IDs
+            stop_on_invalid_id: Halt on invalid IDs (default: False)
+
+        Returns:
+            Tuple of (valid_curies_set, invalid_ids_dict)
+        """
         curies = set()
         invalid_ids = defaultdict(list)
         for id_field_name, local_ids_entry in local_ids_dict.items():
@@ -76,7 +109,16 @@ class Normalizer:
 
     def determine_vocab(self, column_name: str, entity_type: str = None) -> List[str]:
         """
-        TODO: needs improvement! this is a bare-bones heuristic-based/hardcoded approach..
+        Determine which vocabulary/prefix corresponds to a column name.
+
+        Uses heuristic matching against known vocab names and aliases.
+
+        Args:
+            column_name: Name of ID column
+            entity_type: Optional entity type hint
+
+        Returns:
+            List of matching vocabulary names
         """
         logging.debug(f"Determining which vocab corresponds to column '{column_name}'")
         col_name_underscored = re.sub(r'[-\s]+', '_', column_name).lower()  # Replace spaces, hyphens with underscores
@@ -115,7 +157,14 @@ class Normalizer:
 
     def is_valid_id(self, local_id: str, vocab_name_cleaned: str) -> Tuple[bool, str]:
         """
-        True means the local ID is valid for the specified vocab, False means it's not. Returns cleaned local ID as well.
+        Validate local ID for specified vocabulary.
+
+        Args:
+            local_id: Local identifier to validate
+            vocab_name_cleaned: Lowercase vocabulary name
+
+        Returns:
+            Tuple of (is_valid, cleaned_local_id)
         """
         # Grab the proper validation and cleaning functions
         validator = self.vocab_validator_map[vocab_name_cleaned][self.validator_prop]
@@ -130,6 +179,17 @@ class Normalizer:
 
 
     def construct_curie(self, local_id: str, vocab_name_cleaned: Union[str, List[str]], stop_on_failure: bool = False) -> Tuple[str, str]:
+        """
+        Construct standardized curie from local ID and vocabulary.
+
+        Args:
+            local_id: Local identifier
+            vocab_name_cleaned: Vocabulary name(s) to try
+            stop_on_failure: Halt on validation failure (default: False)
+
+        Returns:
+            Tuple of (curie, iri) - empty strings if validation fails
+        """
         # First, if this is a proper curie - remove its prefix
         local_id = local_id.split(':')[1] if ':' in local_id and not local_id.startswith('http') else local_id
         # Construct a standardized curie for the given local ID and vocabulary (or list of vocabularies; first valid kept)
@@ -163,7 +223,15 @@ class Normalizer:
 
 
     def _load_prefix_info(self, biolink_version: str) -> Dict[str, Dict[str, str]]:
-        """Load Biolink model prefix map and add additional entries as needed"""
+        """
+        Load Biolink model prefix map and add custom entries.
+
+        Args:
+            biolink_version: Biolink model version string
+
+        Returns:
+            Dictionary mapping lowercase prefixes to {prefix, iri}
+        """
         logging.debug(f"Grabbing biolink prefix map for version: {biolink_version}")
         url = f"https://raw.githubusercontent.com/biolink/biolink-model/refs/tags/v{biolink_version}/project/prefixmap/biolink-model-prefix-map.json"
         prefix_to_iri_map = self._load_biolink_file(url, biolink_version)
@@ -213,6 +281,12 @@ class Normalizer:
 
 
     def _load_validator_map(self) -> Dict[str, Dict[str, Union[Callable, List[str]]]]:
+        """
+        Load vocabulary validator/cleaner function mappings.
+
+        Returns:
+            Dictionary mapping vocab names to validator, cleaner, and alias configs
+        """
         validator = self.validator_prop
         cleaner = self.cleaner_prop
         aliases = self.aliases_prop
@@ -282,7 +356,16 @@ class Normalizer:
 
     @staticmethod
     def _load_biolink_file(url: str, biolink_version: str) -> dict:
-        """Load/cache a Biolink JSON or YAML file (downloaded from a URL)"""
+        """
+        Download and cache Biolink model file.
+
+        Args:
+            url: URL to Biolink JSON/YAML file
+            biolink_version: Version string for cache naming
+
+        Returns:
+            Parsed JSON content
+        """
         project_root = Path(__file__).parents[2]
 
         cache_dir = project_root / 'cache'
@@ -316,7 +399,7 @@ class Normalizer:
 
     @staticmethod
     def clean_vocab_prefix(vocab: str) -> str:
-        # Get rid of all chars that are not alphanumeric or a period
+        """Remove non-alphanumeric characters (except periods) from vocabulary name."""
         return re.sub(r'[^a-z0-9.]', '', vocab.lower())
 
     @staticmethod
