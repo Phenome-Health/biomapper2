@@ -47,7 +47,7 @@ class Normalizer:
 
         Args:
             item: Entity containing local IDs
-            provided_id_fields: Fields with user-provided IDs
+            provided_id_fields: Fields with user-provided (unnormalized) IDs
             array_delimiters: Characters for splitting delimited ID strings
             stop_on_invalid_id: Halt on invalid IDs (default: False)
 
@@ -62,7 +62,7 @@ class Normalizer:
                              for id_field in provided_id_fields if pd.notnull(item[id_field])}
         else:
             provided_ids = {id_field: item[id_field] for id_field in provided_id_fields if pd.notnull(item[id_field])}
-        assigned_ids = item['assigned_ids']
+        assigned_ids = item.get('assigned_ids')
 
         # Get curies for the provided/assigned IDs
         curies_provided, invalid_ids_provided = self.get_curies(provided_ids, stop_on_invalid_id)
@@ -81,7 +81,7 @@ class Normalizer:
         Convert local IDs to curies for all fields in dictionary.
 
         Args:
-            local_ids_dict: Dictionary mapping field names to local IDs
+            local_ids_dict: Dictionary mapping vocab field names to local IDs
             stop_on_invalid_id: Halt on invalid IDs (default: False)
 
         Returns:
@@ -105,25 +105,24 @@ class Normalizer:
         return curies, dict(invalid_ids)
 
 
-    def determine_vocab(self, column_name: str, entity_type: Optional[str] = None) -> List[str]:
+    def determine_vocab(self, id_field_name: str) -> List[str]:
         """
-        Determine which vocabulary/prefix corresponds to a column name.
+        Determine which vocabulary/prefix corresponds to a field/column name.
 
         Uses heuristic matching against known vocab names and aliases.
 
         Args:
-            column_name: Name of ID column
-            entity_type: Optional entity type hint
+            id_field_name: Name of ID field/column
 
         Returns:
             List of matching vocabulary names
         """
-        logging.debug(f"Determining which vocab corresponds to column '{column_name}'")
-        col_name_underscored = re.sub(r'[-\s]+', '_', column_name).lower()  # Replace spaces, hyphens with underscores
+        logging.debug(f"Determining which vocab corresponds to field '{id_field_name}'")
+        col_name_underscored = re.sub(r'[-\s]+', '_', id_field_name).lower()  # Replace spaces, hyphens with underscores
         col_name_words = col_name_underscored.split('_')
         col_name_rejoined = ''.join([word for word in col_name_words if word not in {'id', 'ids', 'code', 'codes', 'list'}])
         col_name_cleaned = self.clean_vocab_prefix(col_name_rejoined)
-        logging.debug(f"Column name cleaned is: {col_name_cleaned}")
+        logging.debug(f"Field name cleaned is: {col_name_cleaned}")
 
         # If we have an exact match, return it
         if col_name_cleaned in self.vocab_validator_map:
@@ -133,13 +132,13 @@ class Normalizer:
             matches_on_alias = set()
             for vocab, info in self.vocab_validator_map.items():
                 if info.get(self.aliases_prop) and col_name_cleaned in info[self.aliases_prop]:
-                    # This column matches an explicit alias (defined in the vocab_validator_map)
+                    # This field matches an explicit alias (defined in the vocab_validator_map)
                     matches_on_alias.add(vocab)
                 elif '.' in vocab and vocab.split('.')[0] == col_name_cleaned:
-                    # This column matches implicitly, based on the 'root' vocab name (e.g., 'kegg' for 'kegg.compound')
+                    # This field matches implicitly, based on the 'root' vocab name (e.g., 'kegg' for 'kegg.compound')
                     matches_on_alias.add(vocab)
                 elif vocab.replace('.', '') == col_name_cleaned:
-                    # This column matches implicitly, after removing periods (e.g., 'keggcompound' for 'kegg.compound')
+                    # This field matches implicitly, after removing periods (e.g., 'keggcompound' for 'kegg.compound')
                     matches_on_alias.add(vocab)
             if matches_on_alias:
                 return list(matches_on_alias)
@@ -147,7 +146,7 @@ class Normalizer:
                 valid_vocab_names = ', '.join([f"{vocab} (or: {', '.join(info[self.aliases_prop])})"
                                                if info.get(self.aliases_prop) else vocab
                                                for vocab, info in self.vocab_validator_map.items()])
-                error_message = (f"Could not determine vocab for column '{column_name}'. "
+                error_message = (f"Could not determine vocab for field '{id_field_name}'. "
                                  f"Valid vocab names are: {valid_vocab_names}")
                 logging.error(error_message)
                 raise ValueError(error_message)
