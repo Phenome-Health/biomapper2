@@ -15,7 +15,7 @@ import requests
 import yaml
 import pandas as pd
 
-from ..config import BIOLINK_VERSION
+from ..config import BIOLINK_VERSION_DEFAULT
 
 
 class Normalizer:
@@ -25,11 +25,11 @@ class Normalizer:
     Validates IDs against regex patterns and constructs properly formatted curies
     using Biolink model prefix mappings.
     """
-    def __init__(self):
+    def __init__(self, biolink_version: Optional[str] = None):
         self.validator_prop = 'validator'
         self.cleaner_prop = 'cleaner'
         self.aliases_prop = 'aliases'
-        self.vocab_info_map = self._load_prefix_info(BIOLINK_VERSION)
+        self.vocab_info_map = self._load_prefix_info(biolink_version)
         self.vocab_validator_map = self._load_validator_map()
         self.field_name_to_vocab_name_cache = dict()
 
@@ -229,7 +229,7 @@ class Normalizer:
     # ------------------------------------------- INSTANTIATION HELPERS  --------------------------------------------- #
 
 
-    def _load_prefix_info(self, biolink_version: str) -> Dict[str, Dict[str, str]]:
+    def _load_prefix_info(self, biolink_version: Optional[str]) -> Dict[str, Dict[str, str]]:
         """
         Load Biolink model prefix map and add custom entries.
 
@@ -239,6 +239,7 @@ class Normalizer:
         Returns:
             Dictionary mapping lowercase prefixes to {prefix, iri}
         """
+        biolink_version = biolink_version if biolink_version else BIOLINK_VERSION_DEFAULT
         logging.debug(f"Grabbing biolink prefix map for version: {biolink_version}")
         url = f"https://raw.githubusercontent.com/biolink/biolink-model/refs/tags/v{biolink_version}/project/prefixmap/biolink-model-prefix-map.json"
         prefix_to_iri_map = self._load_biolink_file(url, biolink_version)

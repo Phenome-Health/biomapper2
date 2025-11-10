@@ -82,3 +82,14 @@ def test_map_entity_id_field_is_list(shared_mapper: Mapper):
 
     assert 'curies' in mapped_entity
     assert len(mapped_entity['curies']) > 1
+
+
+def test_custom_biolink_version(shared_mapper: Mapper):
+    test_mapper = Mapper(biolink_version="4.2.0")
+    entity = {'name': 'glucose', 'kegg': 'C00031'}
+
+    mapped_entity = shared_mapper.map_entity_to_kg(item=entity,
+                                                   name_field='name',
+                                                   provided_id_fields=['kegg'],
+                                                   entity_type='metabolite')
+    assert len(mapped_entity['curies']) == 1

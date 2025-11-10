@@ -34,7 +34,7 @@ class Mapper:
     4. Resolution - resolve one-to-many mappings
     """
 
-    def __init__(self):
+    def __init__(self, biolink_version: Optional[str] = None):
         self.normalizer = Normalizer()  # Instantiate the ID normalizer (should only be done once, up front)
 
 
