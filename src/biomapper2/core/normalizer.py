@@ -416,15 +416,13 @@ class Normalizer:
     @staticmethod
     def clean_id(local_id: str | float | int) -> str:
         """Convert numeric IDs to strings, strip whitespace, removing trailing .0 for whole numbers."""
+        local_id = str(local_id).strip()
         try:
-            float_val = float(local_id)
-            # If it's a whole number, return as int string (removes .0)
-            if float_val == int(float_val):
-                return str(int(float_val))
+            if local_id.endswith('.0') and float(local_id) == int(float(local_id)):
+                return local_id.removesuffix('.0')
         except (ValueError, TypeError):
             pass
-        # Return as-is (minus leading/trailing whitespace) for non-numeric or decimal values
-        return str(local_id).strip()
+        return local_id
 
     def clean_snomed_id(self, local_id: str) -> str:
         return self.clean_id(local_id)
