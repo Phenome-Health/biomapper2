@@ -73,11 +73,11 @@ def test_map_entity_id_field_is_list(shared_mapper: Mapper):
     entity = {
         'name': 'carnitine',
         'kegg': ['C00487'],
-        'pubchem': '10917'
+        'pubchem_cid': '10917'
     }
     mapped_entity = shared_mapper.map_entity_to_kg(item=entity,
                                                    name_field='name',
-                                                   provided_id_fields=['kegg', 'pubchem'],
+                                                   provided_id_fields=['kegg', 'pubchem_cid'],
                                                    entity_type='metabolite')
 
     assert 'curies' in mapped_entity

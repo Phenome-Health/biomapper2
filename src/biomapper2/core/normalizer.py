@@ -120,7 +120,8 @@ class Normalizer:
         logging.debug(f"Determining which vocab corresponds to field '{id_field_name}'")
         field_name_underscored = re.sub(r'[-\s]+', '_', id_field_name).lower()  # Replace spaces, hyphens with underscores
         field_name_words = field_name_underscored.split('_')
-        field_name_rejoined = ''.join([word for word in field_name_words if word not in {'id', 'ids', 'code', 'codes', 'list'}])
+        field_name_rejoined = ''.join([word for word in field_name_words if word not in {'id', 'ids', 'code', 'cid',
+                                                                                         'codes', 'list'}])
         field_name_cleaned = self.clean_vocab_prefix(field_name_rejoined)
         logging.debug(f"Field name cleaned is: {field_name_cleaned}")
 
