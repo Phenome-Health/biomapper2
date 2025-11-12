@@ -34,7 +34,7 @@ class Normalizer:
         self.vocab_info_map = self._load_prefix_info()
         self.vocab_validator_map = self._load_validator_map()
         self.field_name_to_vocab_name_cache: Dict[str, Set[str]] = dict()
-        self.dashes = {'–', '—', '−', '‐', '‑', '‒'}
+        self.dashes = {'-', '–', '—', '−', '‐', '‑', '‒'}
 
 
     def normalize(self,
@@ -426,9 +426,6 @@ class Normalizer:
             return ''
         else:
             return local_id
-
-    def clean_snomed_id(self, local_id: str) -> str:
-        return self.clean_id(local_id)
 
     @staticmethod
     def clean_zipcode(local_id: str) -> str:

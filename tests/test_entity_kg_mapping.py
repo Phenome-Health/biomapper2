@@ -97,25 +97,45 @@ def test_custom_biolink_version(shared_mapper: Mapper):
 
 
 def test_smiles_canonical_conversion(shared_mapper: Mapper):
-    canonical_smiles = 'CCCCC/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCC(=O)OCCN'  # This is already in canonical form
-    non_canonical_smiles = 'C(OCCN)(=O)CCC/C=C\C/C=C\C/C=C\C/C=C\CCCCC'  # This is in NON-canonical form
+    canonical_smiles = r'CCCCC/C=C\C/C=C\C/C=C\C/C=C\CCCC(=O)OCCN'  # This is already in canonical form
+    non_canonical_smiles = r'C(OCCN)(=O)CCC/C=C\C/C=C\C/C=C\C/C=C\CCCCC'  # This is in NON-canonical form
 
     # Make sure that when we input a non-canonical smiles string it's converted to canonical form
     mapped_entity = shared_mapper.map_entity_to_kg(item={'name': 'Virodhamine', 'smiles': non_canonical_smiles},
                                                    name_field='name',
                                                    provided_id_fields=['smiles'],
                                                    entity_type='lipid')
-    assert len(mapped_entity['curies']) == 1
-    curie = mapped_entity['curies'][0]
+    assert len(mapped_entity['curies_provided']) == 1
+    curie = mapped_entity['curies_provided'][0]
     local_id = curie.split(':')[1]
     assert local_id == canonical_smiles
+    print(mapped_entity)
 
     # Then make sure that when we input a canonical smiles string, it remains in canonical form
     mapped_entity = shared_mapper.map_entity_to_kg(item={'name': 'Virodhamine', 'smiles': canonical_smiles},
                                                    name_field='name',
                                                    provided_id_fields=['smiles'],
                                                    entity_type='lipid')
-    assert len(mapped_entity['curies']) == 1
-    curie = mapped_entity['curies'][0]
+    assert len(mapped_entity['curies_provided']) == 1
+    curie = mapped_entity['curies_provided'][0]
     local_id = curie.split(':')[1]
     assert local_id == canonical_smiles
+
+
+def test_dash_id_handling(shared_mapper: Mapper):
+    """Test entity with a list value for one of the vocab ID fields."""
+    entity = {
+        'name': "parkinson's disease",
+        'mesh': '-',
+        'umls': ['-'],
+        'doid': '14330'
+    }
+    mapped_entity = shared_mapper.map_entity_to_kg(item=entity,
+                                                   name_field='name',
+                                                   provided_id_fields=['mesh', 'umls', 'doid'],
+                                                   entity_type='disease',
+                                                   stop_on_invalid_id=True)
+
+    assert 'curies' in mapped_entity
+    assert len(mapped_entity['curies']) >= 1
+    print(mapped_entity)
