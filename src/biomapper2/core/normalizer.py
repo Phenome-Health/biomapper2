@@ -33,14 +33,14 @@ class Normalizer:
         self.biolink_version = biolink_version if biolink_version else BIOLINK_VERSION_DEFAULT
         self.vocab_info_map = self._load_prefix_info()
         self.vocab_validator_map = self._load_validator_map()
-        self.field_name_to_vocab_name_cache: Dict[str, List[str]] = dict()
+        self.field_name_to_vocab_name_cache: Dict[str, Set[str]] = dict()
 
 
     def normalize(self,
                   item: pd.Series | Dict[str, Any],
                   provided_id_fields: List[str],
                   array_delimiters: List[str],
-                  stop_on_invalid_id: bool = False) -> Tuple[List[str], List[str], List[str], Dict[str, list], Dict[str, list], Dict[str, list]]:
+                  stop_on_invalid_id: bool = False) -> Tuple[List[str], List[str], List[str], Dict[str | tuple, list], Dict[str | tuple, list], Dict[str | tuple, list]]:
         """
         Normalize local IDs to Biolink-standard curies, distinguishing 'provided' vs. 'assigned' IDs.
 
@@ -55,12 +55,9 @@ class Normalizer:
         """
         logging.debug(f"Beginning ID normalization step..")
         # Load/clean the provided and assigned local IDs for this item
-        if array_delimiters:
             # Parse any delimited strings (multiple identifiers in one string)
-            provided_ids = {id_field: self._parse_delimited_string(item[id_field], array_delimiters)
-                             for id_field in provided_id_fields if pd.notnull(item[id_field])}
-        else:
-            provided_ids = {id_field: item[id_field] for id_field in provided_id_fields if pd.notnull(item[id_field])}
+        provided_ids: Dict[str | tuple, Any] = {id_field: self._parse_delimited_string(item[id_field], array_delimiters) if array_delimiters else item[id_field]
+                                                for id_field in provided_id_fields if pd.notnull(item[id_field])}
         assigned_ids = item.get('assigned_ids', dict())
 
         # Get curies for the provided/assigned IDs
@@ -75,7 +72,7 @@ class Normalizer:
         return list(curies), list(curies_provided), list(curies_assigned), invalid_ids, invalid_ids_provided, invalid_ids_assigned
 
 
-    def get_curies(self, local_ids_dict: Dict[str, Any], stop_on_invalid_id: bool = False) -> Tuple[Dict[str, str], Dict[str, Any]]:
+    def get_curies(self, local_ids_dict: Dict[str | tuple, Any], stop_on_invalid_id: bool = False) -> Tuple[Dict[str, str], Dict[str | tuple, List[str]]]:
         """
         Convert local IDs to curies for all fields in dictionary.
 
@@ -90,14 +87,18 @@ class Normalizer:
         invalid_ids = defaultdict(list)
         for id_field_name, local_ids_entry in local_ids_dict.items():
             local_ids = local_ids_entry if isinstance(local_ids_entry, list) else [local_ids_entry]
-            vocab_names = self.determine_vocab(id_field_name)
+            id_field_names = [id_field_name] if isinstance(id_field_name, str) else id_field_name
+            vocab_names = set()
+            for field_name in id_field_names:
+                vocab_names |= self.determine_vocab(field_name)
+
             logging.debug(f"Matching vocabs are: {vocab_names}")
             for local_id in local_ids:
                 # Make sure the local ID is a nice clean string (not int or float)
                 local_id = self.clean_id(local_id)
                 # Get the curie for this local ID
                 if local_id:  # Sometimes cleaning the local ID can make it empty (like if it was just a space)
-                    curie, iri = self._construct_curie(local_id, vocab_names, stop_on_failure=stop_on_invalid_id)
+                    curie, iri = self._construct_curie(local_id, list(vocab_names), stop_on_failure=stop_on_invalid_id)
                     if curie:
                         curies[curie] = iri
                     else:
@@ -105,7 +106,7 @@ class Normalizer:
         return curies, dict(invalid_ids)
 
 
-    def determine_vocab(self, id_field_name: str) -> List[str]:
+    def determine_vocab(self, id_field_name: str) -> Set[str]:
         """
         Determine which vocabulary corresponds to an ID field/column name.
 
@@ -127,7 +128,7 @@ class Normalizer:
 
         if field_name_cleaned in self.vocab_validator_map:
             # We have an exact match, so we return it
-            return [field_name_cleaned]
+            return {field_name_cleaned}
         elif field_name_cleaned in self.field_name_to_vocab_name_cache:
             # We've already processed this field name before, so we return the cached mapping
             return self.field_name_to_vocab_name_cache[field_name_cleaned]
@@ -146,8 +147,8 @@ class Normalizer:
                     matches_on_alias.add(vocab)
             if matches_on_alias:
                 # Cache this mapping for quick lookup later
-                self.field_name_to_vocab_name_cache[field_name_cleaned] = list(matches_on_alias)
-                return list(matches_on_alias)
+                self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_alias
+                return matches_on_alias
             else:
                 valid_vocab_names = ', '.join([f"{vocab} (or: {', '.join(info[self.aliases_prop])})"
                                                if info.get(self.aliases_prop) else vocab
