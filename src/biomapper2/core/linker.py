@@ -10,7 +10,7 @@ from typing import Dict, Any, Tuple, List
 import requests
 import pandas as pd
 
-from ..config import KESTREL_API_URL
+from ..config import KESTREL_API_URL, KESTREL_API_KEY
 
 
 def link(item: pd.Series | Dict[str, Any]) -> Tuple[Dict[str, List[str]], Dict[str, List[str]], Dict[str, List[str]]]:
@@ -43,7 +43,9 @@ def get_kg_ids(curies: List[str]) -> Dict[str, str]:
     if curies:
         # Get the canonical curies from the KG  # TODO: expose streamlined get_canonical_ids dict endpoint in kestrel
         try:
-            response = requests.post(f"{KESTREL_API_URL}/get-nodes", json={'curies': curies})
+            response = requests.post(f"{KESTREL_API_URL}/get-nodes",
+                                     json={'curies': curies},
+                                     headers={'X-API-Key': KESTREL_API_KEY})
             response.raise_for_status()  # Raises HTTPError for bad status codes
             result = response.json()
             curie_to_kg_id_map = {input_curie: node['id'] for input_curie, node in result.items() if node}

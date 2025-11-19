@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Set, Optional
 import pandas as pd
 import requests
 
-from ..config import KESTREL_API_URL
+from ..config import KESTREL_API_URL, KESTREL_API_KEY
 
 
 def annotate(item: pd.Series | Dict[str, Any],
@@ -54,7 +54,9 @@ def annotate(item: pd.Series | Dict[str, Any],
 
 def run_kestrel_fuzzy_search(search_text: str) -> Optional[str]:
     try:
-        response = requests.post(f"{KESTREL_API_URL}/search-node", json={'search_term': search_text, 'limit': 1})
+        response = requests.post(f"{KESTREL_API_URL}/search-node",
+                                 json={'search_term': search_text, 'limit': 1},
+                                 headers={'X-API-Key': KESTREL_API_KEY})
         response.raise_for_status()  # Raises HTTPError for bad status codes
         result = response.json()
         if result:
