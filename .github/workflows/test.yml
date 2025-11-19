@@ -5,6 +5,8 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      KESTREL_API_KEY: ${{ secrets.KESTREL_API_KEY }}
     strategy:
       matrix:
         python-version: ['3.10', '3.12']
