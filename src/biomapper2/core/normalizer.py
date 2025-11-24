@@ -56,7 +56,7 @@ class Normalizer:
         """
         logging.debug(f"Beginning ID normalization step..")
         # Load/clean the provided and assigned local IDs for this item
-            # Parse any delimited strings (multiple identifiers in one string)
+        # Parse any delimited strings (multiple identifiers in one string)
         provided_ids: Dict[str | tuple, Any] = {id_field: self._parse_delimited_string(item[id_field], array_delimiters) if array_delimiters else item[id_field]
                                                 for id_field in provided_id_fields if pd.notnull(item[id_field])}
         assigned_ids = item.get('assigned_ids', dict())

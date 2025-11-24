@@ -25,6 +25,15 @@ uv sync --dev
 
 This will create a virtual environment and install all dependencies.
 
+Then just create a `.env` file with the proper secrets:
+```bash
+cd biomapper2
+cp .env.example .env
+```
+And edit `.env` so that it has the actual secrets instead of placeholders.
+
+Then [run the pytest suite](#run-tests) to confirm all is working.
+
 ## Usage
 
 ### Map a single entity to knowledge graph
