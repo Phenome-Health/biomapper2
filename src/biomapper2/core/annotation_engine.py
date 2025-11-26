@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Set, Optional, Literal
 import pandas as pd
 
 from .annotators.kestrel_text import KestrelTextSearchAnnotator
+from .annotators.base import BaseAnnotator
 from ..utils import AssignedIDsDict
 
 
@@ -75,7 +76,7 @@ class AnnotationEngine:
     # ------------------------------------- Helper methods --------------------------------------- #
 
 
-    def _select_annotators(self, entity_type_cleaned: str) -> List:
+    def _select_annotators(self, entity_type_cleaned: str) -> List[BaseAnnotator]:
         """Select appropriate annotators based on entity type."""
         annotators = []
         if entity_type_cleaned in {'metabolite', 'smallmolecule', 'lipid'}:
@@ -136,14 +137,14 @@ class AnnotationEngine:
             has_provided_ids = any(pd.notna(item.get(field)) for field in provided_id_fields)
             if has_provided_ids:
                 logging.debug(f"Entity has provided_ids and mode={mode}, skipping annotation")
-                return self._get_empty_assigned_ids(item)
+                return self._get_empty_assigned_ids_for_entity(item)
 
         # Otherwise get assigned IDs for the entity
         assigned_ids = dict()  # All annotations will be merged into this
         for annotator in annotators:
             prepared_entity = annotator.prepare(item, provided_id_fields)
             entity_annotations = annotator.get_annotations(prepared_entity, name_field)
-            assigned_ids = self._merge_nested_dicts(assigned_ids, entity_annotations)
+            assigned_ids: AssignedIDsDict = self._merge_nested_dicts(assigned_ids, entity_annotations)
 
         return pd.Series({'assigned_ids': assigned_ids})  # Named Series
 
@@ -181,13 +182,22 @@ class AnnotationEngine:
         return result
 
 
-    @staticmethod
-    def _get_empty_assigned_ids(item: pd.Series | Dict[str, Any] | pd.DataFrame) -> pd.DataFrame | pd.Series:
+    def _get_empty_assigned_ids(self, item: pd.Series | Dict[str, Any] | pd.DataFrame) -> pd.DataFrame | pd.Series:
         """Return empty assigned_ids in appropriate format."""
         if isinstance(item, pd.DataFrame):
-            # Return single-column DataFrame with empty dicts
-            empty_col = pd.Series([{} for _ in range(len(item))], index=item.index)
-            return pd.DataFrame({'assigned_ids': empty_col})
+            return self._get_empty_assigned_ids_for_dataset(item)
         else:
-            # Return named Series with empty dict
-            return pd.Series({'assigned_ids': {}})
+            return self._get_empty_assigned_ids_for_entity(item)
+
+
+    @staticmethod
+    def _get_empty_assigned_ids_for_dataset(item: pd.DataFrame) -> pd.DataFrame:
+        # Return single-column DataFrame with empty dicts
+        empty_col = pd.Series([{} for _ in range(len(item))], index=item.index)
+        return pd.DataFrame({'assigned_ids': empty_col})
+
+
+    @staticmethod
+    def _get_empty_assigned_ids_for_entity(item: pd.Series | Dict[str, Any]) -> pd.Series:
+        # Return named Series with empty dict
+        return pd.Series({'assigned_ids': {}})

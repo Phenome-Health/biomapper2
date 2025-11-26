@@ -1,7 +1,7 @@
 import logging
 import sys
 from collections import defaultdict
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from .base import BaseAnnotator
 from ...utils import kestrel_request, AssignedIDsDict
@@ -29,7 +29,7 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
             else:
                 results = self._kestrel_text_search(search_term, limit=1)
 
-            annotations = defaultdict(lambda: defaultdict(dict))
+            annotations: Dict[str, Dict[str, Dict[str, Any]]] = defaultdict(lambda: defaultdict(dict))
             if results:
                 result = results[0]
                 node_id = result['id']

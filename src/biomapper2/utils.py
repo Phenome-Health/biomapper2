@@ -76,7 +76,7 @@ def calculate_f1_score(precision: Optional[float], recall: Optional[float]) -> O
 
 
 # Kestrel API functions
-def kestrel_request(method: str, endpoint: str, **kwargs) -> dict | list[dict]:
+def kestrel_request(method: str, endpoint: str, **kwargs) -> Any:
     """
     Internal helper for making Kestrel API requests.
 

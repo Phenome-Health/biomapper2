@@ -91,7 +91,7 @@ class Normalizer:
                                                 for id_field in provided_id_fields if pd.notnull(entity[id_field])}
         assigned_ids = entity.get('assigned_ids', dict())
 
-        assigned_ids_flat = defaultdict(set)
+        assigned_ids_flat: Dict[str, Set[Any]] = defaultdict(set)
         for annotator, annotator_assigned_ids in assigned_ids.items():
             for vocab, local_ids_dict in annotator_assigned_ids.items():
                 assigned_ids_flat[vocab] |= set(local_ids_dict)
@@ -116,7 +116,7 @@ class Normalizer:
         })
 
 
-    def get_curies(self, local_ids_dict: Dict[str | tuple, Any], stop_on_invalid_id: bool = False) -> Tuple[Dict[str, str], Dict[str | tuple, List[str]]]:
+    def get_curies(self, local_ids_dict: Dict[Any, Any], stop_on_invalid_id: bool = False) -> Tuple[Dict[str, str], Dict[str | tuple, List[str]]]:
         """
         Convert local IDs to curies for all fields in dictionary.
 

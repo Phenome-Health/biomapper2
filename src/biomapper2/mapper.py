@@ -80,6 +80,7 @@ class Mapper:
             entity_type=entity_type,
             mode=annotation_mode
         )
+        assert isinstance(annotation_result, pd.Series)
         mapped_item = merge_into_entity(mapped_item, annotation_result)
 
         # Do Step 2: normalize vocab IDs to form proper curies
@@ -89,14 +90,17 @@ class Mapper:
             array_delimiters=array_delimiters,
             stop_on_invalid_id=stop_on_invalid_id
         )
+        assert isinstance(normalization_result, pd.Series)
         mapped_item = merge_into_entity(mapped_item, normalization_result)
 
         # Do Step 3: link curies to KG nodes
         linked_result = self.linker.link(mapped_item)
+        assert isinstance(linked_result, pd.Series)
         mapped_item = merge_into_entity(mapped_item, linked_result)
 
         # Do Step 4: resolve one-to-many KG matches
         resolved_result = self.resolver.resolve(mapped_item)
+        assert isinstance(resolved_result, pd.Series)
         mapped_item = merge_into_entity(mapped_item, resolved_result)
 
         return mapped_item
