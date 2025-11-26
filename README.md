@@ -16,7 +16,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 For other platforms, see [uv installation docs](https://docs.astral.sh/uv/getting-started/installation/).
 
 ### Clone and install
-
 ```bash
 git clone https://github.com/arpanauts/biomapper2.git
 cd biomapper2
@@ -37,7 +36,6 @@ Then [run the pytest suite](#run-tests) to confirm all is working.
 ## Usage
 
 ### Map a single entity to knowledge graph
-
 ```python
 from biomapper2.mapper import Mapper
 
@@ -58,7 +56,6 @@ mapped_item = mapper.map_entity_to_kg(
 ```
 
 ### Map a dataset to knowledge graph
-
 ```python
 from biomapper2.mapper import Mapper
 
@@ -76,14 +73,12 @@ mapper.map_dataset_to_kg(
 See `examples/` for complete working examples.
 
 ## Run examples
-
 ```bash
 uv run python examples/basic_entity_kg_mapping.py
 uv run python examples/basic_dataset_kg_mapping.py
 ```
 
 ## Run tests
-
 ```bash
 uv run pytest          # Run all tests
 uv run pytest -v       # Run with verbose output
@@ -93,17 +88,22 @@ uv run pytest -vs      # Run with verbose output and logging/prints displayed
 **Note:** Tests run automatically on every commit via GitHub Actions (CI/CD).
 
 ## Project structure
-
 ```
 src/biomapper2/
 ├── mapper.py                   # Main Mapper class - entry point for entity/dataset mapping
 ├── config.py                   # Configuration (KG API endpoint, logging, etc.)
 ├── core/
 │   ├── annotation_engine.py    # Orchestrates annotation of entities with ontology local IDs
-|   ├── annotators/             # Contains all individual annotators (metabolomics workbench, etc.)
-│   ├── normalizer.py           # Normalizes local IDs to form Biolink-standard curies
+│   ├── annotators/             # Individual annotator implementations (Kestrel text search, etc.)
+│   │   ├── base.py             # Base annotator interface
+│   │   └── kestrel_text.py     # Kestrel text search annotator
+│   ├── normalizer/             # ID normalization package
+│   │   ├── normalizer.py       # Main Normalizer class
+│   │   ├── validators.py       # ID validation functions for different vocabularies
+│   │   ├── cleaners.py         # ID cleaning/standardization functions
+│   │   └── vocab_config.py     # Biolink prefix mappings and validator configurations
 │   ├── linker.py               # Links curies to knowledge graph nodes
-│   └── resolver.py             # Resolves one-to-many entity-->KG matches
+│   └── resolver.py             # Resolves one-to-many entity→KG matches
 └── utils.py                    # Utility functions
 
 examples/                       # Working code examples
