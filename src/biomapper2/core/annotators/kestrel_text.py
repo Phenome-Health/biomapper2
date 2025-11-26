@@ -1,3 +1,4 @@
+import logging
 import sys
 from collections import defaultdict
 from typing import Optional
@@ -53,6 +54,7 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
         search_terms = entities['name'].tolist()
 
         # Build cache with all API calls  TODO: use actual bulk endpoint once stand that up...
+        logging.info(f"Getting results from Kestrel API for {len(entities)} entities")
         cache = {}
         for term in search_terms:
             cache[term] = self._kestrel_text_search(term, limit=1)

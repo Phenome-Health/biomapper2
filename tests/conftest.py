@@ -1,6 +1,11 @@
 import pytest
 
 from biomapper2.mapper import Mapper
+from biomapper2.utils import setup_logging
+
+
+# Setup logging once for all tests
+setup_logging()
 
 
 @pytest.fixture(scope="session")

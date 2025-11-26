@@ -16,9 +16,9 @@ import numpy as np
 
 from .core.normalizer import Normalizer
 from .core.annotation_engine import AnnotationEngine
-from .core.linker import link, get_kg_ids, get_kg_id_fields
-from .core.resolver import resolve
-from .utils import setup_logging, safe_divide, calculate_f1_score
+from .core.linker import Linker
+from .core.resolver import Resolver
+from .utils import setup_logging, safe_divide, calculate_f1_score, merge_into_entity
 
 setup_logging()
 
@@ -38,6 +38,8 @@ class Mapper:
         # Instantiate the mapping modules (should only be done once, up front)
         self.annotation_engine = AnnotationEngine()
         self.normalizer = Normalizer(biolink_version=biolink_version)
+        self.linker = Linker()
+        self.resolver = Resolver()
 
 
     def map_entity_to_kg(self,
@@ -71,33 +73,31 @@ class Mapper:
         mapped_item = copy.deepcopy(item)  # Use a copy to avoid editing input item
 
         # Do Step 1: annotation of local vocab IDs
-        mapped_item['assigned_ids'] = self.annotation_engine.annotate(mapped_item,
-                                                                      name_field,
-                                                                      provided_id_fields,
-                                                                      entity_type,
-                                                                      mode=annotation_mode)
+        annotation_result = self.annotation_engine.annotate(
+            item=mapped_item,
+            name_field=name_field,
+            provided_id_fields=provided_id_fields,
+            entity_type=entity_type,
+            mode=annotation_mode
+        )
+        mapped_item = merge_into_entity(mapped_item, annotation_result)
 
         # Do Step 2: normalization of local vocab IDs (curie formation)
-        normalizer_result_tuple = self.normalizer.normalize(mapped_item, provided_id_fields, array_delimiters, stop_on_invalid_id)
-        curies, curies_provided, curies_assigned, invalid_ids, invalid_ids_provided, invalid_ids_assigned = normalizer_result_tuple
-        mapped_item['curies'] = curies
-        mapped_item['curies_provided'] = curies_provided
-        mapped_item['curies_assigned'] = curies_assigned
-        mapped_item['invalid_ids'] = invalid_ids
-        mapped_item['invalid_ids_provided'] = invalid_ids_provided
-        mapped_item['invalid_ids_assigned'] = invalid_ids_assigned
+        normalization_result = self.normalizer.normalize(
+            item=mapped_item,
+            provided_id_fields=provided_id_fields,
+            array_delimiters=array_delimiters,
+            stop_on_invalid_id=stop_on_invalid_id
+        )
+        mapped_item = merge_into_entity(mapped_item, normalization_result)
 
         # Do Step 3: linking to KG nodes
-        kg_ids, kg_ids_provided, kg_ids_assigned = link(mapped_item)
-        mapped_item['kg_ids'] = kg_ids
-        mapped_item['kg_ids_provided'] = kg_ids_provided
-        mapped_item['kg_ids_assigned'] = kg_ids_assigned
+        linked_result = self.linker.link(mapped_item)
+        mapped_item = merge_into_entity(mapped_item, linked_result)
 
         # Do Step 4: resolving one-to-many KG matches
-        chosen_kg_id, chosen_kg_id_provided, chosen_kg_id_assigned = resolve(mapped_item)
-        mapped_item['chosen_kg_id'] = chosen_kg_id
-        mapped_item['chosen_kg_id_provided'] = chosen_kg_id_provided
-        mapped_item['chosen_kg_id_assigned'] = chosen_kg_id_assigned
+        resolved_result = self.resolver.resolve(mapped_item)
+        mapped_item = merge_into_entity(mapped_item, resolved_result)
 
         return mapped_item
 
@@ -129,7 +129,7 @@ class Mapper:
         logging.info(f"Beginning to map dataset to KG ({dataset_tsv_path})")
         array_delimiters = array_delimiters if array_delimiters is not None else [',', ';']
 
-        # TODO: Optionally allow people to input a Dataframe directly, as opposed to TSV path?
+        # TODO: Optionally allow people to input a Dataframe directly, as opposed to TSV path? #3
 
         # Load tsv into pandas
         df = pd.read_csv(dataset_tsv_path, sep='\t', dtype={id_col: str for id_col in provided_id_columns})
@@ -140,41 +140,33 @@ class Mapper:
         num_rows_start = len(df)
 
         # Do Step 1: annotate all rows with IDs
-        df['assigned_ids'] = self.annotation_engine.annotate(item=df,
-                                                             name_field=name_column,
-                                                             provided_id_fields=provided_id_columns,
-                                                             entity_type=entity_type,
-                                                             mode=annotation_mode)
+        annotation_df = self.annotation_engine.annotate(
+            item=df,
+            name_field=name_column,
+            provided_id_fields=provided_id_columns,
+            entity_type=entity_type,
+            mode=annotation_mode
+        )
+        df = df.join(annotation_df)
         logging.info(f"After step 1 (annotation), df is: \n{df}")
 
         # Do Step 2: normalize IDs in all rows to form proper curies
-        df[['curies', 'curies_provided', 'curies_assigned', 'invalid_ids', 'invalid_ids_provided', 'invalid_ids_assigned']] = df.apply(
-            lambda row: self.normalizer.normalize(item=row,
-                                                  provided_id_fields=provided_id_columns,
-                                                  array_delimiters=array_delimiters),
-            axis=1,
-            result_type='expand'
+        normalization_df = self.normalizer.normalize(
+            item=df,
+            provided_id_fields=provided_id_columns,
+            array_delimiters=array_delimiters
         )
+        df = df.join(normalization_df)
         logging.info(f"After step 2 (normalization), df is: \n{df}")
 
         # Do Step 3: link curies to KG nodes
-        # First look up all curies in bulk (way more efficient than sending in separate requests)
-        curie_to_kg_id_map = get_kg_ids(list(set(df.curies.explode().dropna())))
-        # Then form our new columns using that curie-->kg id map
-        df[['kg_ids', 'kg_ids_provided', 'kg_ids_assigned']] = df.apply(
-            lambda row: get_kg_id_fields(item=row,
-                                         curie_to_kg_id_map=curie_to_kg_id_map),
-            axis=1,
-            result_type='expand'
-        )
+        linked_df = self.linker.link(df)
+        df = df.join(linked_df)
         logging.info(f"After step 3 (linking), df is: \n{df}")
 
         # Do Step 4: resolve one-to-many KG matches
-        df[['chosen_kg_id', 'chosen_kg_id_provided', 'chosen_kg_id_assigned']] = df.apply(
-            lambda row: resolve(item=row),
-            axis=1,
-            result_type='expand'
-        )
+        resolved_df = self.resolver.resolve(df)
+        df = df.join(resolved_df)
         logging.info(f"After step 4 (resolution), df is: \n{df}")
 
         # Do a little validation of results dataframe
@@ -194,8 +186,7 @@ class Mapper:
         return output_tsv_path, stats_summary
 
 
-    @staticmethod
-    def analyze_dataset_mapping(results_tsv_path: str) -> Dict[str, Any]:
+    def analyze_dataset_mapping(self, results_tsv_path: str) -> Dict[str, Any]:
         """
         Analyze dataset mapping results and generate summary statistics.
 
@@ -324,7 +315,7 @@ class Mapper:
         # Do evaluation vs. groundtruth, if available
         if 'kg_ids_groundtruth' in df:
             assert df.kg_ids_groundtruth.notnull().all()  # TODO: adjust later so we don't have to enforce this.. (just use rows w/ groundtruth mappings available)
-            canonical_map = get_kg_ids(list(set(df.kg_ids_groundtruth.explode().dropna())))
+            canonical_map = self.linker.get_kg_ids(list(set(df.kg_ids_groundtruth.explode().dropna())))
             df['kg_ids_groundtruth_canonical'] = df.apply(lambda r: [canonical_map[kg_id] for kg_id in r.kg_ids_groundtruth],
                                                           axis=1)
 

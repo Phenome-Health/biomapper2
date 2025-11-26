@@ -26,7 +26,7 @@ class AnnotationEngine:
                  name_field: str,
                  provided_id_fields: List[str],
                  entity_type: str,
-                 mode: Literal['all', 'missing', 'none'] = 'missing') -> AssignedIDsDict | pd.Series:
+                 mode: Literal['all', 'missing', 'none'] = 'missing') -> pd.DataFrame | pd.Series:
         """
         Annotate entity with additional vocab IDs, obtained using various internal or external methods.
 
@@ -41,7 +41,7 @@ class AnnotationEngine:
                 - 'none': Skip annotation entirely (returns empty)
 
         Returns:
-            AssignedIDsDict for single entity, pd.Series of AssignedIDsDict for DataFrame
+            AssignedIDsDict (in a named Series) for single entity, and in a single-column pd.DataFrame for multiple entities
         """
         # Validate mode
         valid_modes = {'all', 'missing', 'none'}
@@ -91,14 +91,14 @@ class AnnotationEngine:
                            name_field: str,
                            provided_id_fields: List[str],
                            mode: str,
-                           annotators: List) -> pd.Series:
-        """Annotate an entire DataFrame."""
+                           annotators: List) -> pd.DataFrame:
+        """Annotate an entire DataFrame. Returns a single-column DataFrame containing AssignedIDsDicts."""
         if mode == 'missing':
             # Identify rows that need annotation (no provided_ids)
             has_ids_mask = df[provided_id_fields].notna().any(axis=1)
             needs_annotation_mask = ~has_ids_mask
             items_to_annotate = df[needs_annotation_mask]
-            logging.info(f"Mode is set to 'missing': annotating {needs_annotation_mask.sum()} of {len(df)} rows")
+            logging.info(f"Annotation mode is set to 'missing': annotating {needs_annotation_mask.sum()} of {len(df)} rows")
         else:  # mode == 'all'
             items_to_annotate = df
             needs_annotation_mask = pd.Series([True] * len(df), index=df.index)
@@ -121,7 +121,7 @@ class AnnotationEngine:
             # Merge partial results back into full results
             assigned_ids_col[needs_annotation_mask] = annotated_rows
 
-        return assigned_ids_col
+        return pd.DataFrame({'assigned_ids': assigned_ids_col})
 
 
     def _annotate_single(self,
@@ -129,8 +129,8 @@ class AnnotationEngine:
                         name_field: str,
                         provided_id_fields: List[str],
                         mode: str,
-                        annotators: List) -> AssignedIDsDict:
-        """Annotate a single entity."""
+                        annotators: List) -> pd.Series:
+        """Annotate a single entity. Returns named series containing AssignedIDsDict."""
         # If user requested it, skip entities that have any provided IDs
         if mode == 'missing':
             has_provided_ids = any(pd.notna(item.get(field)) for field in provided_id_fields)
@@ -145,7 +145,7 @@ class AnnotationEngine:
             entity_annotations = annotator.get_annotations(prepared_entity, name_field)
             assigned_ids = self._merge_nested_dicts(assigned_ids, entity_annotations)
 
-        return assigned_ids
+        return pd.Series({'assigned_ids': assigned_ids})  # Named Series
 
 
     @staticmethod
@@ -182,9 +182,12 @@ class AnnotationEngine:
 
 
     @staticmethod
-    def _get_empty_assigned_ids(item: pd.Series | Dict[str, Any] | pd.DataFrame) -> AssignedIDsDict | pd.Series:
+    def _get_empty_assigned_ids(item: pd.Series | Dict[str, Any] | pd.DataFrame) -> pd.DataFrame | pd.Series:
         """Return empty assigned_ids in appropriate format."""
         if isinstance(item, pd.DataFrame):
-            return pd.Series([{} for _ in range(len(item))], index=item.index)
+            # Return single-column DataFrame with empty dicts
+            empty_col = pd.Series([{} for _ in range(len(item))], index=item.index)
+            return pd.DataFrame({'assigned_ids': empty_col})
         else:
-            return {}
+            # Return named Series with empty dict
+            return pd.Series({'assigned_ids': {}})

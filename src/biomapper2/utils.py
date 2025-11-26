@@ -7,6 +7,7 @@ import logging
 from typing import Optional, Dict, Any
 
 import requests
+import pandas as pd
 
 from .config import LOG_LEVEL, KESTREL_API_URL, KESTREL_API_KEY
 
@@ -106,3 +107,11 @@ def kestrel_request(method: str, endpoint: str, **kwargs) -> dict | list[dict]:
     except requests.exceptions.RequestException as e:
         logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
         raise
+
+
+def merge_into_entity(entity: pd.Series | Dict[str, Any], series_to_merge: pd.Series) -> pd.Series | Dict[str, Any]:
+    """Merge fields from series_to_merge into entity, returning the updated entity."""
+    if isinstance(entity, pd.Series):
+        return pd.concat([entity, series_to_merge])
+    else:  # Dict
+        return {**entity, **series_to_merge.to_dict()}

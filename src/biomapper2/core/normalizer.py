@@ -38,28 +38,61 @@ class Normalizer:
 
 
     def normalize(self,
-                  item: pd.Series | Dict[str, Any],
+                  item: pd.Series | Dict[str, Any] | pd.DataFrame,
                   provided_id_fields: List[str],
                   array_delimiters: List[str],
-                  stop_on_invalid_id: bool = False) -> Tuple[List[str], List[str], List[str], Dict[str | tuple, list], Dict[str | tuple, list], Dict[str | tuple, list]]:
+                  stop_on_invalid_id: bool = False) -> pd.Series | pd.DataFrame:
         """
         Normalize local IDs to Biolink-standard curies, distinguishing 'provided' vs. 'assigned' IDs.
 
         Args:
-            item: Entity containing local IDs
-            provided_id_fields: Fields with user-provided (unnormalized) IDs
+            item: Entity or entities containing local IDs
+            provided_id_fields: Fields with user-provided (un-normalized) IDs
             array_delimiters: Characters for splitting delimited ID strings
             stop_on_invalid_id: Halt on invalid IDs (default: False)
 
         Returns:
-            Tuple of (curies, curies_provided, curies_assigned, invalid_ids, invalid_ids_provided, invalid_ids_assigned)
+            Normalization results as a pd.Series (for single entity) or pd.DataFrame (for multiple entities)
+            Includes: curies, curies_provided, curies_assigned, invalid_ids, invalid_ids_provided, invalid_ids_assigned
         """
         logging.debug(f"Beginning ID normalization step..")
+
+        if isinstance(item, pd.DataFrame):
+            # Normalize all entities in the dataframe
+            return item.apply(
+                self._normalize_entity,
+                axis=1,
+                provided_id_fields=provided_id_fields,
+                array_delimiters=array_delimiters,
+                result_type='expand'  # Expands Series into columns
+            )
+        else:
+            # Normalize the single input entity
+            return self._normalize_entity(item, provided_id_fields, array_delimiters, stop_on_invalid_id)
+
+
+    def _normalize_entity(self,
+                          entity: pd.Series | Dict[str, Any],
+                          provided_id_fields: List[str],
+                          array_delimiters: List[str],
+                          stop_on_invalid_id: bool = False) -> pd.Series:
+        """
+        Normalize local IDs to Biolink-standard curies, distinguishing 'provided' vs. 'assigned' IDs.
+
+        Args:
+            entity: Entity containing local IDs
+            provided_id_fields: Fields with user-provided (un-normalized) IDs
+            array_delimiters: Characters for splitting delimited ID strings
+            stop_on_invalid_id: Halt on invalid IDs (default: False)
+
+        Returns:
+            Series of curies, curies_provided, curies_assigned, invalid_ids, invalid_ids_provided, invalid_ids_assigned
+        """
         # Load/clean the provided and assigned local IDs for this item
         # Parse any delimited strings (multiple identifiers in one string)
-        provided_ids: Dict[str | tuple, Any] = {id_field: self._parse_delimited_string(item[id_field], array_delimiters) if array_delimiters else item[id_field]
-                                                for id_field in provided_id_fields if pd.notnull(item[id_field])}
-        assigned_ids = item.get('assigned_ids', dict())
+        provided_ids: Dict[str | tuple, Any] = {id_field: self._parse_delimited_string(entity[id_field], array_delimiters) if array_delimiters else entity[id_field]
+                                                for id_field in provided_id_fields if pd.notnull(entity[id_field])}
+        assigned_ids = entity.get('assigned_ids', dict())
 
         assigned_ids_flat = defaultdict(set)
         for annotator, annotator_assigned_ids in assigned_ids.items():
@@ -75,7 +108,15 @@ class Normalizer:
         invalid_ids = {id_field: invalid_ids_provided.get(id_field, []) + invalid_ids_assigned.get(id_field, [])
                        for id_field in set(invalid_ids_provided) | set(invalid_ids_assigned)}
 
-        return list(curies), list(curies_provided), list(curies_assigned), invalid_ids, invalid_ids_provided, invalid_ids_assigned
+        # Return a named Series
+        return pd.Series({
+            'curies': list(curies),
+            'curies_provided': list(curies_provided),
+            'curies_assigned': list(curies_assigned),
+            'invalid_ids': invalid_ids,
+            'invalid_ids_provided': invalid_ids_provided,
+            'invalid_ids_assigned': invalid_ids_assigned
+        })
 
 
     def get_curies(self, local_ids_dict: Dict[str | tuple, Any], stop_on_invalid_id: bool = False) -> Tuple[Dict[str, str], Dict[str | tuple, List[str]]]:
