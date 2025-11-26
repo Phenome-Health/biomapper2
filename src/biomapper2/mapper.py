@@ -70,11 +70,14 @@ class Mapper:
         array_delimiters = array_delimiters if array_delimiters is not None else [',', ';']
         mapped_item = copy.deepcopy(item)  # Use a copy to avoid editing input item
 
-        # Do Step 1: annotation of IDs
-        assigned_ids = self.annotation_engine.annotate(mapped_item, name_field, provided_id_fields, entity_type, mode=annotation_mode)
-        mapped_item['assigned_ids'] = assigned_ids
+        # Do Step 1: annotation of local vocab IDs
+        mapped_item['assigned_ids'] = self.annotation_engine.annotate(mapped_item,
+                                                                      name_field,
+                                                                      provided_id_fields,
+                                                                      entity_type,
+                                                                      mode=annotation_mode)
 
-        # Do Step 2: normalization of IDs (curie formation)
+        # Do Step 2: normalization of local vocab IDs (curie formation)
         normalizer_result_tuple = self.normalizer.normalize(mapped_item, provided_id_fields, array_delimiters, stop_on_invalid_id)
         curies, curies_provided, curies_assigned, invalid_ids, invalid_ids_provided, invalid_ids_assigned = normalizer_result_tuple
         mapped_item['curies'] = curies

@@ -1,5 +1,5 @@
 """
-Entity annotation module for assigning ontology local IDs.
+Entity annotation module for assigning ontology/vocabulary local IDs.
 
 Queries external APIs or uses other creative approaches to retrieve additional identifiers for biological entities.
 """
@@ -28,7 +28,7 @@ class AnnotationEngine:
                  entity_type: str,
                  mode: Literal['all', 'missing', 'none'] = 'missing') -> AssignedIDsDict | pd.Series:
         """
-        Annotate entity with additional local IDs, obtained using various internal or external methods.
+        Annotate entity with additional vocab IDs, obtained using various internal or external methods.
 
         Args:
             item: Entity or entities to annotate
@@ -72,7 +72,7 @@ class AnnotationEngine:
             return self._annotate_single(item, name_field, provided_id_fields, mode, annotators)
 
 
-    # ------------------------------------- Heper methods --------------------------------------- #
+    # ------------------------------------- Helper methods --------------------------------------- #
 
 
     def _select_annotators(self, entity_type_cleaned: str) -> List:
