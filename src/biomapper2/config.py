@@ -3,6 +3,7 @@ Configuration settings for biomapper2.
 
 Customize these values to change API endpoints, model versions, and logging behavior.
 """
+
 import os
 
 from dotenv import load_dotenv
@@ -22,6 +23,6 @@ BIOLINK_VERSION_DEFAULT = "4.2.5"
 LOG_LEVEL = "INFO"
 
 # Secrets (from environment variables)
-KESTREL_API_KEY = os.getenv('KESTREL_API_KEY')
+KESTREL_API_KEY = os.getenv("KESTREL_API_KEY")
 if not KESTREL_API_KEY:
     raise ValueError("KESTREL_API_KEY environment variable is not set")
