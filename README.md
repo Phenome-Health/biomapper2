@@ -1,6 +1,6 @@
 # biomapper2
 
-![Tests](https://github.com/arpanauts/biomapper2/actions/workflows/test.yml/badge.svg)
+![CI](https://github.com/arpanauts/biomapper2/actions/workflows/ci.yml/badge.svg)
 
 Unified toolkit for multiomics data harmonization, from entity linking and identifier standardization to knowledge graph mapping and cross-dataset alignment.
 
@@ -87,6 +87,28 @@ uv run pytest -vs      # Run with verbose output and logging/prints displayed
 
 **Note:** Tests run automatically on every commit via GitHub Actions (CI/CD).
 
+## Development
+
+### Code quality checks
+
+Before committing, run all checks locally:
+```bash
+./scripts/check.sh     # Run ruff, black, pyright, and pytests
+```
+
+Auto-fix formatting and linting issues:
+```bash
+./scripts/fix.sh       # Apply ruff and black fixes automatically
+```
+
+**Note:** These same checks run in CI on every push/PR. All checks must pass before merging.
+
+### Tools used
+- **Black** - Code formatting (120 char line length)
+- **Ruff** - Linting and import sorting
+- **Pyright** - Type checking
+- **Pytest** - Testing
+
 ## Project structure
 ```
 src/biomapper2/
@@ -109,6 +131,7 @@ src/biomapper2/
 examples/                       # Working code examples
 tests/                          # Pytest test suite
 data/                           # Example and groundtruth datasets
+scripts/                        # Development scripts (check.sh, fix.sh)
 ```
 
 ### Configuration
