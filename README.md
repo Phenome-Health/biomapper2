@@ -89,25 +89,15 @@ uv run pytest -vs      # Run with verbose output and logging/prints displayed
 
 ## Development
 
-### Code quality checks
+### Quick Start
 
-Before committing, run all checks locally:
+Run all code quality checks before committing:
 ```bash
 ./scripts/check.sh     # Run ruff, black, pyright, and pytests
+./scripts/fix.sh       # Auto-fix formatting and linting issues
 ```
 
-Auto-fix formatting and linting issues:
-```bash
-./scripts/fix.sh       # Apply ruff and black fixes automatically
-```
-
-**Note:** These same checks run in CI on every push/PR. All checks must pass before merging.
-
-### Tools used
-- **Black** - Code formatting (120 char line length)
-- **Ruff** - Linting and import sorting
-- **Pyright** - Type checking
-- **Pytest** - Testing
+**For detailed contribution guidelines, code style standards, and workflow practices, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).**
 
 ## Project structure
 ```

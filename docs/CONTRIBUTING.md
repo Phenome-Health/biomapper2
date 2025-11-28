@@ -19,7 +19,7 @@ Run all code quality checks locally:
 ./scripts/check.sh
 ```
 
-**Note:** CI runs the same checks as check.sh automatically on every PR. All checks must pass before merging.
+**Note:** CI runs the same checks as `check.sh` automatically on every PR. All checks must pass before merging.
 
 ## Commit Messages
 We use [Conventional Commits](https://www.conventionalcommits.org/):
@@ -107,11 +107,11 @@ With these installed, many issues will be fixed automatically as you code, and y
 
 * Use GitHub Issues for task tracking
 * Move cards across Kanban board:
-  * Backlog - Identified tasks
-  * Ready - Tasks that are ready to be worked on
-  * In progress - Tasks that are actively being worked on
-  * In review - Tasks that are complete and pending PR
-  * Done - Tasks that have had the relevant PR merged
+  * **Backlog** - Identified tasks
+  * **Ready** - Tasks that are ready to be worked on
+  * **In progress** - Tasks that are actively being worked on
+  * **In review** - Tasks that are complete and pending PR
+  * **Done** - Tasks that have had the relevant PR merged
 * Link PRs to issues: `Closes #42` in PR description
 * Label issues: bug, enhancement, documentation, planning
 
