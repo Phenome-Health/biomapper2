@@ -108,18 +108,19 @@ class Mapper:
 
     def map_dataset_to_kg(
         self,
-        dataset_tsv_path: str,
+        dataset: str | pd.DataFrame,  # changed from dataset_tsv_path
         entity_type: str,
         name_column: str,
         provided_id_columns: list[str],
         array_delimiters: list[str] | None = None,
         annotation_mode: Literal["all", "missing", "none"] = "missing",
+        output_prefix: str | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """
         Map all entities in a dataset to knowledge graph nodes.
 
         Args:
-            dataset_tsv_path: Path to TSV file containing dataset
+            dataset: Path to TSV/CSV file or pandas DataFrame for processing
             entity_type: Type of entities (e.g., 'metabolite', 'protein')
             name_column: Column containing entity names
             provided_id_columns: Columns containing (un-normalized) vocab identifiers
@@ -128,17 +129,35 @@ class Mapper:
                 - 'all': Annotate all entities
                 - 'missing': Only annotate entities without provided_ids (default)
                 - 'none': Skip annotation entirely (returns empty)
+            output_prefix: Optional path to save the output TSV file
 
         Returns:
             Tuple of (output_tsv_path, stats_summary)
         """
-        logging.info(f"Beginning to map dataset to KG ({dataset_tsv_path})")
+        logging.info(f"Beginning to map dataset to KG ({dataset})")
         array_delimiters = array_delimiters if array_delimiters is not None else [",", ";"]
 
         # TODO: Optionally allow people to input a Dataframe directly, as opposed to TSV path? #3
+        # Addressed below:
+        # Check if dataset is a pandas dataframe of a path to tsv/csv file
+        # TODO: how to handle other data types, like .txt?
 
-        # Load tsv into pandas
-        df = pd.read_csv(dataset_tsv_path, sep="\t", dtype={id_col: str for id_col in provided_id_columns})
+        # TODO: let file output location be configurable? #11
+        # Issue: if dataset is a pandas df, need to create some default filename
+        # naively create a default output filename (input_df_MAPPED) if output_prefix not provided
+
+        if isinstance(dataset, pd.DataFrame):
+            df = dataset
+            output_tsv_path = "input_df_MAPPED.tsv" if output_prefix is None else f"{output_prefix}_MAPPED.tsv"
+        elif isinstance(dataset, str):
+            # Load tsv into pandas
+            output_tsv_path = dataset.replace(".tsv", "_MAPPED.tsv").replace(".csv", "_MAPPED.tsv")
+            if dataset.endswith(".tsv"):
+                df = pd.read_csv(dataset, sep="\t", dtype={id_col: str for id_col in provided_id_columns})
+            elif dataset.endswith(".csv"):
+                df = pd.read_csv(dataset, dtype={id_col: str for id_col in provided_id_columns})
+            else:
+                raise ValueError(f"Unsupported file extension for dataset: {dataset}")
 
         # Do some basic cleanup to try to ensure empty cells are represented consistently
         df[provided_id_columns] = df[provided_id_columns].replace("-", np.nan)
@@ -182,8 +201,7 @@ class Mapper:
             )
 
         # Dump the final dataframe to a TSV
-        # TODO: let file output location be configurable? #11
-        output_tsv_path = dataset_tsv_path.replace(".tsv", "_MAPPED.tsv")
+
         logging.info(f"Dumping output TSV to {output_tsv_path}")
         df.to_csv(output_tsv_path, sep="\t", index=False)
 
