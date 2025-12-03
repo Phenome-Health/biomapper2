@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pandas as pd
+
 from biomapper2.mapper import Mapper
 
 PROJECT_ROOT_PATH = Path(__file__).parents[1]
@@ -72,3 +74,22 @@ def test_map_dataset_metabolites_synthetic_partial_provided(shared_mapper: Mappe
     assert stats["mapped_to_kg_provided"] == 27
     assert stats["mapped_to_kg_assigned"] == 3
     assert stats["mapped_to_kg_provided_and_assigned"] == 0
+
+
+def test_provide_pandas_df_to_mapper(shared_mapper: Mapper):
+
+    df = pd.read_csv(str(PROJECT_ROOT_PATH / "data" / "examples" / "olink_protein_metadata.tsv"), sep="\t")
+
+    # Map the dataset
+    results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
+        dataset=df,
+        entity_type="protein",
+        name_column="Assay",
+        provided_id_columns=["UniProt"],
+        array_delimiters=["_"],
+    )
+
+    # Based on provided ids alone, we get 2922 / 2923 proteins in this dataset
+    result_df = pd.read_csv(results_tsv_path, sep="\t")
+
+    assert result_df.shape[0] == df.shape[0]
