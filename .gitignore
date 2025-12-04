@@ -18,7 +18,7 @@ htmlcov/
 
 # Jupyter
 .ipynb_checkpoints/
-*.ipynb  # Optional: if notebooks shouldn't be tracked
+*.ipynb 
 
 # IDE
 .vscode/
@@ -37,6 +37,7 @@ data/processed/
 *.tsv
 *.parquet
 *.h5
+*.json
 data/**/*.json
 
 # Allow our designated example/groundtruth datasets
