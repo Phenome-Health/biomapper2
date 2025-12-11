@@ -1,0 +1,32 @@
+name: Mirror Sync
+
+on:
+  # Trigger after CI workflow completes on main
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  sync-to-mirror:
+    runs-on: ubuntu-latest
+    # Only run on source repo, after successful CI
+    if: |
+      github.repository == 'Phenome-Health/biomapper2' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Full history for proper sync
+
+      - name: Push to mirror
+        run: |
+          git remote add mirror https://x-access-token:${{ secrets.MIRROR_PUSH_TOKEN }}@github.com/arpanauts/biomapper2.git
+          git push mirror main --force
+        env:
+          MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
