@@ -26,15 +26,15 @@ class TestRealAPI:
         assert "metabolomics-workbench" in result
         annotations = result["metabolomics-workbench"]
 
-        # Verify expected vocabularies are present
-        assert "pubchem.compound" in annotations
-        assert "inchikey" in annotations
+        # Verify expected fields are present (raw API field names)
+        assert "pubchem_cid" in annotations
+        assert "inchi_key" in annotations
         assert "smiles" in annotations
-        assert "rm" in annotations
+        assert "refmet_id" in annotations
 
         # Verify specific known values for Carnitine
-        assert "10917" in annotations["pubchem.compound"]
-        assert "PHIQHXFUZVPYII-ZCFIWIBFSA-N" in annotations["inchikey"]
+        assert "10917" in annotations["pubchem_cid"]
+        assert "PHIQHXFUZVPYII-ZCFIWIBFSA-N" in annotations["inchi_key"]
 
     def test_real_api_nonexistent(self):
         """Test real API call for nonexistent metabolite."""
@@ -59,9 +59,9 @@ class TestRealAPI:
         assert "metabolomics-workbench" in result
         annotations = result["metabolomics-workbench"]
 
-        # Verify expected vocabularies are present (this is a known metabolite)
-        assert "pubchem.compound" in annotations
-        assert "inchikey" in annotations
+        # Verify expected fields are present (raw API field names)
+        assert "pubchem_cid" in annotations
+        assert "inchi_key" in annotations
 
         # Verify specific known values for 5-hydroxyindoleacetic acid
-        assert "1826" in annotations["pubchem.compound"]
+        assert "1826" in annotations["pubchem_cid"]

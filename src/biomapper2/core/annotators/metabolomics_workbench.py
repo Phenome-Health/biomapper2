@@ -15,7 +15,8 @@ from .base import BaseAnnotator
 class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
     """Annotator that queries the Metabolomics Workbench RefMet API.
 
-    Retrieves vocabulary IDs (PubChem, InChIKey, SMILES, RefMet) for metabolite entities.
+    Retrieves vocabulary IDs for metabolite entities. Returns raw API field names;
+    the Normalizer handles mapping to standard vocab names and ID cleaning.
 
     API Endpoint: GET https://www.metabolomicsworkbench.org/rest/refmet/name/{metabolite_name}/all/
     """
@@ -23,13 +24,17 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
     slug = "metabolomics-workbench"
     BASE_URL = "https://www.metabolomicsworkbench.org/rest/refmet/name"
 
-    # Mapping from API response fields to normalizer vocabulary names
-    FIELD_TO_VOCAB = {
-        "pubchem_cid": "pubchem.compound",
-        "inchi_key": "inchikey",
-        "smiles": "smiles",
-        "refmet_id": "rm",
-    }
+    # API fields to extract (raw field names - Normalizer handles mapping)
+    API_FIELDS = [
+        "pubchem_cid",
+        "inchi_key",
+        "smiles",
+        "refmet_id",
+        "ChEBI_ID",
+        "HMDB_ID",
+        "LM_ID",
+        "KEGG_ID",
+    ]
 
     def get_annotations(self, entity: dict | pd.Series, name_field: str, cache: dict | None = None) -> AssignedIDsDict:
         """Get annotations for a single entity.
@@ -40,7 +45,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             cache: Optional pre-fetched results from bulk API call
 
         Returns:
-            Dict with annotation results
+            Dict with annotation results using raw API field names
         """
         # Extract the entity name
         name = entity.get(name_field)
@@ -59,15 +64,14 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             # No data returned from API
             return {self.slug: {}}
 
-        # Build the annotations structure
+        # Build the annotations structure using raw API field names
         annotations: dict[str, dict[str, dict[str, Any]]] = defaultdict(lambda: defaultdict(dict))
 
-        for api_field, vocab in self.FIELD_TO_VOCAB.items():
+        for api_field in self.API_FIELDS:
             value = api_data.get(api_field)
             if value:
-                # Clean up the value (e.g., remove "RM" prefix from refmet_id)
-                local_id = self._clean_value(api_field, value)
-                annotations[vocab][local_id] = {}
+                # Use raw field name and value - Normalizer handles mapping and cleaning
+                annotations[api_field][value] = {}
 
         return {self.slug: dict(annotations)}
 
@@ -120,19 +124,3 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             return data
 
         return None
-
-    @staticmethod
-    def _clean_value(api_field: str, value: str) -> str:
-        """Clean up API field values.
-
-        Args:
-            api_field: Name of the API field
-            value: Raw value from API
-
-        Returns:
-            Cleaned value
-        """
-        if api_field == "refmet_id" and value.startswith("RM"):
-            # Remove "RM" prefix from refmet_id (e.g., "RM0008606" -> "0008606")
-            return value[2:]
-        return value

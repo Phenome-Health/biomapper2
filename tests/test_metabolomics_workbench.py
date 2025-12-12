@@ -55,7 +55,7 @@ class TestGetAnnotations:
 
     @patch("biomapper2.core.annotators.metabolomics_workbench.requests.get")
     def test_vocabulary_mappings(self, mock_get: MagicMock):
-        """Test that API fields are mapped to correct vocabulary names."""
+        """Test that API fields are returned with raw field names (Normalizer handles mapping)."""
         # Arrange
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -75,24 +75,22 @@ class TestGetAnnotations:
         # Act
         result = annotator.get_annotations(entity, name_field="name")
 
-        # Assert - verify vocabulary mappings
+        # Assert - verify raw API field names are used (Normalizer handles mapping)
         annotations = result["metabolomics-workbench"]
 
-        # pubchem_cid -> pubchem.compound
-        assert "pubchem.compound" in annotations
-        assert "10917" in annotations["pubchem.compound"]
+        # Raw field names preserved
+        assert "pubchem_cid" in annotations
+        assert "10917" in annotations["pubchem_cid"]
 
-        # inchi_key -> inchikey
-        assert "inchikey" in annotations
-        assert "PHIQHXFUZVPYII-ZCFIWIBFSA-N" in annotations["inchikey"]
+        assert "inchi_key" in annotations
+        assert "PHIQHXFUZVPYII-ZCFIWIBFSA-N" in annotations["inchi_key"]
 
-        # smiles -> smiles
         assert "smiles" in annotations
         assert "C[N+](C)(C)C[C@@H](CC(=O)[O-])O" in annotations["smiles"]
 
-        # refmet_id -> rm (with RM prefix removed)
-        assert "rm" in annotations
-        assert "0008606" in annotations["rm"]
+        # refmet_id preserved with RM prefix (Normalizer handles cleaning)
+        assert "refmet_id" in annotations
+        assert "RM0008606" in annotations["refmet_id"]
 
 
 class TestEdgeCases:
@@ -175,9 +173,9 @@ class TestEdgeCases:
         call_url = mock_get.call_args[0][0]
         assert "5-hydroxyindoleacetic%20acid" in call_url
 
-        # Assert - verify annotations returned
+        # Assert - verify annotations returned with raw field names
         assert "metabolomics-workbench" in result
-        assert "pubchem.compound" in result["metabolomics-workbench"]
+        assert "pubchem_cid" in result["metabolomics-workbench"]
 
     @patch("biomapper2.core.annotators.metabolomics_workbench.requests.get")
     def test_api_http_error(self, mock_get: MagicMock):
@@ -227,15 +225,15 @@ class TestEdgeCases:
         # Act
         result = annotator.get_annotations(entity, name_field="name")
 
-        # Assert - should only include available fields
+        # Assert - should only include available fields (raw API field names)
         annotations = result["metabolomics-workbench"]
-        assert "pubchem.compound" in annotations
-        assert "12345" in annotations["pubchem.compound"]
+        assert "pubchem_cid" in annotations
+        assert "12345" in annotations["pubchem_cid"]
 
         # Missing fields should not be in annotations
-        assert "inchikey" not in annotations
+        assert "inchi_key" not in annotations
         assert "smiles" not in annotations
-        assert "rm" not in annotations
+        assert "refmet_id" not in annotations
 
 
 class TestBulkOperations:
@@ -315,10 +313,10 @@ class TestBulkOperations:
         # Assert - no API call should be made
         mock_get.assert_not_called()
 
-        # Assert - annotations should still be returned from cache
+        # Assert - annotations should still be returned from cache (raw field names)
         assert "metabolomics-workbench" in result
-        assert "pubchem.compound" in result["metabolomics-workbench"]
-        assert "10917" in result["metabolomics-workbench"]["pubchem.compound"]
+        assert "pubchem_cid" in result["metabolomics-workbench"]
+        assert "10917" in result["metabolomics-workbench"]["pubchem_cid"]
 
 
 class TestAnnotationEngineIntegration:
@@ -392,11 +390,11 @@ class TestEndToEndPipeline:
         assert "metabolomics-workbench" in assigned_ids
         mw_annotations = assigned_ids["metabolomics-workbench"]
 
-        # Verify expected vocabularies are populated
-        assert "pubchem.compound" in mw_annotations
-        assert "10917" in mw_annotations["pubchem.compound"]
-        assert "inchikey" in mw_annotations
-        assert "PHIQHXFUZVPYII-ZCFIWIBFSA-N" in mw_annotations["inchikey"]
+        # Verify expected fields are populated (raw API field names)
+        assert "pubchem_cid" in mw_annotations
+        assert "10917" in mw_annotations["pubchem_cid"]
+        assert "inchi_key" in mw_annotations
+        assert "PHIQHXFUZVPYII-ZCFIWIBFSA-N" in mw_annotations["inchi_key"]
 
     def test_annotation_engine_annotates_dataframe_with_real_api(self):
         """Test that AnnotationEngine correctly annotates a DataFrame using real MW API."""
@@ -419,12 +417,12 @@ class TestEndToEndPipeline:
         assert "assigned_ids" in result.columns
         assert len(result) == 2
 
-        # Verify first row (Carnitine) has MW annotations
+        # Verify first row (Carnitine) has MW annotations (raw field names)
         carnitine_ids = result.iloc[0]["assigned_ids"]
         assert "metabolomics-workbench" in carnitine_ids
-        assert "pubchem.compound" in carnitine_ids["metabolomics-workbench"]
+        assert "pubchem_cid" in carnitine_ids["metabolomics-workbench"]
 
-        # Verify second row (Glucose) has MW annotations
+        # Verify second row (Glucose) has MW annotations (raw field names)
         glucose_ids = result.iloc[1]["assigned_ids"]
         assert "metabolomics-workbench" in glucose_ids
-        assert "pubchem.compound" in glucose_ids["metabolomics-workbench"]
+        assert "pubchem_cid" in glucose_ids["metabolomics-workbench"]
