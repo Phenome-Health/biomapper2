@@ -31,10 +31,19 @@ Run: `./scripts/check.sh`
 ## 5. Tests
 - New code has test coverage
 - Integration tests are marked with `@pytest.mark.integration`
+- **Test count: 8 or fewer tests** for a single feature/component
+- **Single test file** per feature (not split across multiple files)
+- **End-to-end test exists** using `Mapper.map_entity_to_kg()` or `Mapper.map_dataset_to_kg()`
 
 ## 6. Documentation
 - CLAUDE.md is up to date (if patterns changed)
 - Demo notebooks reflect current API behavior
+
+## 7. PR Comment Review
+Before posting any PR comments:
+- Show the draft comment to user for review
+- Wait for user approval before posting
+- Include a summary of changes made
 
 ---
 

@@ -115,3 +115,17 @@ When implementing annotators:
 3. **Run quality checks**: `./scripts/check.sh`
 4. **Verify patterns** match existing annotators (raw field names, no ID cleaning)
 5. **Commit both files** when adding dependencies: `pyproject.toml` and `uv.lock`
+6. **Test requirements** for new features:
+   - 8 or fewer tests in a single test file
+   - Include at least one end-to-end test using `Mapper.map_entity_to_kg()`
+   - Mark integration tests with `@pytest.mark.integration`
+
+---
+
+## Claude Code Workflow
+
+When using Claude Code to prepare PRs:
+
+1. **Before posting PR comments**: Always present the draft comment to the user for review first
+2. **Before pushing**: Show the user the changes and get confirmation
+3. **Use /pr-prep**: Run the PR preparation checklist before finalizing
