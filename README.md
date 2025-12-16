@@ -1,6 +1,6 @@
 # biomapper2
 
-![CI](https://github.com/arpanauts/biomapper2/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/Phenome-Health/biomapper2/actions/workflows/ci.yml/badge.svg)
 
 Unified toolkit for multiomics data harmonization, from entity linking and identifier standardization to knowledge graph mapping and cross-dataset alignment.
 
@@ -17,7 +17,7 @@ For other platforms, see [uv installation docs](https://docs.astral.sh/uv/gettin
 
 ### Clone and install
 ```bash
-git clone https://github.com/arpanauts/biomapper2.git
+git clone https://github.com/Phenome-Health/biomapper2.git
 cd biomapper2
 uv sync --dev
 ```
