@@ -92,10 +92,12 @@ class TestNormalizeIntegration:
 
     def test_normalize_entity_with_list_in_string_uniprot(self, normalizer):
         """List-in-string UniProt IDs produce correct curies."""
-        entity = pd.Series({
-            "name": "Test Protein",
-            "UniProt": "['Q14213', 'Q8NEV9']",
-        })
+        entity = pd.Series(
+            {
+                "name": "Test Protein",
+                "UniProt": "['Q14213', 'Q8NEV9']",
+            }
+        )
         result = normalizer.normalize(
             item=entity,
             provided_id_fields=["UniProt"],
@@ -108,10 +110,12 @@ class TestNormalizeIntegration:
 
     def test_normalize_entity_with_tuple_in_string_hmdb(self, normalizer):
         """Tuple-in-string HMDB IDs produce correct curies."""
-        entity = pd.Series({
-            "name": "Test Metabolite",
-            "HMDB": "('HMDB0000122', 'HMDB0000190')",
-        })
+        entity = pd.Series(
+            {
+                "name": "Test Metabolite",
+                "HMDB": "('HMDB0000122', 'HMDB0000190')",
+            }
+        )
         result = normalizer.normalize(
             item=entity,
             provided_id_fields=["HMDB"],
@@ -122,11 +126,13 @@ class TestNormalizeIntegration:
 
     def test_normalize_entity_mixed_formats(self, normalizer):
         """Handles mix of list-in-string and delimited formats."""
-        entity = pd.Series({
-            "name": "Test Entity",
-            "UniProt": "['Q14213', 'Q8NEV9']",  # list-in-string
-            "HMDB": "HMDB0000122,HMDB0000190",  # comma-delimited
-        })
+        entity = pd.Series(
+            {
+                "name": "Test Entity",
+                "UniProt": "['Q14213', 'Q8NEV9']",  # list-in-string
+                "HMDB": "HMDB0000122,HMDB0000190",  # comma-delimited
+            }
+        )
         result = normalizer.normalize(
             item=entity,
             provided_id_fields=["UniProt", "HMDB"],
