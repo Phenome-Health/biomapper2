@@ -4,7 +4,7 @@ from typing import Any
 
 import pandas as pd
 
-from ...utils import AssignedIDsDict, kestrel_request
+from ...utils import AssignedIDsDict, kestrel_request, text_is_not_empty
 from .base import BaseAnnotator
 
 
@@ -17,7 +17,7 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
 
         # Extract the value to search
         search_term = entity.get(name_field)
-        if search_term:
+        if text_is_not_empty(search_term):
             # Use cache if available, otherwise make API call
             if cache:
                 results = cache.get(search_term)
@@ -40,14 +40,19 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
     def get_annotations_bulk(self, entities: pd.DataFrame, name_field: str) -> pd.Series:  # Series of AssignedIDsDicts
         """Get annotations for multiple entities with bulk optimization."""
 
+        # TODO: Remove this once using kestrel's new bulk endpoint (this is temporary catch)
+        if len(entities) > 30:
+            raise ValueError("KestrelTextSearchAnnotator can't handle large batches yet (but soon it will!)")
+
         # Extract all search terms (adjust column name as needed)
-        search_terms = entities["name"].tolist()
+        search_terms = entities[name_field].tolist()
 
         # Build cache with all API calls  TODO: use actual bulk endpoint once stand that up...
         logging.info(f"Getting results from Kestrel API for {len(entities)} entities")
         cache = {}
         for term in search_terms:
-            cache[term] = self._kestrel_text_search(term, limit=1)
+            if text_is_not_empty(term):
+                cache[term] = self._kestrel_text_search(term, limit=1)
 
         # Annotate each entity using the cache
         assigned_ids_col = entities.apply(self.get_annotations, axis=1, cache=cache, name_field=name_field)

@@ -62,7 +62,7 @@ from biomapper2.mapper import Mapper
 mapper = Mapper()
 
 mapper.map_dataset_to_kg(
-    dataset_tsv_path='data/examples/olink_protein_metadata.tsv',
+    dataset='data/examples/olink_protein_metadata.tsv',
     entity_type='protein',
     name_column='Assay',
     provided_id_columns=['UniProt'],
