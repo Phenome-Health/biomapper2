@@ -8,6 +8,7 @@ import logging
 import re
 import sys
 from collections import defaultdict
+from collections.abc import Iterable
 from typing import Any
 
 import pandas as pd
@@ -146,7 +147,7 @@ class Normalizer:
         curies = dict()
         invalid_ids = defaultdict(list)
         for id_field_name, local_ids_entry in local_ids_dict.items():
-            local_ids = [local_ids_entry] if isinstance(local_ids_entry, str) else local_ids_entry
+            local_ids = local_ids_entry if isinstance(local_ids_entry, Iterable) else [local_ids_entry]
             id_field_names = [id_field_name] if isinstance(id_field_name, str) else id_field_name
             vocab_names = set()
             for field_name in id_field_names:
