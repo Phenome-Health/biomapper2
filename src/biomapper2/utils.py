@@ -5,7 +5,8 @@ Provides logging setup and mathematical helpers for metric calculations.
 """
 
 import logging
-from typing import Any, TypeGuard
+from collections.abc import Iterable
+from typing import Any, TypeGuard, cast
 
 import pandas as pd
 import requests
@@ -35,6 +36,19 @@ def setup_logging():
 def text_is_not_empty(value: Any) -> TypeGuard[str]:
     """Check if a name/text field value is a valid non-empty string."""
     return isinstance(value, str) and value.strip() != ""
+
+
+def to_list(
+    item: str | Iterable[str] | int | Iterable[int] | float | Iterable[float] | None,
+) -> list[str | int | float]:
+    if item is None:
+        return []
+    elif isinstance(item, list):
+        return cast(list[str | int | float], item)
+    elif isinstance(item, (str, int, float)):
+        return [item]
+    else:
+        return list(item)
 
 
 def safe_divide(numerator, denominator) -> float | None:
