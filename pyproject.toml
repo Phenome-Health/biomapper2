@@ -22,8 +22,8 @@ packages = ["src/biomapper2"]
 
 [dependency-groups]
 dev = [
-    "ipykernel>=7.1.0",
     "black>=25.11.0",
+    "ipykernel>=7.1.0",
     "pandas-stubs>=2.3.2.250926",
     "pyright>=1.1.407",
     "pytest>=8.4.2",
@@ -49,3 +49,8 @@ select = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["biomapper2"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]

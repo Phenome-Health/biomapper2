@@ -13,6 +13,7 @@ import pandas as pd
 from ..utils import AssignedIDsDict
 from .annotators.base import BaseAnnotator
 from .annotators.kestrel_text import KestrelTextSearchAnnotator
+from .annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
 
 
 class AnnotationEngine:
@@ -21,6 +22,7 @@ class AnnotationEngine:
     def __init__(self):
         """Initialize the annotation engine and set up available annotators."""
         self.kestrel_text_search_annotator = KestrelTextSearchAnnotator()
+        self.metabolomics_workbench_annotator = MetabolomicsWorkbenchAnnotator()
 
     def annotate(
         self,
@@ -79,9 +81,9 @@ class AnnotationEngine:
 
     def _select_annotators(self, entity_type_cleaned: str) -> list[BaseAnnotator]:
         """Select appropriate annotators based on entity type."""
-        annotators = []
+        annotators: list[BaseAnnotator] = []
         if entity_type_cleaned in {"metabolite", "smallmolecule", "lipid"}:
-            pass  # TODO: plug in metabolomics workbench API here..
+            annotators.append(self.metabolomics_workbench_annotator)
         if not annotators:
             # Back up to using a text search (this is a PLACEHOLDER, should not be fallback long-term)
             annotators.append(self.kestrel_text_search_annotator)
