@@ -63,6 +63,77 @@ def load_prefix_info(biolink_version: str) -> dict[str, dict[str, str]]:
     prefix_to_iri_map["PLANTFA"] = ""  # Could look harder for this iri..
     prefix_to_iri_map["RM"] = "https://www.metabolomicsworkbench.org/databases/refmet/refmet_details.php?REFMET_ID=RM"
 
+    # KRAKEN Vocab Prefixes (Issue #12) - add custom prefixes not in Biolink
+    prefix_to_iri_map["KEGG.ENZYME"] = "https://www.kegg.jp/entry/ec:"
+    prefix_to_iri_map["KEGG.GLYCAN"] = "https://www.kegg.jp/entry/"
+    prefix_to_iri_map["HGNC"] = "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:"
+    prefix_to_iri_map["MGI"] = "http://www.informatics.jax.org/marker/MGI:"
+    prefix_to_iri_map["RGD"] = "https://rgd.mcw.edu/rgdweb/report/gene/main.html?id="
+    prefix_to_iri_map["RXNORM"] = "https://mor.nlm.nih.gov/RxNav/search?searchBy=RXCUI&searchTerm="
+    prefix_to_iri_map["RXCUI"] = "https://mor.nlm.nih.gov/RxNav/search?searchBy=RXCUI&searchTerm="
+    prefix_to_iri_map["DrugCentral"] = "https://drugcentral.org/drugcard/"
+    prefix_to_iri_map["ATC"] = "https://www.whocc.no/atc_ddd_index/?code="
+    prefix_to_iri_map["RHEA"] = "https://www.rhea-db.org/rhea/"
+    prefix_to_iri_map["UNII"] = "https://precision.fda.gov/uniisearch/srs/unii/"
+    prefix_to_iri_map["OMIM.PS"] = "https://www.omim.org/phenotypicSeries/PS"
+    prefix_to_iri_map["orphanet"] = "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=en&Expert="
+    prefix_to_iri_map["PR"] = "https://proconsortium.org/app/entry/PR:"
+    prefix_to_iri_map["SMPDB"] = "https://smpdb.ca/view/"
+    # Tier 2: Anatomy/Phenotype Ontologies
+    prefix_to_iri_map["AEO"] = "http://purl.obolibrary.org/obo/AEO_"
+    prefix_to_iri_map["BSPO"] = "http://purl.obolibrary.org/obo/BSPO_"
+    prefix_to_iri_map["PATO"] = "http://purl.obolibrary.org/obo/PATO_"
+    prefix_to_iri_map["PO"] = "http://purl.obolibrary.org/obo/PO_"
+    prefix_to_iri_map["SO"] = "http://purl.obolibrary.org/obo/SO_"
+    prefix_to_iri_map["NBO"] = "http://purl.obolibrary.org/obo/NBO_"
+    prefix_to_iri_map["OBI"] = "http://purl.obolibrary.org/obo/OBI_"
+    prefix_to_iri_map["UO"] = "http://purl.obolibrary.org/obo/UO_"
+    prefix_to_iri_map["FAO"] = "http://purl.obolibrary.org/obo/FAO_"
+    prefix_to_iri_map["DDANAT"] = "http://purl.obolibrary.org/obo/DDANAT_"
+    prefix_to_iri_map["GENEPIO"] = "http://purl.obolibrary.org/obo/GENEPIO_"
+    prefix_to_iri_map["MAXO"] = "http://purl.obolibrary.org/obo/MAXO_"
+    prefix_to_iri_map["ZFA"] = "http://purl.obolibrary.org/obo/ZFA_"
+    prefix_to_iri_map["FBbt"] = "http://purl.obolibrary.org/obo/FBbt_"
+    prefix_to_iri_map["EMAPA"] = "http://purl.obolibrary.org/obo/EMAPA_"
+    prefix_to_iri_map["EHDAA2"] = "http://purl.obolibrary.org/obo/EHDAA2_"
+    prefix_to_iri_map["MOD"] = "http://purl.obolibrary.org/obo/MOD_"
+    prefix_to_iri_map["MI"] = "http://purl.obolibrary.org/obo/MI_"
+    # Tier 3: Specialized/Medical
+    prefix_to_iri_map["PathWhiz"] = "https://smpdb.ca/pathwhiz/pathways/"
+    prefix_to_iri_map["PathWhiz.Bound"] = "https://smpdb.ca/pathwhiz/reactions/"
+    prefix_to_iri_map["PathWhiz.Compound"] = "https://smpdb.ca/pathwhiz/metabolites/"
+    prefix_to_iri_map["PathWhiz.ElementCollection"] = "https://smpdb.ca/pathwhiz/"
+    prefix_to_iri_map["PathWhiz.NucleicAcid"] = "https://smpdb.ca/pathwhiz/"
+    prefix_to_iri_map["PathWhiz.ProteinComplex"] = "https://smpdb.ca/pathwhiz/"
+    prefix_to_iri_map["PathWhiz.Reaction"] = "https://smpdb.ca/pathwhiz/reactions/"
+    prefix_to_iri_map["MEDDRA"] = "http://purl.bioontology.org/ontology/MEDDRA/"
+    prefix_to_iri_map["medgen"] = "https://www.ncbi.nlm.nih.gov/medgen/"
+    prefix_to_iri_map["ICD10PCS"] = "https://www.icd10data.com/ICD10PCS/Codes/"
+    prefix_to_iri_map["icd11.foundation"] = "https://icd.who.int/browse11/l-m/en#/"
+    prefix_to_iri_map["HCPCS"] = "https://www.cms.gov/medicare/coding-billing/healthcare-common-procedure-system/"
+    prefix_to_iri_map["NDDF"] = ""
+    prefix_to_iri_map["VANDF"] = ""
+    prefix_to_iri_map["GTOPDB"] = "https://www.guidetopharmacology.org/GRAC/LigandDisplayForward?ligandId="
+    prefix_to_iri_map["PDQ"] = "https://www.cancer.gov/publications/pdq"
+    prefix_to_iri_map["CHV"] = ""
+    prefix_to_iri_map["CDNO"] = "http://purl.obolibrary.org/obo/CDNO_"
+    prefix_to_iri_map["ECTO"] = "http://purl.obolibrary.org/obo/ECTO_"
+    prefix_to_iri_map["FOODON"] = "http://purl.obolibrary.org/obo/FOODON_"
+    prefix_to_iri_map["PSY"] = ""
+    prefix_to_iri_map["ttd.target"] = "https://db.idrblab.net/ttd/data/target/details/"
+    # Tier 4: Model Organism Databases
+    prefix_to_iri_map["FB"] = "https://flybase.org/reports/"
+    prefix_to_iri_map["WB"] = "https://wormbase.org/species/c_elegans/gene/"
+    prefix_to_iri_map["ZFIN"] = "https://zfin.org/"
+    prefix_to_iri_map["SGD"] = "https://www.yeastgenome.org/locus/"
+    prefix_to_iri_map["PomBase"] = "https://www.pombase.org/gene/"
+    prefix_to_iri_map["dictyBase"] = "http://dictybase.org/gene/"
+    prefix_to_iri_map["dictybase.gene"] = "http://dictybase.org/gene/"
+    prefix_to_iri_map["AraPort"] = "https://www.arabidopsis.org/servlets/TairObject?accession="
+    prefix_to_iri_map["CGNC"] = "https://vertebrate.genenames.org/data/gene-symbol-report/#!/cgnc_id/"
+    prefix_to_iri_map["ecogene"] = "https://ecocyc.org/gene?orgid=ECOLI&id="
+    prefix_to_iri_map["EnsemblGenomes"] = "https://www.ensemblgenomes.org/id/"
+
     # Override prefixes as needed (if Biolink's iri is broken)
     prefix_to_iri_map["OMIM"] = "http://purl.bioontology.org/ontology/OMIM/"  # Works for regular ids and MTHU ids
     prefix_to_iri_map["REACT"] = "https://reactome.org/content/detail/"  # Works for Complexes and Pathways (I think)
@@ -155,6 +226,83 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "uszipcode": {"validator": validators.is_uszipcode_id, "cleaner": cleaners.clean_zipcode},
         "vesiclepedia": {"validator": validators.is_vesiclepedia_id},
         "wikipathways": {"validator": validators.is_wikipathways_id, "cleaner": cleaners.clean_wikipathways_id},
+        # =========================================================================
+        # KRAKEN Vocab Validators (Issue #12)
+        # =========================================================================
+        # --- Tier 1: Core Metabolomics/Proteomics/Drugs ---
+        "hgnc": {"validator": validators.is_numeric_id},
+        "mgi": {"validator": validators.is_numeric_id},
+        "rgd": {"validator": validators.is_numeric_id},
+        "rxnorm": {"validator": validators.is_numeric_id},
+        "rxcui": {"validator": validators.is_numeric_id},
+        "drugcentral": {"validator": validators.is_numeric_id},
+        "atc": {"validator": validators.is_atc_id},
+        "rhea": {"validator": validators.is_numeric_id},
+        "unii": {"validator": validators.is_unii_id},
+        "hp": {"validator": validators.is_seven_digit_id, "aliases": ["hpo"]},
+        "omim.ps": {"validator": validators.is_omim_ps_id},
+        "orphanet": {"validator": validators.is_numeric_id, "aliases": ["orpha"]},
+        "pr": {"validator": validators.is_pr_id},
+        "smpdb": {"validator": validators.is_smpdb_id},
+        "kegg.enzyme": {"validator": validators.is_ec_id},  # Reuse existing EC validator
+        "kegg.glycan": {"validator": validators.is_kegg_glycan_id},
+        # --- Tier 2: Anatomy/Phenotype Ontologies ---
+        "aeo": {"validator": validators.is_seven_digit_id},
+        "bspo": {"validator": validators.is_seven_digit_id},
+        "pato": {"validator": validators.is_seven_digit_id},
+        "po": {"validator": validators.is_seven_digit_id},
+        "so": {"validator": validators.is_seven_digit_id},
+        "nbo": {"validator": validators.is_seven_digit_id},
+        "obi": {"validator": validators.is_seven_digit_id},
+        "uo": {"validator": validators.is_seven_digit_id},
+        "fao": {"validator": validators.is_seven_digit_id},
+        "ddanat": {"validator": validators.is_seven_digit_id},
+        "genepio": {"validator": validators.is_seven_digit_id},
+        "maxo": {"validator": validators.is_seven_digit_id},
+        "fma": {"validator": validators.is_numeric_id},
+        "zfa": {"validator": validators.is_zfa_id},
+        "fbbt": {"validator": validators.is_fbbt_id},
+        "emapa": {"validator": validators.is_numeric_id},
+        "ehdaa2": {"validator": validators.is_seven_digit_id},
+        "mod": {"validator": validators.is_mod_id},
+        "mi": {"validator": validators.is_mi_id},
+        # --- Tier 3: Specialized/Medical ---
+        "pathwhiz": {"validator": validators.is_pathwhiz_id},
+        "pathwhiz.bound": {"validator": validators.is_numeric_id},
+        "pathwhiz.compound": {"validator": validators.is_numeric_id},
+        "pathwhiz.elementcollection": {"validator": validators.is_numeric_id},
+        "pathwhiz.nucleicacid": {"validator": validators.is_numeric_id},
+        "pathwhiz.proteincomplex": {"validator": validators.is_numeric_id},
+        "pathwhiz.reaction": {"validator": validators.is_numeric_id},
+        "meddra": {"validator": validators.is_meddra_id},
+        "medgen": {"validator": validators.is_numeric_id},
+        "icd10pcs": {"validator": validators.is_icd10pcs_id},
+        "icd11.foundation": {"validator": validators.is_numeric_id},
+        "hcpcs": {"validator": validators.is_hcpcs_id},
+        "nddf": {"validator": validators.is_numeric_id},
+        "vandf": {"validator": validators.is_vandf_id},
+        "gtopdb": {"validator": validators.is_gtopdb_id},
+        "pdq": {"validator": validators.is_pdq_id},
+        "chv": {"validator": validators.is_chv_id},
+        "cdno": {"validator": validators.is_seven_digit_id},
+        "ecto": {"validator": validators.is_numeric_id},
+        "foodon": {"validator": validators.is_foodon_id},
+        "psy": {"validator": validators.is_numeric_id},
+        "ttd.target": {"validator": validators.is_ttd_target_id},
+        # Note: Generic "kegg" is intentionally NOT registered here.
+        # load_prefix_info() removes KEGG prefix; use kegg.compound, kegg.drug, etc. instead.
+        # --- Tier 4: Model Organism Databases ---
+        "fb": {"validator": validators.is_flybase_id, "aliases": ["flybase"]},
+        "wb": {"validator": validators.is_wormbase_gene_id, "aliases": ["wormbase"]},
+        "zfin": {"validator": validators.is_zfin_id},
+        "sgd": {"validator": validators.is_sgd_id},
+        "pombase": {"validator": validators.is_pombase_id},
+        "dictybase": {"validator": validators.is_dictybase_id},
+        "dictybase.gene": {"validator": validators.is_dictybase_gene_id},
+        "araport": {"validator": validators.is_araport_id},
+        "cgnc": {"validator": validators.is_numeric_id},
+        "ecogene": {"validator": validators.is_ecogene_id},
+        "ensemblgenomes": {"validator": validators.is_ensemblgenomes_id},
     }
 
 

@@ -410,3 +410,224 @@ def is_nhanes_id(local_id: str) -> bool:
 def is_sider_id(local_id: str) -> bool:
     """Allows: SIDER identifiers (typically alphanumeric with possible special chars)"""
     return bool(re.match(r"^[A-Z0-9._-]+$", local_id))
+
+
+# =============================================================================
+# KRAKEN Vocab Validators (Issue #12)
+# =============================================================================
+
+
+def is_numeric_id(local_id: str) -> bool:
+    """Generic validator for pure numeric identifiers (positive integers).
+    Used by: HGNC, MGI, RGD, RxNorm, RXCUI, DrugCentral, RHEA, orphanet, FMA, etc."""
+    return local_id.isdigit() and int(local_id) > 0
+
+
+def is_seven_digit_id(local_id: str) -> bool:
+    """Allows: exactly 7 digits (zero-padded).
+    Used by: HP, PATO, SO, NBO, OBI, UO, AEO, BSPO, FAO, DDANAT, GENEPIO, MAXO, etc."""
+    return bool(re.match(r"^\d{7}$", local_id))
+
+
+# --- Tier 1: Core Metabolomics/Proteomics/Drugs ---
+
+
+def is_atc_id(local_id: str) -> bool:
+    """ATC drug classification codes: letter, 2 digits, 2 letters, 2 digits.
+    Examples: N02AX05, C09DB06, G04BE09"""
+    return bool(re.match(r"^[A-Z]\d{2}[A-Z]{2}\d{2}$", local_id))
+
+
+def is_unii_id(local_id: str) -> bool:
+    """FDA UNII identifiers: exactly 10 alphanumeric characters.
+    Examples: 4XQ51KS2JU, 99R7V50C6Y"""
+    return bool(re.match(r"^[A-Z0-9]{10}$", local_id))
+
+
+def is_omim_ps_id(local_id: str) -> bool:
+    """OMIM Phenotype Series IDs: exactly 6 digits.
+    Examples: 220150, 145600"""
+    return bool(re.match(r"^\d{6}$", local_id))
+
+
+def is_pr_id(local_id: str) -> bool:
+    """Protein Ontology IDs: UniProt-style (6 alphanumeric) or 9-digit numeric.
+    Examples: Q9BY49, P12345, 000007707"""
+    # UniProt-style: 6 alphanumeric with at least one letter and one digit
+    if re.match(r"^[A-Z0-9]{6}$", local_id):
+        has_letter = any(c.isalpha() for c in local_id)
+        has_digit = any(c.isdigit() for c in local_id)
+        return has_letter and has_digit
+    # 9-digit numeric
+    return bool(re.match(r"^\d{9}$", local_id))
+
+
+def is_smpdb_id(local_id: str) -> bool:
+    """SMPDB pathway IDs: SMP followed by 7 digits.
+    Examples: SMP0032202, SMP0086506"""
+    return bool(re.match(r"^SMP\d{7}$", local_id))
+
+
+def is_kegg_glycan_id(local_id: str) -> bool:
+    """KEGG glycan IDs: G followed by 5 digits.
+    Examples: G04638, G02524"""
+    return bool(re.match(r"^G\d{5}$", local_id))
+
+
+# --- Tier 2: Anatomy/Phenotype Ontologies ---
+
+
+def is_fbbt_id(local_id: str) -> bool:
+    """FlyBase anatomy IDs: exactly 8 digits.
+    Examples: 00001059, 00050048"""
+    return bool(re.match(r"^\d{8}$", local_id))
+
+
+def is_zfa_id(local_id: str) -> bool:
+    """Zebrafish anatomy IDs: exactly 7 digits.
+    Examples: 0001617, 0000110"""
+    return bool(re.match(r"^\d{7}$", local_id))
+
+
+def is_mod_id(local_id: str) -> bool:
+    """Protein modification ontology IDs: exactly 5 digits.
+    Examples: 01160, 00046"""
+    return bool(re.match(r"^\d{5}$", local_id))
+
+
+def is_mi_id(local_id: str) -> bool:
+    """Molecular interactions ontology IDs: 4 digits.
+    Examples: 2133, 0001"""
+    return bool(re.match(r"^\d{4}$", local_id))
+
+
+# --- Tier 3: Specialized/Medical ---
+
+
+def is_pathwhiz_id(local_id: str) -> bool:
+    """PathWhiz pathway IDs: PW followed by 6 digits.
+    Examples: PW050892, PW056905"""
+    return bool(re.match(r"^PW\d{6}$", local_id))
+
+
+def is_meddra_id(local_id: str) -> bool:
+    """MedDRA IDs: exactly 8 digits.
+    Examples: 10011730, 10000001"""
+    return bool(re.match(r"^\d{8}$", local_id))
+
+
+def is_icd10pcs_id(local_id: str) -> bool:
+    """ICD-10 Procedure Coding System IDs: 7 alphanumeric characters.
+    Examples: 0LPY4JZ, 02100Z9"""
+    return bool(re.match(r"^[A-Z0-9]{7}$", local_id))
+
+
+def is_hcpcs_id(local_id: str) -> bool:
+    """Healthcare Common Procedure Coding System IDs: letter followed by 4 digits.
+    Examples: A9551, J0171"""
+    return bool(re.match(r"^[A-Z]\d{4}$", local_id))
+
+
+def is_vandf_id(local_id: str) -> bool:
+    """VA National Drug File IDs: numeric.
+    Examples: 4040230"""
+    return local_id.isdigit() and int(local_id) > 0
+
+
+def is_gtopdb_id(local_id: str) -> bool:
+    """Guide to Pharmacology IDs: numeric.
+    Examples: 7484"""
+    return local_id.isdigit() and int(local_id) > 0
+
+
+def is_pdq_id(local_id: str) -> bool:
+    """NCI PDQ IDs: CDR followed by 10 digits.
+    Examples: CDR0000770458"""
+    return bool(re.match(r"^CDR\d{10}$", local_id))
+
+
+def is_chv_id(local_id: str) -> bool:
+    """Consumer Health Vocabulary IDs: exactly 10 digits.
+    Examples: 0000006350"""
+    return bool(re.match(r"^\d{10}$", local_id))
+
+
+def is_foodon_id(local_id: str) -> bool:
+    """Food Ontology IDs: exactly 8 digits.
+    Examples: 03541961"""
+    return bool(re.match(r"^\d{8}$", local_id))
+
+
+def is_ttd_target_id(local_id: str) -> bool:
+    """Therapeutic Target Database IDs: alphanumeric with optional hyphens.
+    Examples: CY-1503, T12345"""
+    return bool(re.match(r"^[A-Za-z0-9_-]+$", local_id))
+
+
+def is_kegg_pathway_id(local_id: str) -> bool:
+    """KEGG pathway IDs: 5 digits (general pathways) or hsa/mmu + 5 digits.
+    Examples: 04966, hsa04110"""
+    return bool(re.match(r"^([a-z]{3})?\d{5}$", local_id))
+
+
+# --- Tier 4: Model Organism Databases ---
+
+
+def is_flybase_id(local_id: str) -> bool:
+    """FlyBase IDs: FB prefix + type code (gn/tr/pp/cl/ab/ba/rf) + digits.
+    Examples: FBgn0019985, FBtr0073412, FBpp0080851"""
+    return bool(re.match(r"^FB(gn|tr|pp|cl|ab|ba|rf)\d+$", local_id))
+
+
+def is_wormbase_gene_id(local_id: str) -> bool:
+    """WormBase gene IDs: WBGene followed by 8 digits.
+    Examples: WBGene00012992, WBGene00010912"""
+    return bool(re.match(r"^WBGene\d{8}$", local_id))
+
+
+def is_zfin_id(local_id: str) -> bool:
+    """ZFIN zebrafish IDs: ZDB-TYPE-digits-digits.
+    Examples: ZDB-GENE-130109-1, ZDB-GENE-041014-10"""
+    return bool(re.match(r"^ZDB-[A-Z]+-\d+-\d+$", local_id))
+
+
+def is_sgd_id(local_id: str) -> bool:
+    """SGD yeast IDs: S followed by 9 digits.
+    Examples: S000004291, S000004559"""
+    return bool(re.match(r"^S\d{9}$", local_id))
+
+
+def is_pombase_id(local_id: str) -> bool:
+    """PomBase fission yeast IDs: SP + alphanumeric + dot + digits + optional 'c'.
+    Examples: SPAC6F12.09, SPAP8A3.14c, SPBC1289.02"""
+    return bool(re.match(r"^SP[A-Z0-9]+\.\d+c?$", local_id))
+
+
+def is_dictybase_id(local_id: str) -> bool:
+    """DictyBase IDs: DDB_G followed by 7 digits.
+    Examples: DDB_G0293130"""
+    return bool(re.match(r"^DDB_G\d{7}$", local_id))
+
+
+def is_dictybase_gene_id(local_id: str) -> bool:
+    """DictyBase gene IDs (short form): G followed by 7 digits.
+    Examples: G0281589"""
+    return bool(re.match(r"^G\d{7}$", local_id))
+
+
+def is_araport_id(local_id: str) -> bool:
+    """Arabidopsis (AraPort) IDs: AT + chromosome (1-5, M, C) + G + 5 digits.
+    Examples: AT1G27500, AT5G10140"""
+    return bool(re.match(r"^AT[1-5MC]G\d{5}$", local_id))
+
+
+def is_ecogene_id(local_id: str) -> bool:
+    """E. coli EcoGene IDs: EG followed by digits.
+    Examples: EG12315"""
+    return bool(re.match(r"^EG\d+$", local_id))
+
+
+def is_ensemblgenomes_id(local_id: str) -> bool:
+    """Ensembl Genomes IDs: uppercase letters followed by digits.
+    Examples: BMEI0545"""
+    return bool(re.match(r"^[A-Z]+\d+$", local_id))
