@@ -13,28 +13,22 @@ from .base import BaseAnnotator
 
 
 class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
-    """Annotator that queries the Metabolomics Workbench RefMet API.
+    """Annotator that queries the Metabolomics Workbench RefMet match API.
 
-    Retrieves vocabulary IDs for metabolite entities. Returns raw API field names;
-    the Normalizer handles mapping to standard vocab names and ID cleaning.
+    Retrieves RefMet IDs for metabolite entities using fuzzy name matching.
+    Returns raw API field names; the Normalizer handles mapping and ID cleaning.
 
-    API Endpoint: GET https://www.metabolomicsworkbench.org/rest/refmet/name/{metabolite_name}/all/
+    The /match endpoint handles non-standard names (e.g., "cholate" → "Cholic acid").
+    Only refmet_id is returned since KRAKEN has all RefMet equivalencies.
+
+    API Endpoint: GET https://www.metabolomicsworkbench.org/rest/refmet/match/{metabolite_name}
     """
 
     slug = "metabolomics-workbench"
-    BASE_URL = "https://www.metabolomicsworkbench.org/rest/refmet/name"
+    BASE_URL = "https://www.metabolomicsworkbench.org/rest/refmet/match"
 
-    # API fields to extract (raw field names - Normalizer handles mapping)
-    API_FIELDS = [
-        "pubchem_cid",
-        "inchi_key",
-        "smiles",
-        "refmet_id",
-        "ChEBI_ID",
-        "HMDB_ID",
-        "LM_ID",
-        "KEGG_ID",
-    ]
+    # Only extract refmet_id - KRAKEN has all RefMet equivalencies
+    API_FIELDS = ["refmet_id"]
 
     def get_annotations(self, entity: dict | pd.Series, name_field: str, cache: dict | None = None) -> AssignedIDsDict:
         """Get annotations for a single entity.
@@ -100,7 +94,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         return assigned_ids_col
 
     def _fetch_refmet_data(self, metabolite_name: str) -> dict[str, Any] | None:
-        """Fetch RefMet data from the Metabolomics Workbench API.
+        """Fetch RefMet data from the Metabolomics Workbench match API.
 
         Args:
             metabolite_name: Name of the metabolite to look up
@@ -108,19 +102,17 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         Returns:
             API response dict or None if not found
         """
-        url = f"{self.BASE_URL}/{quote(metabolite_name)}/all/"
+        url = f"{self.BASE_URL}/{quote(metabolite_name)}"
 
         response = requests.get(url, timeout=30)
         response.raise_for_status()
 
         data = response.json()
 
-        # API returns empty list [] when metabolite not found
-        if isinstance(data, list):
-            return None
-
-        # API returns a dict when metabolite is found
+        # /match endpoint returns dict with "-" values when no match found
         if isinstance(data, dict):
+            if data.get("refmet_id") == "-":
+                return None
             return data
 
         return None

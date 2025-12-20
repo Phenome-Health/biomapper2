@@ -1,13 +1,13 @@
 """Unit tests for MetabolomicsWorkbenchAnnotator.
 
-Consolidated test suite with 8 tests covering:
-- Basic annotator structure
-- Core annotation behavior
-- Edge cases
-- Bulk operations
-- Engine integration
-- Real API calls (integration tests)
-- Full Mapper pipeline (end-to-end test)
+Test suite (8 tests) covering:
+- Basic annotator structure (1 test)
+- Core annotation behavior with /match endpoint (1 test)
+- Edge cases: no match, missing input (2 tests)
+- Bulk operations (1 test)
+- Engine integration (1 test)
+- Real API calls: exact + fuzzy match (1 integration test)
+- Full Mapper pipeline (1 end-to-end test)
 """
 
 from unittest.mock import MagicMock, patch
@@ -35,15 +35,17 @@ class TestMetabolomicsWorkbenchAnnotator:
     # Test 2: Core annotation behavior
     # =========================================================================
     @patch("biomapper2.core.annotators.metabolomics_workbench.requests.get")
-    def test_get_annotations_returns_raw_field_names(self, mock_get: MagicMock):
-        """Test that annotations use raw API field names (Normalizer handles mapping)."""
-        # Arrange
+    def test_get_annotations_returns_refmet_id(self, mock_get: MagicMock):
+        """Test that annotations return refmet_id (KRAKEN has all equivalencies)."""
+        # Arrange - /match endpoint response format
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "name": "Carnitine",
-            "pubchem_cid": "10917",
-            "inchi_key": "PHIQHXFUZVPYII-ZCFIWIBFSA-N",
-            "smiles": "C[N+](C)(C)C[C@@H](CC(=O)[O-])O",
+            "refmet_name": "Carnitine",
+            "formula": "C7H15NO3",
+            "exactmass": "161.1052",
+            "super_class": "Fatty Acyls",
+            "main_class": "Fatty acyl carnitines",
+            "sub_class": "Acyl carnitines",
             "refmet_id": "RM0008606",
         }
         mock_response.status_code = 200
@@ -56,25 +58,30 @@ class TestMetabolomicsWorkbenchAnnotator:
         # Act
         result = annotator.get_annotations(entity, name_field="name")
 
-        # Assert - raw API field names preserved
+        # Assert - only refmet_id is extracted (KRAKEN has all equivalencies)
         annotations = result["metabolomics-workbench"]
-        assert "pubchem_cid" in annotations
-        assert "10917" in annotations["pubchem_cid"]
-        assert "inchi_key" in annotations
-        assert "PHIQHXFUZVPYII-ZCFIWIBFSA-N" in annotations["inchi_key"]
-        assert "smiles" in annotations
-        # refmet_id preserved with RM prefix (Normalizer handles cleaning)
         assert "refmet_id" in annotations
         assert "RM0008606" in annotations["refmet_id"]
+        # Other fields NOT extracted since we only need refmet_id
+        assert "pubchem_cid" not in annotations
 
     # =========================================================================
     # Test 3: Edge case - not found
     # =========================================================================
     @patch("biomapper2.core.annotators.metabolomics_workbench.requests.get")
-    def test_empty_response(self, mock_get: MagicMock):
-        """Test that empty API response (metabolite not found) returns empty annotations."""
+    def test_no_match_response(self, mock_get: MagicMock):
+        """Test that /match 'no match' response (dash values) returns empty annotations."""
+        # /match endpoint returns dashes when no match found
         mock_response = MagicMock()
-        mock_response.json.return_value = []
+        mock_response.json.return_value = {
+            "refmet_name": "-",
+            "formula": "-",
+            "exactmass": "-",
+            "super_class": "-",
+            "main_class": "-",
+            "sub_class": "-",
+            "refmet_id": "-",
+        }
         mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
@@ -104,10 +111,11 @@ class TestMetabolomicsWorkbenchAnnotator:
     @patch("biomapper2.core.annotators.metabolomics_workbench.requests.get")
     def test_bulk_returns_series(self, mock_get: MagicMock):
         """Test that get_annotations_bulk returns Series with matching index."""
+        # /match endpoint response format
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "name": "Carnitine",
-            "pubchem_cid": "10917",
+            "refmet_name": "Carnitine",
+            "refmet_id": "RM0008606",
         }
         mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
@@ -142,26 +150,23 @@ class TestMetabolomicsWorkbenchAnnotator:
     # Test 7: Real API call (integration)
     # =========================================================================
     @pytest.mark.integration
-    def test_real_api_carnitine(self):
-        """Test real API call for known metabolite: Carnitine."""
+    def test_real_api_match_endpoint(self):
+        """Test real API call: exact match and fuzzy match."""
         annotator = MetabolomicsWorkbenchAnnotator()
-        entity = {"name": "Carnitine"}
 
-        result = annotator.get_annotations(entity, name_field="name")
-
-        # Verify structure
+        # Test 1: Exact match - "Carnitine"
+        result = annotator.get_annotations({"name": "Carnitine"}, name_field="name")
         assert "metabolomics-workbench" in result
         annotations = result["metabolomics-workbench"]
-
-        # Verify raw API field names
-        assert "pubchem_cid" in annotations
-        assert "inchi_key" in annotations
-        assert "smiles" in annotations
         assert "refmet_id" in annotations
+        assert "RM0008606" in annotations["refmet_id"]
 
-        # Verify known values
-        assert "10917" in annotations["pubchem_cid"]
-        assert "PHIQHXFUZVPYII-ZCFIWIBFSA-N" in annotations["inchi_key"]
+        # Test 2: Fuzzy match - "cholate" → "Cholic acid" (RM0135798)
+        result = annotator.get_annotations({"name": "cholate"}, name_field="name")
+        assert "metabolomics-workbench" in result
+        annotations = result["metabolomics-workbench"]
+        assert "refmet_id" in annotations
+        assert "RM0135798" in annotations["refmet_id"]
 
     # =========================================================================
     # Test 8: Full Mapper pipeline (end-to-end)
@@ -192,7 +197,7 @@ class TestMetabolomicsWorkbenchAnnotator:
         assigned_ids = result["assigned_ids"]
         assert "metabolomics-workbench" in assigned_ids
 
-        # Verify MW annotations have expected fields (raw API field names)
+        # Verify MW annotations have refmet_id (only field extracted now)
         mw_annotations = assigned_ids["metabolomics-workbench"]
-        assert "pubchem_cid" in mw_annotations
-        assert "10917" in mw_annotations["pubchem_cid"]
+        assert "refmet_id" in mw_annotations
+        assert "RM0008606" in mw_annotations["refmet_id"]
