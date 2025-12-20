@@ -5,6 +5,7 @@ description = "Unified toolkit for multiomics data harmonization"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "bmt>=1.4.6",
     "numpy>=2.2.6",
     "pandas>=2.3.3",
     "python-dotenv>=1.2.1",

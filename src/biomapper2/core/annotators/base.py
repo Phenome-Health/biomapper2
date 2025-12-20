@@ -29,13 +29,16 @@ class BaseAnnotator(ABC):  # Inherit from ABC
         return item
 
     @abstractmethod
-    def get_annotations(self, entity: dict | pd.Series, name_field: str, cache: dict | None = None) -> AssignedIDsDict:
+    def get_annotations(
+        self, entity: dict | pd.Series, name_field: str, category: str, cache: dict | None = None
+    ) -> AssignedIDsDict:
         """
         Get annotations for a single entity.
 
         Args:
             entity: Entity to annotate (dict or DataFrame row)
             name_field: Name of the field containing the entity name
+            category: Biolink category (standardized entity type)
             cache: Optional pre-fetched results from bulk API call
 
         Returns:
@@ -44,13 +47,16 @@ class BaseAnnotator(ABC):  # Inherit from ABC
         pass
 
     @abstractmethod
-    def get_annotations_bulk(self, entities: pd.DataFrame, name_field: str) -> pd.Series:  # Series of AssignedIdsDicts
+    def get_annotations_bulk(
+        self, entities: pd.DataFrame, name_field: str, category: str
+    ) -> pd.Series:  # Series of AssignedIdsDicts
         """
         Get annotations for multiple entities with bulk API call.
 
         Args:
             entities: DataFrame where each row is an entity
             name_field: Name of the column containing entity names
+            category: Biolink category (standardized entity type)
 
         Returns:
             Column (Series) of annotation results (same index as input)

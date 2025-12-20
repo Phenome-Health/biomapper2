@@ -56,7 +56,7 @@ class TestMetabolomicsWorkbenchAnnotator:
         entity = {"name": "Carnitine"}
 
         # Act
-        result = annotator.get_annotations(entity, name_field="name")
+        result = annotator.get_annotations(entity, name_field="name", category="biolink:SmallMolecule")
 
         # Assert - only refmet_id is extracted (KRAKEN has all equivalencies)
         annotations = result["metabolomics-workbench"]
@@ -89,7 +89,7 @@ class TestMetabolomicsWorkbenchAnnotator:
         annotator = MetabolomicsWorkbenchAnnotator()
         entity = {"name": "NonexistentMetabolite"}
 
-        result = annotator.get_annotations(entity, name_field="name")
+        result = annotator.get_annotations(entity, name_field="name", category="biolink:SmallMolecule")
 
         assert result == {"metabolomics-workbench": {}}
 
@@ -101,7 +101,7 @@ class TestMetabolomicsWorkbenchAnnotator:
         annotator = MetabolomicsWorkbenchAnnotator()
         entity = {"other_field": "value"}
 
-        result = annotator.get_annotations(entity, name_field="name")
+        result = annotator.get_annotations(entity, name_field="name", category="biolink:SmallMolecule")
 
         assert result == {}
 
@@ -127,7 +127,7 @@ class TestMetabolomicsWorkbenchAnnotator:
             index=[10, 20, 30],
         )
 
-        result = annotator.get_annotations_bulk(entities, name_field="name")
+        result = annotator.get_annotations_bulk(entities, name_field="name", category="biolink:SmallMolecule")
 
         assert isinstance(result, pd.Series)
         assert list(result.index) == [10, 20, 30]
@@ -141,7 +141,7 @@ class TestMetabolomicsWorkbenchAnnotator:
         from biomapper2.core.annotation_engine import AnnotationEngine
 
         engine = AnnotationEngine()
-        annotators = engine._select_annotators("metabolite")
+        biolink_category, annotators = engine._select_annotators("metabolite")
 
         annotator_types = [type(a).__name__ for a in annotators]
         assert "MetabolomicsWorkbenchAnnotator" in annotator_types
@@ -155,14 +155,14 @@ class TestMetabolomicsWorkbenchAnnotator:
         annotator = MetabolomicsWorkbenchAnnotator()
 
         # Test 1: Exact match - "Carnitine"
-        result = annotator.get_annotations({"name": "Carnitine"}, name_field="name")
+        result = annotator.get_annotations({"name": "Carnitine"}, name_field="name", category="biolink:SmallMolecule")
         assert "metabolomics-workbench" in result
         annotations = result["metabolomics-workbench"]
         assert "refmet_id" in annotations
         assert "RM0008606" in annotations["refmet_id"]
 
         # Test 2: Fuzzy match - "cholate" → "Cholic acid" (RM0135798)
-        result = annotator.get_annotations({"name": "cholate"}, name_field="name")
+        result = annotator.get_annotations({"name": "cholate"}, name_field="name", category="biolink:SmallMolecule")
         assert "metabolomics-workbench" in result
         annotations = result["metabolomics-workbench"]
         assert "refmet_id" in annotations

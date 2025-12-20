@@ -30,17 +30,11 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
     # Only extract refmet_id - KRAKEN has all RefMet equivalencies
     API_FIELDS = ["refmet_id"]
 
-    def get_annotations(self, entity: dict | pd.Series, name_field: str, cache: dict | None = None) -> AssignedIDsDict:
-        """Get annotations for a single entity.
+    def get_annotations(
+        self, entity: dict | pd.Series, name_field: str, category: str, cache: dict | None = None
+    ) -> AssignedIDsDict:
+        """Implements BaseAnnotator.get_annotations"""
 
-        Args:
-            entity: Entity to annotate (dict or DataFrame row)
-            name_field: Name of the field containing the entity name
-            cache: Optional pre-fetched results from bulk API call
-
-        Returns:
-            Dict with annotation results using raw API field names
-        """
         # Extract the entity name
         name = entity.get(name_field)
 
@@ -69,16 +63,9 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
 
         return {self.slug: dict(annotations)}
 
-    def get_annotations_bulk(self, entities: pd.DataFrame, name_field: str) -> pd.Series:
-        """Get annotations for multiple entities with bulk API call.
+    def get_annotations_bulk(self, entities: pd.DataFrame, name_field: str, category: str) -> pd.Series:
+        """Implements BaseAnnotator.get_annotations_bulk"""
 
-        Args:
-            entities: DataFrame where each row is an entity
-            name_field: Name of the column containing entity names
-
-        Returns:
-            Column (Series) of annotation results (same index as input)
-        """
         # Extract unique names to avoid duplicate API calls
         names = entities[name_field].dropna().unique().tolist()
 
@@ -89,7 +76,9 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             cache[name] = self._fetch_refmet_data(name)
 
         # Apply get_annotations to each row using the cache
-        assigned_ids_col = entities.apply(self.get_annotations, axis=1, cache=cache, name_field=name_field)
+        assigned_ids_col = entities.apply(
+            self.get_annotations, axis=1, cache=cache, name_field=name_field, category=category
+        )
 
         return assigned_ids_col
 

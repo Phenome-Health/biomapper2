@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 from typing import Any
 
 import pandas as pd
@@ -12,8 +11,10 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
 
     slug = "kestrel-text-search"
 
-    def get_annotations(self, entity: dict | pd.Series, name_field: str, cache: dict | None = None) -> AssignedIDsDict:
-        """Get annotations via Kestrel text search."""
+    def get_annotations(
+        self, entity: dict | pd.Series, name_field: str, category: str, cache: dict | None = None
+    ) -> AssignedIDsDict:
+        """Implements BaseAnnotator.get_annotations"""
 
         # Extract the value to search
         search_term = entity.get(name_field)
@@ -22,7 +23,8 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
             if cache:
                 term_results = cache.get(search_term)
             else:
-                term_results = self._kestrel_text_search(search_term, limit=1)
+                results = self._kestrel_text_search(search_term, category, limit=1)
+                term_results = results[search_term]
 
             annotations: dict[str, dict[str, dict[str, Any]]] = {}
             if term_results:
@@ -37,22 +39,27 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
             # This entity didn't have a name, so we can't use this annotator on it
             return dict()
 
-    def get_annotations_bulk(self, entities: pd.DataFrame, name_field: str) -> pd.Series:  # Series of AssignedIDsDicts
-        """Get annotations for multiple entities with bulk optimization."""
+    def get_annotations_bulk(
+        self, entities: pd.DataFrame, name_field: str, category: str
+    ) -> pd.Series:  # Series of AssignedIDsDicts
+        """Implements BaseAnnotator.get_annotations_bulk"""
 
         search_terms = entities[name_field].tolist()
 
         logging.info(f"Getting text search results from Kestrel API for {len(entities)} entities")
-        results = self._kestrel_text_search(search_terms, limit=1)
+        results = self._kestrel_text_search(search_terms, category, limit=1)
 
         # Annotate each entity using the results from the bulk request
-        assigned_ids_col = entities.apply(self.get_annotations, axis=1, cache=results, name_field=name_field)
+        assigned_ids_col = entities.apply(
+            self.get_annotations, axis=1, cache=results, name_field=name_field, category=category
+        )
 
         return assigned_ids_col
 
     # ----------------------------------------- Helper methods ----------------------------------------------- #
 
     @staticmethod
-    def _kestrel_text_search(query: str | list[str], limit: int = 10) -> list[dict]:
+    def _kestrel_text_search(search_text: str | list[str], category: str, limit: int = 10) -> dict[str, list[dict]]:
         """Call Kestrel text search endpoint."""
-        return kestrel_request("POST", "text-search", json={"search_text": query, "limit": limit})
+        payload = {"search_text": search_text, "limit": limit, "category_filter": category}
+        return kestrel_request("POST", "text-search", json=payload)
