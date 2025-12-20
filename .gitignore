@@ -49,3 +49,6 @@ data/**/*.json
 # Other app-specific items
 cache/
 .env
+
+# Serena AI tool
+.serena/
