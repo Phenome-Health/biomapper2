@@ -12,6 +12,10 @@ from biomapper2.core.normalizer import validators
 class TestKrakenValidators:
     """Tests for KRAKEN vocabulary validators."""
 
+    # =========================================================================
+    # Shared Validators
+    # =========================================================================
+
     def test_numeric_id_validators(self):
         """Test validators for pure numeric IDs (HGNC, RxNorm, etc.)."""
         # Valid numeric IDs
@@ -24,6 +28,10 @@ class TestKrakenValidators:
         assert not validators.is_numeric_id("")  # Empty
         assert not validators.is_numeric_id("HGNC:25111")  # With prefix
         assert not validators.is_numeric_id("abc")  # Letters
+
+    # =========================================================================
+    # Tier 1: Core Metabolomics/Proteomics/Drugs
+    # =========================================================================
 
     def test_atc_drug_classification(self):
         """Test ATC drug classification code validator."""
@@ -49,6 +57,10 @@ class TestKrakenValidators:
         assert not validators.is_unii_id("4XQ51KS2JUX")  # 11 chars (too long)
         assert not validators.is_unii_id("4xq51ks2ju")  # Lowercase
 
+    # =========================================================================
+    # Tier 2: Anatomy/Phenotype Ontologies (7-digit shared pattern)
+    # =========================================================================
+
     def test_seven_digit_ontology_ids(self):
         """Test 7-digit ontology ID validators (HP, PATO, SO, etc.)."""
         # Valid 7-digit IDs
@@ -60,6 +72,10 @@ class TestKrakenValidators:
         assert not validators.is_seven_digit_id("410133")  # 6 digits
         assert not validators.is_seven_digit_id("04101330")  # 8 digits
         assert not validators.is_seven_digit_id("041013A")  # Contains letter
+
+    # =========================================================================
+    # Tier 3: Specialized/Medical Vocabularies
+    # =========================================================================
 
     def test_pathwhiz_pathway_ids(self):
         """Test PathWhiz pathway ID validator."""
@@ -175,6 +191,10 @@ class TestKrakenValidators:
         assert validators.is_foodon_id("03541961")
         assert not validators.is_foodon_id("0354196")  # 7 digits
 
+    # =========================================================================
+    # Tier 4: Model Organism Databases
+    # =========================================================================
+
     def test_tier4_model_organism_ids(self):
         """Test Tier 4 model organism database validators."""
         # FlyBase: FB + type code + digits
@@ -218,6 +238,45 @@ class TestKrakenValidators:
         assert validators.is_ecogene_id("EG12315")
         assert not validators.is_ecogene_id("12315")  # Missing prefix
 
+    # =========================================================================
+    # Edge Cases: Final 4 Vocabulary Validators
+    # =========================================================================
+
+    def test_final4_edge_case_validators(self):
+        """Test final 4 edge case validators: KEGG, CHEMBL.MECHANISM, OBA, OBO."""
+        # KEGG generic IDs: 5 digits (pathways) OR letter + 5 digits (compounds/drugs)
+        assert validators.is_kegg_generic_id("04966")  # Pathway
+        assert validators.is_kegg_generic_id("04024")  # Pathway
+        assert validators.is_kegg_generic_id("00590")  # Pathway
+        assert validators.is_kegg_generic_id("C00031")  # Compound
+        assert validators.is_kegg_generic_id("D00001")  # Drug
+        assert not validators.is_kegg_generic_id("0496")  # 4 digits
+        assert not validators.is_kegg_generic_id("049660")  # 6 digits
+        assert not validators.is_kegg_generic_id("C0003")  # Too short
+
+        # CHEMBL.MECHANISM: lowercase with underscores, parens, hyphens
+        assert validators.is_chembl_mechanism_id("mitochondrial_complex_i_(nadh_dehydrogenase)_inhibitor")
+        assert validators.is_chembl_mechanism_id("integrin_beta-7_antagonist")
+        assert validators.is_chembl_mechanism_id("inducible_t-cell_costimulator_inhibitor")
+        assert not validators.is_chembl_mechanism_id("UPPERCASE_NOT_ALLOWED")  # Uppercase
+
+        # OBA: exactly 7 digits
+        assert validators.is_oba_id("2044301")
+        assert validators.is_oba_id("2053738")
+        assert validators.is_oba_id("2042686")
+        assert not validators.is_oba_id("204430")  # 6 digits
+        assert not validators.is_oba_id("20443010")  # 8 digits
+
+        # OBO: alphanumeric with underscores, hashes, colons
+        assert validators.is_obo_id("APOLLO_SV_00000031")
+        assert validators.is_obo_id("INO_0000018")
+        assert validators.is_obo_id("EnsemblBacteria#_SAOUHSC_02706")
+        assert not validators.is_obo_id("has spaces")  # Spaces not allowed
+
+    # =========================================================================
+    # Integration Tests
+    # =========================================================================
+
     @pytest.mark.integration
     def test_normalizer_handles_kraken_vocabs(self):
         """Integration test: Normalizer can process KRAKEN vocab IDs."""
@@ -246,6 +305,12 @@ class TestKrakenValidators:
         # Check Tier 4 vocabs are registered
         assert "fb" in vocab_map
         assert "zfin" in vocab_map
+
+        # Check Final 4 edge case vocabs are registered
+        assert "kegg" in vocab_map
+        assert "chembl.mechanism" in vocab_map
+        assert "oba" in vocab_map
+        assert "obo" in vocab_map
 
         # Verify aliases work
         assert "hpo" in vocab_map.get("hp", {}).get("aliases", [])

@@ -631,3 +631,33 @@ def is_ensemblgenomes_id(local_id: str) -> bool:
     """Ensembl Genomes IDs: uppercase letters followed by digits.
     Examples: BMEI0545"""
     return bool(re.match(r"^[A-Z]+\d+$", local_id))
+
+
+# --- Edge Cases: Final 4 Vocabulary Validators ---
+
+
+def is_kegg_generic_id(local_id: str) -> bool:
+    """Generic KEGG IDs: 5 digits (pathways) OR letter + 5 digits (compounds/drugs).
+    Examples: 04966, 04024, 00590, C00031, D00001
+    Note: This is flexible to handle both KRAKEN pathway IDs and user-provided compound IDs."""
+    return bool(re.match(r"^(\d{5}|[A-Z]\d{5})$", local_id))
+
+
+def is_chembl_mechanism_id(local_id: str) -> bool:
+    """CHEMBL mechanism IDs: lowercase alphanumeric with underscores.
+    Examples: mitochondrial_complex_i_(nadh_dehydrogenase)_inhibitor"""
+    # Allow lowercase letters, digits, underscores, hyphens, and parentheses
+    return bool(re.match(r"^[a-z0-9_(),-]+$", local_id))
+
+
+def is_oba_id(local_id: str) -> bool:
+    """Ontology for Biomedical Annotations IDs: 7 digits.
+    Examples: 2044301, 2053738, 2042686"""
+    return bool(re.match(r"^\d{7}$", local_id))
+
+
+def is_obo_id(local_id: str) -> bool:
+    """Open Biological Ontology cross-references: variable patterns.
+    Examples: APOLLO_SV_00000031, INO_0000018, EnsemblBacteria#_SAOUHSC_02706"""
+    # Allow uppercase letters, digits, underscores, hashes, and colons
+    return bool(re.match(r"^[A-Za-z0-9_#:]+$", local_id))

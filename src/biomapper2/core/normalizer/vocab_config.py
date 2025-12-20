@@ -28,10 +28,6 @@ def load_prefix_info(biolink_version: str) -> dict[str, dict[str, str]]:
     )
     prefix_to_iri_map = _load_biolink_file(url, biolink_version)
 
-    # Remove prefixes as needed
-    if "KEGG" in prefix_to_iri_map:
-        del prefix_to_iri_map["KEGG"]  # We want to use only KEGG.COMPOUND, KEGG.REACTION, etc.
-
     # Add prefixes as needed (ones we're making up, that don't exist in biolink)
     prefix_to_iri_map["USZIPCODE"] = "https://www.unitedstateszipcodes.org/"
     prefix_to_iri_map["SMILES"] = "https://pubchem.ncbi.nlm.nih.gov/compound/"
@@ -133,6 +129,10 @@ def load_prefix_info(biolink_version: str) -> dict[str, dict[str, str]]:
     prefix_to_iri_map["CGNC"] = "https://vertebrate.genenames.org/data/gene-symbol-report/#!/cgnc_id/"
     prefix_to_iri_map["ecogene"] = "https://ecocyc.org/gene?orgid=ECOLI&id="
     prefix_to_iri_map["EnsemblGenomes"] = "https://www.ensemblgenomes.org/id/"
+    # Final 4 edge case prefixes
+    prefix_to_iri_map["OBA"] = "http://purl.obolibrary.org/obo/OBA_"
+    prefix_to_iri_map["OBO"] = "http://purl.obolibrary.org/obo/"
+    prefix_to_iri_map["CHEMBL.MECHANISM"] = "https://www.ebi.ac.uk/chembl/mechanism/"
 
     # Override prefixes as needed (if Biolink's iri is broken)
     prefix_to_iri_map["OMIM"] = "http://purl.bioontology.org/ontology/OMIM/"  # Works for regular ids and MTHU ids
@@ -289,8 +289,11 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "foodon": {"validator": validators.is_foodon_id},
         "psy": {"validator": validators.is_numeric_id},
         "ttd.target": {"validator": validators.is_ttd_target_id},
-        # Note: Generic "kegg" is intentionally NOT registered here.
-        # load_prefix_info() removes KEGG prefix; use kegg.compound, kegg.drug, etc. instead.
+        # --- Final 4: Edge case prefixes ---
+        "kegg": {"validator": validators.is_kegg_generic_id},  # Generic KEGG pathway IDs
+        "chembl.mechanism": {"validator": validators.is_chembl_mechanism_id},
+        "oba": {"validator": validators.is_oba_id},  # Ontology for Biomedical Annotations
+        "obo": {"validator": validators.is_obo_id},  # Open Biological Ontology cross-refs
         # --- Tier 4: Model Organism Databases ---
         "fb": {"validator": validators.is_flybase_id, "aliases": ["flybase"]},
         "wb": {"validator": validators.is_wormbase_gene_id, "aliases": ["wormbase"]},
