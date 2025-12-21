@@ -53,15 +53,15 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             return {self.slug: {}}
 
         # Build the annotations structure using raw API field names
-        annotations: dict[str, dict[str, dict[str, Any]]] = defaultdict(lambda: defaultdict(dict))
+        annotations: dict[str, dict[str, dict[str, Any]]] = {}
 
         for api_field in self.API_FIELDS:
             value = api_data.get(api_field)
             if value:
                 # Use raw field name and value - Normalizer handles mapping and cleaning
-                annotations[api_field][value] = {}
+                annotations.setdefault(api_field, {})[value] = {}
 
-        return {self.slug: dict(annotations)}
+        return {self.slug: annotations}
 
     def get_annotations_bulk(self, entities: pd.DataFrame, name_field: str, category: str) -> pd.Series:
         """Implements BaseAnnotator.get_annotations_bulk"""
