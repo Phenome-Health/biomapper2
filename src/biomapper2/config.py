@@ -5,11 +5,17 @@ Customize these values to change API endpoints, model versions, and logging beha
 """
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()  # Load environmental variables (secrets)
 
+
+# Set up our general cache directory (e.g., for requests cache, biolink)
+PROJECT_ROOT = Path(__file__).parents[2]
+CACHE_DIR = PROJECT_ROOT / "cache"
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # KG API configuration
 # Set to https://kestrel.nathanpricelab.com/api to use 'production' KESTREL hosting KRAKEN

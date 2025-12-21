@@ -11,6 +11,7 @@ import requests_cache
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
+from ...config import CACHE_DIR
 from ...utils import AssignedIDsDict
 from .base import BaseAnnotator
 
@@ -35,7 +36,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
 
     def __init__(self):
         self._session = requests_cache.CachedSession(
-            ".cache/metabolomics_workbench_http",
+            CACHE_DIR / "metabolomics_workbench_http",
             expire_after=timedelta(days=7),
         )
 
