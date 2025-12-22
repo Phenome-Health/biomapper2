@@ -7,6 +7,7 @@ Generates summary statistics, performance metrics, and diagnostic outputs.
 import ast
 import json
 import logging
+from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
@@ -221,7 +222,7 @@ def _calculate_assigned_performance(
     assigned_kg_ids_mask: pd.Series,
     mapped_to_kg_provided_mask: pd.Series,
     mapped_to_kg_provided: int,
-    get_kg_ids_assigned: callable,
+    get_kg_ids_assigned: Callable,
     total_items: int,
     include_chosen: bool = False,
     chosen_assigned_col: str | None = None,

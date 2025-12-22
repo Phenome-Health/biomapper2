@@ -141,10 +141,9 @@ class TestMetabolomicsWorkbenchAnnotator:
         from biomapper2.core.annotation_engine import AnnotationEngine
 
         engine = AnnotationEngine()
-        annotators = engine._select_annotators("biolink:SmallMolecule")
+        annotator_slugs = engine._select_annotators("biolink:SmallMolecule")
 
-        annotator_types = [type(a).__name__ for a in annotators]
-        assert "MetabolomicsWorkbenchAnnotator" in annotator_types
+        assert MetabolomicsWorkbenchAnnotator.slug in annotator_slugs
 
     # =========================================================================
     # Test 7: Real API call (integration)

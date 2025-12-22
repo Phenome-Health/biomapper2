@@ -85,11 +85,10 @@ class AnnotationEngine:
             )
         annotators_to_use = [self.annotator_registry[slug] for slug in annotator_slugs]
 
-        if annotators:
+        if annotators_to_use:
             logging.debug(f"Using annotators: {annotator_slugs}")
         else:
-            logging.warning("Did not identify any annotators to use for input item. Proceeding without assigned IDs.")
-            return self._get_empty_assigned_ids(item)
+            raise ValueError("Could not identify any annotators to use for input item.")
 
         # Get annotations using selected annotators
         if isinstance(item, pd.DataFrame):
