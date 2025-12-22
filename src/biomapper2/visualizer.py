@@ -9,24 +9,15 @@ from typing import Callable
 import numpy as np
 
 
-class Visualizer:
+class HarmonizationVisualizer:
     """Aggregates mapping stats and renders visualizations."""
     
     DEFAULT_CONFIG = {
+        # Ordering
         "row_order": None,
         "col_order": None,
-        "row_display_names": {},
-        "col_display_names": {},
-        "cmap": "RdYlGn",
-        "vmin": 0,
-        "vmax": 100,
-        "na_color": "#ffffff",
-        "figsize": (10, 6),
-        "figsize_per_cell": (3, 2),
-        "dpi": 300,
-        "annot_fontsize": 9,
-        "title": "Harmonization Coverage",
-        "output_formats": ["pdf", "png"],
+        
+        # Display labels
         "entity_labels": {
             "proteins": "Proteins",
             "metabolites": "Metabolites",
@@ -34,6 +25,20 @@ class Visualizer:
             "clinical-labs": "Labs",
             "questionnaire": "Questionnaires",
         },
+        
+        # Figure settings
+        "figsize_per_cell": (2.2, 1.6),
+        "figsize_per_cell_heatmap": (1.6, 1.2),
+        "dpi": 300,
+        "output_formats": ["pdf", "png"],
+        "title": "Harmonization Coverage",
+        
+        # Heatmap settings
+        "heatmap_vmin": 0,
+        "heatmap_vmax": 100,
+        "heatmap_na_color": "#ffffff",
+        "heatmap_annot_fontsize": 9,
+        
         # Breakdown chart settings
         "breakdown_colors": {
             "total": "lightgray",
@@ -137,6 +142,7 @@ class Visualizer:
                 df = pd.concat([df, missing_df], ignore_index=True)
         
         return df
+
     def render_heatmap(
         self,
         df: pd.DataFrame,
@@ -144,8 +150,18 @@ class Visualizer:
         title: str | None = None,
         dataset_labels: dict[str, str] | None = None,
         entity_labels: dict[str, str] | None = None,
+        figsize: tuple[float, float] | None = None,
     ) -> plt.Figure:
-        """Render coverage heatmap from tidy DataFrame."""
+        """Render coverage heatmap from tidy DataFrame.
+        
+        Args:
+            df: Tidy DataFrame with dataset, entity, coverage columns
+            output_path: Optional path to save figure (without extension)
+            title: Optional title override
+            dataset_labels: Optional display names for datasets
+            entity_labels: Optional display names for entities
+            figsize: Optional (width, height) override; if None, calculated from grid size
+        """
         _dataset_labels = dataset_labels or {}
         _entity_labels = {**self.config["entity_labels"], **(entity_labels or {})}
     
@@ -174,22 +190,27 @@ class Visualizer:
         matrix.index = matrix.index.map(lambda x: _entity_labels.get(x, x))
         matrix.columns = matrix.columns.map(lambda x: _dataset_labels.get(x, x))
     
-        fig, ax = plt.subplots(figsize=self.config["figsize"], dpi=self.config["dpi"])
+        # Calculate figure size based on grid dimensions, or use override
+        n_rows, n_cols = matrix.shape
+        if figsize is None:
+            cell_w, cell_h = self.config["figsize_per_cell_heatmap"]
+            figsize = (n_cols * cell_w + 1.5, n_rows * cell_h + 1)  # extra space for colorbar and title
+        
+        fig, ax = plt.subplots(figsize=figsize, dpi=self.config["dpi"])
     
         cmap = sns.diverging_palette(10, 130, as_cmap=True)
-        cmap.set_bad(color=self.config["na_color"])
-        # print(matrix.isna().sum())
+        cmap.set_bad(color=self.config["heatmap_na_color"])
     
         sns.heatmap(
             matrix * 100,
             annot=annot,
             fmt="",
             cmap=cmap,
-            vmin=self.config["vmin"],
-            vmax=self.config["vmax"],
+            vmin=self.config["heatmap_vmin"],
+            vmax=self.config["heatmap_vmax"],
             cbar_kws={"label": "Coverage (%)"},
             annot_kws={
-                "fontsize": self.config["annot_fontsize"],
+                "fontsize": self.config["heatmap_annot_fontsize"],
                 "ha": "center",
                 "va": "center",
             },
@@ -198,7 +219,6 @@ class Visualizer:
             linecolor="white",
             ax=ax,
         )
-        # In render_heatmap, after sns.heatmap():
 
         # Manually add N/A text for NaN cells
         for i in range(matrix.shape[0]):
@@ -207,7 +227,7 @@ class Visualizer:
                     ax.text(
                         j + 0.5, i + 0.5, "N/A",
                         ha="center", va="center",
-                        fontsize=self.config["annot_fontsize"],
+                        fontsize=self.config["heatmap_annot_fontsize"],
                         color="black",
                     )
 
@@ -220,73 +240,49 @@ class Visualizer:
     
         if output_path:
             self._save_fig(fig, output_path)
-
-    # return fig
-    # def render_heatmap(self, df: pd.DataFrame, output_path: str | Path | None = None, 
-    #                    title: str | None = None) -> plt.Figure:
-    #     """Render coverage heatmap from tidy DataFrame."""
-    #     matrix = df.pivot(index="entity", columns="dataset", values="coverage")
         
-    #     if self.config["row_order"]:
-    #         matrix = matrix.reindex(self.config["row_order"])
-    #     if self.config["col_order"]:
-    #         matrix = matrix.reindex(columns=self.config["col_order"])
-        
-    #     # Build annotations
-    #     annot = np.empty(matrix.shape, dtype=object)
-    #     for i, entity in enumerate(matrix.index):
-    #         for j, dataset in enumerate(matrix.columns):
-    #             val = matrix.iloc[i, j]
-    #             if pd.isna(val):
-    #                 annot[i, j] = "N/A"
-    #             else:
-    #                 expl = df.loc[(df["entity"] == entity) & (df["dataset"] == dataset), 
-    #                               "coverage_explanation"].values[0]
-    #                 annot[i, j] = f"{val*100:.1f}%\n({expl})"
-        
-    #     fig, ax = plt.subplots(figsize=self.config["figsize"], dpi=self.config["dpi"])
-        
-    #     cmap = sns.diverging_palette(10, 130, as_cmap=True)
-    #     cmap.set_bad(color=self.config["na_color"])
-        
-    #     sns.heatmap(
-    #         matrix * 100, annot=annot, fmt="", cmap=cmap,
-    #         vmin=self.config["vmin"], vmax=self.config["vmax"],
-    #         cbar_kws={"label": "Coverage (%)"},
-    #         annot_kws={"fontsize": self.config["annot_fontsize"], "ha": "center", "va": "center"},
-    #         square=True, linewidths=0.5, linecolor="white", ax=ax
-    #     )
-        
-    #     ax.set_title(title or self.config["title"])
-    #     ax.set_xlabel("Dataset")
-    #     plt.tight_layout()
-        
-    #     if output_path:
-    #         self._save_fig(fig, output_path)
-        
-    #     # return fig
+        return fig
     
-    
-    def render_breakdown(self, df: pd.DataFrame, output_path: str | Path | None = None,
-                         title: str | None = None) -> plt.Figure:
-        """
-        Render stacked bar breakdown grid.
+    def render_breakdown(
+        self,
+        df: pd.DataFrame,
+        output_path: str | Path | None = None,
+        title: str | None = None,
+        dataset_labels: dict[str, str] | None = None,
+        entity_labels: dict[str, str] | None = None,
+        figsize: tuple[float, float] | None = None,
+    ) -> plt.Figure:
+        """Render stacked bar breakdown grid.
         
-        Rows: entity types
-        Columns: datasets
-        Each cell: 3 bars showing Total -> Valid IDs -> Mapped to KG
+        Args:
+            df: Tidy DataFrame with dataset, entity, and breakdown columns
+            output_path: Optional path to save figure (without extension)
+            title: Optional title override
+            dataset_labels: Optional display names for datasets
+            entity_labels: Optional display names for entities
+            figsize: Optional (width, height) override; if None, calculated from grid size
+        
+        Each cell shows 3 bars: Total -> Valid IDs -> Mapped to KG
         """
+        _dataset_labels = dataset_labels or {}
+        _entity_labels = {**self.config["entity_labels"], **(entity_labels or {})}
+        
         entities = self._get_ordered_values(df, "entity", self.config["row_order"])
         datasets = self._get_ordered_values(df, "dataset", self.config["col_order"])
         
-        entity_display = [self.config["row_display_names"].get(e, e.title()) for e in entities]
-        dataset_display = [self.config["col_display_names"].get(d, d.title()) for d in datasets]
+        entity_display = [_entity_labels.get(e, e.title()) for e in entities]
+        dataset_display = [_dataset_labels.get(d, d.title()) for d in datasets]
         
-        cell_w, cell_h = self.config["figsize_per_cell"]
+        # Calculate figure size based on grid dimensions, or use override
+        if figsize is None:
+            cell_w, cell_h = self.config["figsize_per_cell"]
+            figsize = (len(datasets) * cell_w, len(entities) * cell_h + 1.2)
+        
         fig, axes = plt.subplots(
             len(entities), len(datasets),
-            figsize=(len(datasets) * cell_w, len(entities) * cell_h),
+            figsize=figsize,
             squeeze=False,
+            layout="constrained",
         )
         
         colors = self.config["breakdown_colors"]
@@ -300,14 +296,14 @@ class Visualizer:
                 if not mask.any() or df.loc[mask, "n_total"].isna().all():
                     ax.text(0.5, 0.5, "N/A", ha="center", va="center",
                             fontsize=12, transform=ax.transAxes, color="gray")
-                    self._style_breakdown_cell(ax, i, j, entity_disp, dataset_disp, len(entities))
+                    self._style_breakdown_cell(ax, i, j, entity_disp, dataset_disp)
                     continue
                 
                 row = df[mask].iloc[0]
                 self._draw_breakdown_bars(ax, row, colors, label_thresh)
-                self._style_breakdown_cell(ax, i, j, entity_disp, dataset_disp, len(entities))
+                self._style_breakdown_cell(ax, i, j, entity_disp, dataset_disp)
         
-        fig.suptitle(title or self.config["title"], fontsize=16, fontweight="bold", y=0.96)
+        fig.suptitle(title or self.config["title"], fontsize=18, fontweight="bold")
         
         legend_elements = [
             mpatches.Patch(color=colors["only_provided"], alpha=0.8, label="Provided IDs"),
@@ -316,16 +312,12 @@ class Visualizer:
             mpatches.Patch(color=colors["one_to_one"], alpha=0.8, label="1:1 Mappings"),
             mpatches.Patch(color=colors["multi"], alpha=0.8, label="Multi-Mappings"),
         ]
-        fig.legend(handles=legend_elements, loc="center", bbox_to_anchor=(0.5, 0.05),
-                   ncol=3, fontsize=9)
-        
-        plt.tight_layout()
-        plt.subplots_adjust(top=0.88, bottom=0.12)
+        fig.legend(handles=legend_elements, loc="outside lower center", ncol=3, fontsize=9)
         
         if output_path:
             self._save_fig(fig, output_path)
         
-        # return fig
+        return fig
     
     def _get_ordered_values(self, df: pd.DataFrame, col: str, order: list | None) -> list:
         """Get unique values in specified order, or alphabetically if None."""
@@ -396,7 +388,7 @@ class Visualizer:
             ax.text(x_pos[2], one_to_one_portion + multi_portion / 2, f"{multi:,}",
                     ha="center", va="center", fontsize=7, fontweight="bold")
         
-        # Bar labels below
+        # Bar labels belowrender_breakdown
         ax.text(x_pos[0], -5, "Total", ha="center", va="top", fontsize=8)
         ax.text(x_pos[1], -5, "Valid\nIDs", ha="center", va="top", fontsize=8)
         ax.text(x_pos[2], -5, "Mapped\nto KG", ha="center", va="top", fontsize=8)
@@ -413,7 +405,7 @@ class Visualizer:
         extended_h = heights + [mapped_pct + 0.8]
         ax.step(extended_x, extended_h, "k:", linewidth=1, alpha=0.7, zorder=10, where="post")
     
-    def _style_breakdown_cell(self, ax, row_idx, col_idx, entity_disp, dataset_disp, n_rows):
+    def _style_breakdown_cell(self, ax, row_idx, col_idx, entity_disp, dataset_disp):
         """Apply consistent styling to a breakdown cell."""
         ax.set_ylim(0, 120)
         ax.set_xlim(0, 1)
