@@ -189,6 +189,12 @@ def analyze_dataset_mapping(results_tsv_path: str, linker: Any) -> dict[str, Any
         "per_annotator": per_annotator_stats,
     }
 
+    # Add OVERALL groundtruth comparison if available
+    if "kg_ids_groundtruth_canonical" in df.columns:
+        performance["overall"]["per_groundtruth"] = _calculate_groundtruth_performance(
+            df, predicted_mask=mapped_to_kg_mask, get_predicted_kg_ids=lambda r: r.kg_ids.keys()
+        )
+
     # Tack the performance metrics onto our other stats
     stats["performance"] = performance
 
@@ -287,29 +293,42 @@ def _calculate_assigned_performance(
 
     # Add groundtruth comparison if available
     if "kg_ids_groundtruth_canonical" in df.columns:
-        has_groundtruth_mask = df.kg_ids_groundtruth_canonical.apply(len) > 0
-        groundtruth_count = has_groundtruth_mask.sum()
-        mapped_to_kg_both_gt = (assigned_kg_ids_mask & has_groundtruth_mask).sum()
-
-        correct_per_groundtruth = df.apply(
-            lambda r: len(set(_get_groundtruth_kg_ids(r)) & set(get_kg_ids_assigned(r))) > 0,
-            axis=1,
-        ).sum()
-
-        precision_gt = _calculate_precision(correct_per_groundtruth, mapped_to_kg_both_gt)
-        recall_gt = _calculate_recall(correct_per_groundtruth, groundtruth_count)
-
-        result["per_groundtruth"] = {
-            "mapped_to_kg_groundtruth_and_assigned": int(mapped_to_kg_both_gt),
-            "correct": int(correct_per_groundtruth),
-            "precision": precision_gt,
-            "precision_explanation": f"{correct_per_groundtruth} / {mapped_to_kg_both_gt}",
-            "recall": recall_gt,
-            "recall_explanation": f"{correct_per_groundtruth} / {groundtruth_count}",
-            "f1_score": _calculate_f1_score(precision_gt, recall_gt),
-        }
+        result["per_groundtruth"] = _calculate_groundtruth_performance(
+            df,
+            predicted_mask=assigned_kg_ids_mask,
+            get_predicted_kg_ids=get_kg_ids_assigned,
+        )
 
     return result
+
+
+def _calculate_groundtruth_performance(
+    df: pd.DataFrame,
+    predicted_mask: pd.Series,
+    get_predicted_kg_ids: Callable,
+) -> dict[str, Any]:
+    """Calculate precision/recall/F1 against canonical groundtruth IDs."""
+    has_groundtruth_mask = df.kg_ids_groundtruth_canonical.apply(len) > 0
+    groundtruth_count = has_groundtruth_mask.sum()
+    mapped_both = (predicted_mask & has_groundtruth_mask).sum()
+
+    correct = df.apply(
+        lambda r: len(set(r.kg_ids_groundtruth_canonical) & set(get_predicted_kg_ids(r))) > 0,
+        axis=1,
+    ).sum()
+
+    precision = _calculate_precision(correct, mapped_both)
+    recall = _calculate_recall(correct, groundtruth_count)
+
+    return {
+        "mapped_to_kg_and_groundtruth": int(mapped_both),
+        "correct": int(correct),
+        "precision": precision,
+        "precision_explanation": f"{correct} / {mapped_both}",
+        "recall": recall,
+        "recall_explanation": f"{correct} / {groundtruth_count}",
+        "f1_score": _calculate_f1_score(precision, recall),
+    }
 
 
 def _get_all_assigned_kg_ids(r) -> set:
