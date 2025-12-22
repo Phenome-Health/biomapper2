@@ -34,6 +34,8 @@ def analyze_dataset_mapping(results_tsv_path: str, linker: Any) -> dict[str, Any
         "curies_assigned",
         "invalid_ids_provided",
         "invalid_ids_assigned",
+        "unrecognized_vocabs_provided",
+        "unrecognized_vocabs_assigned",
         "kg_ids",
         "kg_ids_provided",
         "kg_ids_assigned",
@@ -60,12 +62,12 @@ def analyze_dataset_mapping(results_tsv_path: str, linker: Any) -> dict[str, Any
     not_mapped_to_kg_mask = ~mapped_to_kg_mask
     one_to_many_mask = df.kg_ids.apply(lambda x: len(x) > 1)
     many_to_one_mask = df.chosen_kg_id.notna() & df.chosen_kg_id.duplicated(keep=False)
-    has_invalid_ids_mask = df.apply(
-        lambda r: len(r.invalid_ids_provided) > 0 or len(r.invalid_ids_assigned) > 0,
-        axis=1,
-    )
     has_invalid_ids_provided_mask = df.invalid_ids_provided.apply(lambda x: len(x) > 0)
     has_invalid_ids_assigned_mask = df.invalid_ids_assigned.apply(lambda x: len(x) > 0)
+    has_invalid_ids_mask = has_invalid_ids_provided_mask | has_invalid_ids_assigned_mask
+    has_unrecognized_vocabs_provided_mask = df.unrecognized_vocabs_provided.apply(lambda x: len(x) > 0)
+    has_unrecognized_vocabs_assigned_mask = df.unrecognized_vocabs_assigned.apply(lambda x: len(x) > 0)
+    has_unrecognized_vocabs_mask = has_unrecognized_vocabs_provided_mask | has_unrecognized_vocabs_assigned_mask
     has_no_ids_mask = ~has_valid_ids_mask & ~has_invalid_ids_mask
     assigned_correct_per_provided_mask = df.apply(
         lambda r: len(
@@ -93,6 +95,9 @@ def analyze_dataset_mapping(results_tsv_path: str, linker: Any) -> dict[str, Any
     has_invalid_ids = has_invalid_ids_mask.sum()
     has_invalid_ids_provided = has_invalid_ids_provided_mask.sum()
     has_invalid_ids_assigned = has_invalid_ids_assigned_mask.sum()
+    has_unrecognized_vocabs = has_unrecognized_vocabs_mask.sum()
+    has_unrecognized_vocabs_provided = has_unrecognized_vocabs_provided_mask.sum()
+    has_unrecognized_vocabs_assigned = has_unrecognized_vocabs_assigned_mask.sum()
     mapped_to_kg = mapped_to_kg_mask.sum()
     mapped_to_kg_provided = mapped_to_kg_provided_mask.sum()
     mapped_to_kg_assigned = mapped_to_kg_assigned_mask.sum()
@@ -136,6 +141,9 @@ def analyze_dataset_mapping(results_tsv_path: str, linker: Any) -> dict[str, Any
         "has_invalid_ids": int(has_invalid_ids),
         "has_invalid_ids_provided": int(has_invalid_ids_provided),
         "has_invalid_ids_assigned": int(has_invalid_ids_assigned),
+        "has_unrecognized_vocabs": int(has_unrecognized_vocabs),
+        "has_unrecognized_vocabs_provided": int(has_unrecognized_vocabs_provided),
+        "has_unrecognized_vocabs_assigned": int(has_unrecognized_vocabs_assigned),
         "has_no_ids": int(has_no_ids),
         "has_invalid_ids_and_not_mapped_to_kg": int(has_invalid_ids_and_not_mapped_to_kg),
     }
