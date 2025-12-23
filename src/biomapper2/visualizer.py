@@ -81,13 +81,8 @@ class Visualizer:
             with open(json_file) as f:
                 data = json.load(f)
 
-            # Prefer embedded _meta, fall back to filename
-            if "_meta" in data:
-                dataset = data["_meta"].get("dataset")
-                entity = data["_meta"].get("entity")
-            else:
-                parsed = self.parse_filename(json_file.name)
-                dataset, entity = parsed["dataset"], parsed["entity"]
+            parsed = self.parse_filename(json_file.name)
+            dataset, entity = parsed["dataset"], parsed["entity"]
 
             all_datasets.add(dataset)
             all_entities.add(entity)
