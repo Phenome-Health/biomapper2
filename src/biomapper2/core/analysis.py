@@ -23,6 +23,10 @@ def analyze_dataset_mapping(results_tsv_path: str, linker: Any, annotation_mode:
     Args:
         results_tsv_path: Path to mapped dataset TSV
         linker: Linker instance for canonicalizing groundtruth IDs
+        annotation_mode: Dictates which entities annotation was applied to
+            - 'all': All entities were candidates for annotation
+            - 'missing': Only entities without provided IDs were candidates
+            - 'none': No annotation was attempted
 
     Returns:
         Dictionary containing coverage, precision, recall, and F1 metrics
@@ -220,7 +224,7 @@ def analyze_dataset_mapping(results_tsv_path: str, linker: Any, annotation_mode:
 
     # Save all result stats
     logging.info(f"Dataset summary stats are: {json.dumps(stats, indent=2)}")
-    results_filepath_root = results_tsv_path.replace(".tsv", "")
+    results_filepath_root = results_tsv_path.removesuffix(".tsv")
     with open(f"{results_filepath_root}_a_summary_stats.json", "w+") as stats_file:
         json.dump(stats, stats_file, indent=2)
 
@@ -373,11 +377,6 @@ def _get_all_assigned_kg_ids(r) -> set:
 def _get_provided_kg_ids(r):
     """Get kg_ids from provided for a row."""
     return r.kg_ids_provided.keys()
-
-
-def _get_groundtruth_kg_ids(r):
-    """Get kg_ids from groundtruth for a row."""
-    return r.kg_ids_groundtruth_canonical
 
 
 def _check_assigned_correct(r: pd.Series, get_reference_ids: Callable[[pd.Series], set]) -> bool | None:
