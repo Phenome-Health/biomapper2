@@ -326,7 +326,7 @@ def _calculate_assigned_performance(
 
     result = {
         "eligible_entities": int(eligible_entities),
-        "mapped_to_kg": int(mapped_to_kg_assigned),
+        "mapped_to_kg_assigned": int(mapped_to_kg_assigned),
         "coverage": _calculate_coverage(mapped_to_kg_assigned, eligible_entities),
         "coverage_explanation": f"{mapped_to_kg_assigned} / {eligible_entities}",
         "per_groundtruth": _calculate_groundtruth_performance(

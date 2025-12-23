@@ -211,7 +211,7 @@ class TestEligibleEntitiesCalculation:
 
         assert stats["performance"]["assigned_ids"]["eligible_entities"] == 0
         assert stats["performance"]["assigned_ids"]["coverage"] is None
-        assert stats["performance"]["assigned_ids"]["mapped_to_kg"] == 0
+        assert stats["performance"]["assigned_ids"]["mapped_to_kg_assigned"] == 0
 
 
 class TestPerAnnotatorStats:
