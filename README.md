@@ -95,7 +95,7 @@ stats_df = viz.aggregate_stats(
 
 viz.render_heatmap(
     df=stats_df,
-    output_path='docs/assets/comparison_viz' # defaults to producing pdf and png, configurable via Visualizer()
+    output_path='docs/assets/comparison_viz' # defaults to producing pdf and png, configurable via Visualizer(
 )
 ```
 <p align="center">
