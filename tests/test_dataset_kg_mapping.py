@@ -84,7 +84,7 @@ def test_provide_pandas_df_to_mapper(shared_mapper: Mapper):
         name_column="Assay",
         provided_id_columns=["UniProt"],
         array_delimiters=["_"],
-        output_prefix="examples/"
+        output_prefix="examples/",
     )
 
     # Based on provided ids alone, we get 2922 / 2923 proteins in this dataset

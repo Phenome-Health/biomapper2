@@ -39,6 +39,8 @@ data/processed/
 *.h5
 *.json
 data/**/*.json
+*.png
+*.pdf
 
 # Allow our designated example/groundtruth datasets
 !data/examples/metabolites_synthetic.tsv

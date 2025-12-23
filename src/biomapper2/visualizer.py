@@ -2,7 +2,7 @@ import itertools
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -11,11 +11,56 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.figure import Figure
 
+# Fields that must be present in every stats JSON
+REQUIRED_STATS_FIELDS = frozenset(
+    {
+        "total_items",
+        "mapped_to_kg",
+        "has_valid_ids",
+        "has_only_provided_ids",
+        "has_only_assigned_ids",
+        "has_both_provided_and_assigned_ids",
+        "one_to_one_mappings",
+        "multi_mappings",
+    }
+)
+
+# Column schema for stats records (single source of truth)
+_STATS_RECORD_COLUMNS = (
+    "dataset",
+    "entity",
+    "coverage",
+    "coverage_explanation",
+    "n_total",
+    "n_mapped",
+    "one_to_one",
+    "multi_mappings",
+    "has_valid_ids",
+    "has_only_provided_ids",
+    "has_only_assigned_ids",
+    "has_both_provided_and_assigned_ids",
+    "_source_file",
+)
+
+
+class StatsValidationError(ValueError):
+    """Raised when a stats JSON file is missing required fields."""
+
+    pass
+
+
+class StatsParseError(ValueError):
+    """Raised when a stats JSON file cannot be parsed."""
+
+    pass
+
 
 class Visualizer:
     """Aggregates mapping stats and renders visualizations."""
 
-    DEFAULT_CONFIG = {
+    DEFAULT_CONFIG: dict[str, Any] = {
+        # File discovery
+        "file_glob": "*_MAPPED_a_summary_stats.json",
         # Ordering
         "row_order": None,
         "col_order": None,
@@ -48,10 +93,21 @@ class Visualizer:
             "multi": "khaki",
         },
         "breakdown_label_threshold_pct": 8,
+        # Breakdown bar layout
+        "breakdown_bar_width": 0.25,
+        "breakdown_bar_positions": [0.1, 0.4, 0.7],
+        "breakdown_bar_alpha": 0.8,
+        "breakdown_total_bar_alpha": 0.7,
+        "breakdown_label_fontsize": 7,
+        "breakdown_count_fontsize": 6.5,
     }
 
-    def __init__(self, config: dict | None = None, parse_filename: Callable | None = None):
-        self.config = {**self.DEFAULT_CONFIG, **(config or {})}
+    def __init__(
+        self,
+        config: dict[str, Any] | None = None,
+        parse_filename: Callable[[str], dict[str, str]] | None = None,
+    ):
+        self.config: dict[str, Any] = {**self.DEFAULT_CONFIG, **(config or {})}
         self.parse_filename = parse_filename or self._parse_filename_default
 
     def _parse_filename_default(self, filename: str) -> dict:
@@ -69,17 +125,18 @@ class Visualizer:
         Single pass: extracts metadata, stats, and tracks combinations for gap-filling.
         """
         stats_dir = Path(stats_dir)
-        json_files = list(stats_dir.glob("*_MAPPED_a_summary_stats.json"))
+        file_glob = self.config["file_glob"]
+        json_files = list(stats_dir.glob(file_glob))
 
         if not json_files:
-            raise ValueError(f"No stats JSON files found in {stats_dir}")
+            raise ValueError(f"No stats JSON files matching '{file_glob}' found in {stats_dir}")
 
         records = []
-        all_datasets, all_entities = set(), set()
+        all_datasets: set[str] = set()
+        all_entities: set[str] = set()
 
         for json_file in json_files:
-            with open(json_file) as f:
-                data = json.load(f)
+            data = self._load_and_validate_json(json_file)
 
             parsed = self.parse_filename(json_file.name)
             dataset, entity = parsed["dataset"], parsed["entity"]
@@ -97,22 +154,21 @@ class Visualizer:
                 coverage, coverage_explanation = None, None
 
             records.append(
-                {
-                    "dataset": dataset,
-                    "entity": entity,
-                    "coverage": coverage,
-                    "coverage_explanation": coverage_explanation,
-                    "n_total": n_total,
-                    "n_mapped": n_mapped,
-                    "one_to_one": data.get("one_to_one_mappings"),
-                    "multi_mappings": data.get("multi_mappings"),
-                    # Breakdown-specific fields
-                    "has_valid_ids": data.get("has_valid_ids"),
-                    "has_only_provided_ids": data.get("has_only_provided_ids"),
-                    "has_only_assigned_ids": data.get("has_only_assigned_ids"),
-                    "has_both_provided_and_assigned_ids": data.get("has_both_provided_and_assigned_ids"),
-                    "_source_file": json_file.name,
-                }
+                self._make_stats_record(
+                    dataset=dataset,
+                    entity=entity,
+                    coverage=coverage,
+                    coverage_explanation=coverage_explanation,
+                    n_total=n_total,
+                    n_mapped=n_mapped,
+                    one_to_one=data.get("one_to_one_mappings"),
+                    multi_mappings=data.get("multi_mappings"),
+                    has_valid_ids=data.get("has_valid_ids"),
+                    has_only_provided_ids=data.get("has_only_provided_ids"),
+                    has_only_assigned_ids=data.get("has_only_assigned_ids"),
+                    has_both_provided_and_assigned_ids=data.get("has_both_provided_and_assigned_ids"),
+                    source_file=json_file.name,
+                )
             )
 
         df = pd.DataFrame(records)
@@ -123,27 +179,60 @@ class Visualizer:
 
             if missing:
                 missing_records = [
-                    {
-                        "dataset": d,
-                        "entity": e,
-                        "coverage": None,
-                        "coverage_explanation": "N/A",
-                        "n_total": None,
-                        "n_mapped": None,
-                        "one_to_one": None,
-                        "multi_mappings": None,
-                        "has_valid_ids": None,
-                        "has_only_provided_ids": None,
-                        "has_only_assigned_ids": None,
-                        "has_both_provided_and_assigned_ids": None,
-                        "_source_file": "MISSING",
-                    }
-                    for d, e in missing
+                    self._make_stats_record(dataset=d, entity=e, source_file="MISSING") for d, e in missing
                 ]
                 missing_df = pd.DataFrame(missing_records).astype(df.dtypes, errors="ignore")
                 df = pd.concat([df, missing_df], ignore_index=True)
 
         return df
+
+    def _load_and_validate_json(self, json_file: Path) -> dict[str, Any]:
+        """Load JSON file and validate required fields are present."""
+        try:
+            with open(json_file) as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise StatsParseError(f"Failed to parse JSON file '{json_file.name}': {e}") from e
+
+        missing_fields = REQUIRED_STATS_FIELDS - data.keys()
+        if missing_fields:
+            raise StatsValidationError(
+                f"Stats file '{json_file.name}' is missing required fields: {sorted(missing_fields)}"
+            )
+        return data
+
+    @staticmethod
+    def _make_stats_record(
+        dataset: str,
+        entity: str,
+        coverage: float | None = None,
+        coverage_explanation: str | None = "N/A",
+        n_total: int | None = None,
+        n_mapped: int | None = None,
+        one_to_one: int | None = None,
+        multi_mappings: int | None = None,
+        has_valid_ids: int | None = None,
+        has_only_provided_ids: int | None = None,
+        has_only_assigned_ids: int | None = None,
+        has_both_provided_and_assigned_ids: int | None = None,
+        source_file: str = "UNKNOWN",
+    ) -> dict[str, Any]:
+        """Create a stats record dict with consistent schema."""
+        return {
+            "dataset": dataset,
+            "entity": entity,
+            "coverage": coverage,
+            "coverage_explanation": coverage_explanation,
+            "n_total": n_total,
+            "n_mapped": n_mapped,
+            "one_to_one": one_to_one,
+            "multi_mappings": multi_mappings,
+            "has_valid_ids": has_valid_ids,
+            "has_only_provided_ids": has_only_provided_ids,
+            "has_only_assigned_ids": has_only_assigned_ids,
+            "has_both_provided_and_assigned_ids": has_both_provided_and_assigned_ids,
+            "_source_file": source_file,
+        }
 
     def render_heatmap(
         self,
@@ -338,8 +427,12 @@ class Visualizer:
 
     def _draw_breakdown_bars(self, ax, row, colors, label_thresh):
         """Draw the three stacked bars for a single breakdown cell."""
-        bar_width = 0.25
-        x_pos = [0.1, 0.4, 0.7]
+        bar_width = self.config["breakdown_bar_width"]
+        x_pos = self.config["breakdown_bar_positions"]
+        bar_alpha = self.config["breakdown_bar_alpha"]
+        total_alpha = self.config["breakdown_total_bar_alpha"]
+        label_fs = self.config["breakdown_label_fontsize"]
+        count_fs = self.config["breakdown_count_fontsize"]
 
         total = row["n_total"] or 0
         valid = row["has_valid_ids"] or 0
@@ -364,18 +457,18 @@ class Visualizer:
         multi_portion = (multi_pct_of_mapped / 100) * mapped_pct
 
         # Bar 1: Total (baseline 100%)
-        ax.bar(x_pos[0], 100, bar_width, color=colors["total"], alpha=0.7)
-        ax.text(x_pos[0], 50, f"{total:,}", ha="center", va="center", fontsize=7, fontweight="bold")
+        ax.bar(x_pos[0], 100, bar_width, color=colors["total"], alpha=total_alpha)
+        ax.text(x_pos[0], 50, f"{total:,}", ha="center", va="center", fontsize=label_fs, fontweight="bold")
 
         # Bar 2: Valid IDs breakdown
-        ax.bar(x_pos[1], only_provided_pct, bar_width, color=colors["only_provided"], alpha=0.8)
-        ax.bar(x_pos[1], both_pct, bar_width, color=colors["both"], alpha=0.8, bottom=only_provided_pct)
+        ax.bar(x_pos[1], only_provided_pct, bar_width, color=colors["only_provided"], alpha=bar_alpha)
+        ax.bar(x_pos[1], both_pct, bar_width, color=colors["both"], alpha=bar_alpha, bottom=only_provided_pct)
         ax.bar(
             x_pos[1],
             only_assigned_pct,
             bar_width,
             color=colors["only_assigned"],
-            alpha=0.8,
+            alpha=bar_alpha,
             bottom=only_provided_pct + both_pct,
         )
 
@@ -387,7 +480,7 @@ class Visualizer:
                 f"{only_provided:,}",
                 ha="center",
                 va="center",
-                fontsize=7,
+                fontsize=label_fs,
                 fontweight="bold",
             )
         if both_pct > label_thresh:
@@ -397,7 +490,7 @@ class Visualizer:
                 f"{both:,}",
                 ha="center",
                 va="center",
-                fontsize=7,
+                fontsize=label_fs,
                 fontweight="bold",
             )
         if only_assigned_pct > label_thresh:
@@ -407,13 +500,13 @@ class Visualizer:
                 f"{only_assigned:,}",
                 ha="center",
                 va="center",
-                fontsize=7,
+                fontsize=label_fs,
                 fontweight="bold",
             )
 
         # Bar 3: Mapped to KG breakdown
-        ax.bar(x_pos[2], one_to_one_portion, bar_width, color=colors["one_to_one"], alpha=0.8)
-        ax.bar(x_pos[2], multi_portion, bar_width, color=colors["multi"], alpha=0.8, bottom=one_to_one_portion)
+        ax.bar(x_pos[2], one_to_one_portion, bar_width, color=colors["one_to_one"], alpha=bar_alpha)
+        ax.bar(x_pos[2], multi_portion, bar_width, color=colors["multi"], alpha=bar_alpha, bottom=one_to_one_portion)
 
         if one_to_one_portion > label_thresh:
             ax.text(
@@ -422,7 +515,7 @@ class Visualizer:
                 f"{one_to_one:,}",
                 ha="center",
                 va="center",
-                fontsize=7,
+                fontsize=label_fs,
                 fontweight="bold",
             )
         if multi_portion > label_thresh:
@@ -432,19 +525,19 @@ class Visualizer:
                 f"{multi:,}",
                 ha="center",
                 va="center",
-                fontsize=7,
+                fontsize=label_fs,
                 fontweight="bold",
             )
 
-        # Bar labels belowrender_breakdown
+        # Bar labels below bars
         ax.text(x_pos[0], -5, "Total", ha="center", va="top", fontsize=8)
         ax.text(x_pos[1], -5, "Valid\nIDs", ha="center", va="top", fontsize=8)
         ax.text(x_pos[2], -5, "Mapped\nto KG", ha="center", va="top", fontsize=8)
 
         # Count labels above bars
-        ax.text(x_pos[0], 104, f"{total:,}", ha="center", va="bottom", fontsize=6.5, color="grey")
-        ax.text(x_pos[1], valid_pct + 4, f"{valid:,}", ha="center", va="bottom", fontsize=6.5, color="grey")
-        ax.text(x_pos[2], mapped_pct + 4, f"{mapped:,}", ha="center", va="bottom", fontsize=6.5, color="grey")
+        ax.text(x_pos[0], 104, f"{total:,}", ha="center", va="bottom", fontsize=count_fs, color="grey")
+        ax.text(x_pos[1], valid_pct + 4, f"{valid:,}", ha="center", va="bottom", fontsize=count_fs, color="grey")
+        ax.text(x_pos[2], mapped_pct + 4, f"{mapped:,}", ha="center", va="bottom", fontsize=count_fs, color="grey")
 
         # Step-down line
         heights = [100 + 0.8, valid_pct + 0.8, mapped_pct + 0.8]
