@@ -7,7 +7,7 @@ through annotation, normalization, linking, and resolution steps.
 
 import copy
 import logging
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ from .core.annotation_engine import AnnotationEngine
 from .core.linker import Linker
 from .core.normalizer import Normalizer
 from .core.resolver import Resolver
-from .utils import merge_into_entity, setup_logging
+from .utils import AnnotationMode, merge_into_entity, setup_logging
 
 setup_logging()
 
@@ -48,7 +48,7 @@ class Mapper:
         entity_type: str,
         array_delimiters: list[str] | None = None,
         stop_on_invalid_id: bool = False,
-        annotation_mode: Literal["all", "missing", "none"] = "missing",
+        annotation_mode: AnnotationMode = "missing",
         annotators: list[str] | None = None,
     ) -> pd.Series | dict[str, Any]:
         """
@@ -116,7 +116,7 @@ class Mapper:
         provided_id_columns: list[str],
         array_delimiters: list[str] | None = None,
         output_prefix: str | None = None,
-        annotation_mode: Literal["all", "missing", "none"] = "missing",
+        annotation_mode: AnnotationMode = "missing",
         annotators: list[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """
@@ -210,6 +210,6 @@ class Mapper:
         logging.info(f"Dumping output TSV to {output_tsv_path}")
         df.to_csv(output_tsv_path, sep="\t", index=False)
 
-        stats_summary = analyze_dataset_mapping(output_tsv_path, self.linker)
+        stats_summary = analyze_dataset_mapping(output_tsv_path, self.linker, annotation_mode)
 
         return output_tsv_path, stats_summary

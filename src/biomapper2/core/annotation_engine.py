@@ -6,11 +6,17 @@ Queries external APIs or uses other creative approaches to retrieve additional i
 
 import logging
 from copy import deepcopy
-from typing import Any, Literal
+from typing import Any
 
 import pandas as pd
 
-from ..utils import AssignedIDsDict, get_descendants, initialize_biolink_model_toolkit, standardize_entity_type
+from ..utils import (
+    AnnotationMode,
+    AssignedIDsDict,
+    get_descendants,
+    initialize_biolink_model_toolkit,
+    standardize_entity_type,
+)
 from .annotators.base import BaseAnnotator
 from .annotators.kestrel_hybrid import KestrelHybridSearchAnnotator
 from .annotators.kestrel_text import KestrelTextSearchAnnotator
@@ -40,7 +46,7 @@ class AnnotationEngine:
         name_field: str,
         provided_id_fields: list[str],
         entity_type: str,
-        mode: Literal["all", "missing", "none"] = "missing",
+        mode: AnnotationMode = "missing",
         annotators: list[str] | None = None,
     ) -> pd.DataFrame | pd.Series:
         """
@@ -117,7 +123,7 @@ class AnnotationEngine:
         df: pd.DataFrame,
         name_field: str,
         provided_id_fields: list[str],
-        mode: str,
+        mode: AnnotationMode,
         category: str,
         annotators: list,
     ) -> pd.DataFrame:
@@ -159,7 +165,7 @@ class AnnotationEngine:
         item: pd.Series | dict[str, Any],
         name_field: str,
         provided_id_fields: list[str],
-        mode: str,
+        mode: AnnotationMode,
         category: str,
         annotators: list,
     ) -> pd.Series:

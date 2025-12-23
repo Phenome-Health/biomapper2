@@ -6,7 +6,7 @@ Provides logging setup and mathematical helpers for metric calculations.
 
 import logging
 from collections.abc import Iterable
-from typing import Any, TypeGuard, cast
+from typing import Any, Literal, TypeGuard, cast
 
 import pandas as pd
 import requests
@@ -17,6 +17,9 @@ from .config import BIOLINK_VERSION_DEFAULT, KESTREL_API_KEY, KESTREL_API_URL, L
 # Type alias for annotation results structure
 # Structure: {annotator: {vocabulary: {local_id: result_metadata_dict}}}
 AssignedIDsDict = dict[str, dict[str, dict[str, dict[str, Any]]]]
+
+# Type hint for annotation mode
+AnnotationMode = Literal["all", "missing", "none"]
 
 
 def setup_logging():
