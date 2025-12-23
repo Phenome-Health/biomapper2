@@ -2,12 +2,12 @@
 
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
 import requests
 import yaml
 
+from ...config import CACHE_DIR
 from . import cleaners, validators
 
 
@@ -265,12 +265,9 @@ def _load_biolink_file(url: str, biolink_version: str) -> dict:
     Returns:
         Parsed JSON content
     """
-    project_root = Path(__file__).parents[4]
-
-    cache_dir = project_root / "cache"
     file_name = url.split("/")[-1]
     file_name_json = file_name.split(".")[0] + f"_{biolink_version}" + ".json"
-    local_path = cache_dir / file_name_json
+    local_path = CACHE_DIR / file_name_json
     logging.debug(f"Local file path is: {local_path}")
 
     # Download the file if we don't already have it cached
@@ -284,7 +281,7 @@ def _load_biolink_file(url: str, biolink_version: str) -> dict:
             response_json = response.json()
 
         # Cache the response
-        cache_dir.mkdir(parents=True, exist_ok=True)
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
         with open(local_path, "w+") as cache_file:
             json.dump(response_json, cache_file, indent=2)
 

@@ -104,37 +104,41 @@ class Normalizer:
         }
         assigned_ids = entity.get("assigned_ids", dict())
 
-        assigned_ids_flat: dict[str, set[Any]] = defaultdict(set)
-        for annotator, annotator_assigned_ids in assigned_ids.items():
-            for vocab, local_ids_dict in annotator_assigned_ids.items():
-                assigned_ids_flat[vocab] |= set(local_ids_dict)
+        # Get curies for the provided IDs
+        curies_provided, invalid_ids_provided, unrecognized_vocabs_provided = self.get_curies(
+            provided_ids, stop_on_invalid_id
+        )
 
-        # Get curies for the provided/assigned IDs
-        curies_provided, invalid_ids_provided = self.get_curies(provided_ids, stop_on_invalid_id)
-        curies_assigned, invalid_ids_assigned = self.get_curies(assigned_ids_flat, stop_on_invalid_id)
+        # Get curies for the assigned IDs (per annotator, to track provenance)
+        curies_assigned, invalid_ids_assigned, unrecognized_vocabs_assigned = dict(), dict(), set()
+        for annotator_slug, annotator_assigned_ids in assigned_ids.items():
+            annotator_curies, annotator_invalid_ids, annotator_unrecognized_vocabs = self.get_curies(
+                annotator_assigned_ids, stop_on_invalid_id
+            )
+            curies_assigned[annotator_slug] = list(annotator_curies)
+            if annotator_invalid_ids:
+                invalid_ids_assigned[annotator_slug] = annotator_invalid_ids
+            unrecognized_vocabs_assigned |= annotator_unrecognized_vocabs
 
-        # Form final result
-        curies = set(curies_provided) | set(curies_assigned)
-        invalid_ids = {
-            id_field: invalid_ids_provided.get(id_field, []) + invalid_ids_assigned.get(id_field, [])
-            for id_field in set(invalid_ids_provided) | set(invalid_ids_assigned)
-        }
+        # Form final overall combined set of curies
+        curies = set(curies_provided) | set().union(*curies_assigned.values())
 
         # Return a named Series
         return pd.Series(
             {
                 "curies": list(curies),
                 "curies_provided": list(curies_provided),
-                "curies_assigned": list(curies_assigned),
-                "invalid_ids": invalid_ids,
+                "curies_assigned": curies_assigned,
                 "invalid_ids_provided": invalid_ids_provided,
                 "invalid_ids_assigned": invalid_ids_assigned,
+                "unrecognized_vocabs_provided": list(unrecognized_vocabs_provided),
+                "unrecognized_vocabs_assigned": list(unrecognized_vocabs_assigned),
             }
         )
 
     def get_curies(
         self, local_ids_dict: dict[Any, Any], stop_on_invalid_id: bool = False
-    ) -> tuple[dict[str, str], dict[str | tuple, list[str]]]:
+    ) -> tuple[dict[str, str], dict[str | tuple, list[str]], set[str]]:
         """
         Convert local IDs to curies for all fields in dictionary.
 
@@ -143,31 +147,40 @@ class Normalizer:
             stop_on_invalid_id: Halt on invalid IDs (default: False)
 
         Returns:
-            Tuple of (valid_curies_dict_with_iris, invalid_ids_dict)
+            Tuple of (valid_curies_dict_with_iris, invalid_ids_dict, unrecognized_vocabs_set)
         """
         curies = dict()
         invalid_ids = defaultdict(list)
+        unrecognized_vocabs = set()
         for id_field_name, local_ids_entry in local_ids_dict.items():
             local_ids = to_list(local_ids_entry)
             id_field_names = [id_field_name] if isinstance(id_field_name, str) else id_field_name
             vocab_names = set()
             for field_name in id_field_names:
-                vocab_names |= self.determine_vocab(field_name)
+                matching_vocabs = self.determine_vocab(field_name)
+                if matching_vocabs:
+                    vocab_names |= matching_vocabs
+                else:
+                    unrecognized_vocabs.add(field_name)
 
             logging.debug(f"Matching vocabs are: {vocab_names}")
-            for local_id in local_ids:
-                # Make sure the local ID is a nice clean string (not int or float)
-                local_id = self.clean_id(local_id)
-                # Get the curie for this local ID
-                if local_id:  # Sometimes cleaning the local ID can make it empty (like if it was just a space)
-                    curie, iri = self._construct_curie(local_id, list(vocab_names), stop_on_failure=stop_on_invalid_id)
-                    if curie:
-                        curies[curie] = iri
-                    else:
-                        invalid_ids[id_field_name].append(local_id)
-        return curies, dict(invalid_ids)
+            if vocab_names:
+                for local_id in local_ids:
+                    # Make sure the local ID is a nice clean string (not int or float)
+                    local_id = self.clean_id(local_id)
+                    # Get the curie for this local ID
+                    if local_id:  # Sometimes cleaning the local ID can make it empty (like if it was just a space)
+                        curie, iri = self._construct_curie(
+                            local_id, list(vocab_names), stop_on_failure=stop_on_invalid_id
+                        )
+                        if curie:
+                            curies[curie] = iri
+                        else:
+                            invalid_ids[id_field_name].append(local_id)
 
-    def determine_vocab(self, id_field_name: str) -> set[str]:
+        return curies, dict(invalid_ids), unrecognized_vocabs
+
+    def determine_vocab(self, id_field_name: str) -> set[str] | None:
         """
         Determine which vocabulary corresponds to an ID field/column name.
 
@@ -177,7 +190,7 @@ class Normalizer:
             id_field_name: Name of ID field/column
 
         Returns:
-            List of matching vocabulary names (in standardized form)
+            Set of matching vocabulary names (in standardized form)
         """
         logging.debug(f"Determining which vocab corresponds to field '{id_field_name}'")
         field_name_underscored = re.sub(
@@ -214,18 +227,7 @@ class Normalizer:
                 self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_alias
                 return matches_on_alias
             else:
-                valid_vocab_names = ", ".join(
-                    [
-                        f"{vocab} (or: {', '.join(info[self.aliases_prop])})" if info.get(self.aliases_prop) else vocab
-                        for vocab, info in self.vocab_validator_map.items()
-                    ]
-                )
-                error_message = (
-                    f"Could not determine vocab for field '{id_field_name}'. "
-                    f"Valid vocab names are: {valid_vocab_names}"
-                )
-                logging.error(error_message)
-                raise ValueError(error_message)
+                return None
 
     def is_valid_id(self, local_id: str, vocab_name_cleaned: str) -> tuple[bool, str]:
         """

@@ -13,8 +13,14 @@ def test_all_example_scripts_run():
 
     failed = []
     for script_path in example_scripts:
+        print(f"on script path: {script_path}")
         result = subprocess.run(
-            [sys.executable, str(script_path)], cwd=script_path.parent, capture_output=True, text=True, timeout=60
+            [sys.executable, str(script_path)],
+            cwd=script_path.parent,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            stdin=subprocess.DEVNULL,
         )
 
         if result.returncode != 0:

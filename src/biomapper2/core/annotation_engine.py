@@ -10,19 +10,29 @@ from typing import Any, Literal
 
 import pandas as pd
 
-from ..utils import AssignedIDsDict
+from ..utils import AssignedIDsDict, get_descendants, initialize_biolink_model_toolkit, standardize_entity_type
 from .annotators.base import BaseAnnotator
+from .annotators.kestrel_hybrid import KestrelHybridSearchAnnotator
 from .annotators.kestrel_text import KestrelTextSearchAnnotator
+from .annotators.kestrel_vector import KestrelVectorSearchAnnotator
 from .annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
 
 
 class AnnotationEngine:
     """Engine for annotating biological entities with additional ontology IDs."""
 
-    def __init__(self):
+    def __init__(self, biolink_version: str | None = None):
         """Initialize the annotation engine and set up available annotators."""
-        self.kestrel_text_search_annotator = KestrelTextSearchAnnotator()
-        self.metabolomics_workbench_annotator = MetabolomicsWorkbenchAnnotator()
+        self.annotator_registry: dict[str, BaseAnnotator] = {
+            annotator.slug: annotator
+            for annotator in [
+                KestrelHybridSearchAnnotator(),
+                KestrelTextSearchAnnotator(),
+                KestrelVectorSearchAnnotator(),
+                MetabolomicsWorkbenchAnnotator(),
+            ]
+        }
+        self.bmt = initialize_biolink_model_toolkit(biolink_version)
 
     def annotate(
         self,
@@ -31,6 +41,7 @@ class AnnotationEngine:
         provided_id_fields: list[str],
         entity_type: str,
         mode: Literal["all", "missing", "none"] = "missing",
+        annotators: list[str] | None = None,
     ) -> pd.DataFrame | pd.Series:
         """
         Annotate entity with additional vocab IDs, obtained using various internal or external methods.
@@ -44,53 +55,71 @@ class AnnotationEngine:
                 - 'all': Annotate all entities
                 - 'missing': Only annotate entities without provided_ids (default)
                 - 'none': Skip annotation entirely (returns empty)
+            annotators: Optional list of annotators to use (by slug). If None, annotators are selected automatically.
 
         Returns:
             AssignedIDsDict (in a named Series) for single entity, and in a single-column
             pd.DataFrame for multiple entities.
         """
-        # Validate mode
         valid_modes = {"all", "missing", "none"}
         if mode not in valid_modes:
             raise ValueError(f"Invalid mode '{mode}'. Must be one of: {valid_modes}")
-
-        logging.debug("Beginning annotation step..")
-        entity_type_cleaned = "".join(c for c in entity_type.lower() if c.isalpha())
 
         # Skip annotation if user requested it
         if mode == "none":
             logging.debug(f"Skipping all annotation since mode={mode}")
             return self._get_empty_assigned_ids(item)
 
-        # Figure out which annotators to use
-        annotators = self._select_annotators(entity_type_cleaned)
+        logging.debug("Beginning annotation step..")
 
-        if annotators:
-            logging.debug(f"Using annotators: {annotators}")
+        # Validate the entity type and convert it into a standard biolink category
+        category = standardize_entity_type(entity_type, self.bmt)
+        logging.debug(f"Biolink category for entity type '{entity_type}' is: {category}")
+
+        annotator_slugs = annotators if annotators else self._select_annotators(category)
+        invalid_slugs = set(annotator_slugs).difference(set(self.annotator_registry.keys()))
+        if invalid_slugs:
+            raise ValueError(
+                f"Invalid annotator slug(s) provided: {invalid_slugs}. "
+                f"Valid options are: {list(self.annotator_registry.keys())}"
+            )
+        annotators_to_use = [self.annotator_registry[slug] for slug in annotator_slugs]
+
+        if annotators_to_use:
+            logging.debug(f"Using annotators: {annotator_slugs}")
         else:
-            logging.warning("Did not identify any annotators to use for input item. Proceeding without assigned IDs.")
-            return self._get_empty_assigned_ids(item)
+            raise ValueError("Could not identify any annotators to use for input item.")
 
         # Get annotations using selected annotators
         if isinstance(item, pd.DataFrame):
-            return self._annotate_dataframe(item, name_field, provided_id_fields, mode, annotators)
+            return self._annotate_dataframe(item, name_field, provided_id_fields, mode, category, annotators_to_use)
         else:
-            return self._annotate_single(item, name_field, provided_id_fields, mode, annotators)
+            return self._annotate_single(item, name_field, provided_id_fields, mode, category, annotators_to_use)
 
     # ------------------------------------- Helper methods --------------------------------------- #
 
-    def _select_annotators(self, entity_type_cleaned: str) -> list[BaseAnnotator]:
-        """Select appropriate annotators based on entity type."""
-        annotators: list[BaseAnnotator] = []
-        if entity_type_cleaned in {"metabolite", "smallmolecule", "lipid"}:
-            annotators.append(self.metabolomics_workbench_annotator)
-        if not annotators:
-            # Back up to using a text search (this is a PLACEHOLDER, should not be fallback long-term)
-            annotators.append(self.kestrel_text_search_annotator)
+    def _select_annotators(self, category: str) -> list[str]:
+        """Select appropriate annotators based on entity type (returns their slugs)."""
+        annotators: list[str] = []
+
+        # Choose which annotators to use considering biolink category and its descendants
+        category_with_descendants = get_descendants(category, self.bmt)
+        if category_with_descendants.intersection({"biolink:SmallMolecule"}):
+            annotators.append(MetabolomicsWorkbenchAnnotator.slug)
+
+        # Always include fallback annotator (temp: orchestration will become more advanced later)
+        annotators.append(KestrelHybridSearchAnnotator.slug)
+
         return annotators
 
     def _annotate_dataframe(
-        self, df: pd.DataFrame, name_field: str, provided_id_fields: list[str], mode: str, annotators: list
+        self,
+        df: pd.DataFrame,
+        name_field: str,
+        provided_id_fields: list[str],
+        mode: str,
+        category: str,
+        annotators: list,
     ) -> pd.DataFrame:
         """Annotate an entire DataFrame. Returns a single-column DataFrame containing AssignedIDsDicts."""
         if mode == "missing":
@@ -114,7 +143,7 @@ class AnnotationEngine:
 
             for annotator in annotators:
                 prepared_df = annotator.prepare(items_to_annotate, provided_id_fields)
-                annotations_col = annotator.get_annotations_bulk(prepared_df, name_field)
+                annotations_col = annotator.get_annotations_bulk(prepared_df, name_field, category)
                 annotated_rows = pd.Series(
                     [self._merge_nested_dicts(d1, d2) for d1, d2 in zip(annotated_rows, annotations_col)],
                     index=annotated_rows.index,
@@ -131,6 +160,7 @@ class AnnotationEngine:
         name_field: str,
         provided_id_fields: list[str],
         mode: str,
+        category: str,
         annotators: list,
     ) -> pd.Series:
         """Annotate a single entity. Returns named series containing AssignedIDsDict."""
@@ -145,7 +175,7 @@ class AnnotationEngine:
         assigned_ids = dict()  # All annotations will be merged into this
         for annotator in annotators:
             prepared_entity = annotator.prepare(item, provided_id_fields)
-            entity_annotations = annotator.get_annotations(prepared_entity, name_field)
+            entity_annotations = annotator.get_annotations(prepared_entity, name_field, category)
             assigned_ids: AssignedIDsDict = self._merge_nested_dicts(assigned_ids, entity_annotations)
 
         return pd.Series({"assigned_ids": assigned_ids})  # Named Series

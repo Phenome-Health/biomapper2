@@ -7,9 +7,9 @@ from ...utils import AssignedIDsDict, kestrel_request, text_is_not_empty
 from .base import BaseAnnotator
 
 
-class KestrelTextSearchAnnotator(BaseAnnotator):
+class KestrelVectorSearchAnnotator(BaseAnnotator):
 
-    slug = "kestrel-text-search"
+    slug = "kestrel-vector-search"
 
     def get_annotations(
         self, entity: dict | pd.Series, name_field: str, category: str, cache: dict | None = None
@@ -23,7 +23,7 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
             if cache:
                 term_results = cache.get(search_term)
             else:
-                results = self._kestrel_text_search(search_term, category, limit=1)
+                results = self._kestrel_vector_search(search_term, category, limit=1)
                 term_results = results[search_term]
 
             annotations: dict[str, dict[str, dict[str, Any]]] = {}
@@ -47,8 +47,9 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
         # Filter out any empty/NaN entity names
         search_terms = [t for t in entities[name_field].tolist() if text_is_not_empty(t)]
 
-        logging.info(f"Getting text search results from Kestrel API for {len(entities)} entities")
-        results = self._kestrel_text_search(search_terms, category, limit=1)
+        logging.info(f"Getting vector search results from Kestrel API for {len(entities)} entities")
+        results = self._kestrel_vector_search(search_terms, category, limit=1)
+        logging.debug(f"Kestrel results: {results}")
 
         # Annotate each entity using the results from the bulk request
         assigned_ids_col = entities.apply(
@@ -60,7 +61,7 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
     # ----------------------------------------- Helper methods ----------------------------------------------- #
 
     @staticmethod
-    def _kestrel_text_search(search_text: str | list[str], category: str, limit: int = 10) -> dict[str, list[dict]]:
-        """Call Kestrel text search endpoint."""
+    def _kestrel_vector_search(search_text: str | list[str], category: str, limit: int = 10) -> dict[str, list[dict]]:
+        """Call Kestrel vector search endpoint."""
         payload = {"search_text": search_text, "limit": limit, "category_filter": category}
-        return kestrel_request("POST", "text-search", json=payload)
+        return kestrel_request("POST", "vector-search", json=payload)

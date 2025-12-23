@@ -160,3 +160,17 @@ def test_annotation_mode_parameter(shared_mapper: Mapper):
     )
     print_entity(mapped_entity_missing_2)
     assert mapped_entity_missing_2["assigned_ids"]
+
+
+def test_user_provided_annotators(shared_mapper: Mapper):
+    entity = {"name": "cholate"}
+    mapped_entity = shared_mapper.map_entity_to_kg(
+        item=entity,
+        name_field="name",
+        provided_id_fields=[],
+        entity_type="metabolite",
+        annotators=["kestrel-vector-search", "metabolomics-workbench"],
+    )
+    print_entity(mapped_entity)
+    assert mapped_entity["kg_ids_assigned"]
+    assert "kestrel-vector-search" in mapped_entity["kg_ids_assigned"]

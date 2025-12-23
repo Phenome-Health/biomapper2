@@ -1,19 +1,16 @@
 """Tests for mapping datasets to the KG."""
 
-from pathlib import Path
-
 import pandas as pd
 
+from biomapper2.config import PROJECT_ROOT
 from biomapper2.mapper import Mapper
-
-PROJECT_ROOT_PATH = Path(__file__).parents[1]
 
 
 def test_map_dataset_metabolites_synthetic(shared_mapper: Mapper):
 
     # Map the dataset
     results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
-        dataset=str(PROJECT_ROOT_PATH / "data" / "examples" / "metabolites_synthetic.tsv"),
+        dataset=str(PROJECT_ROOT / "data" / "examples" / "metabolites_synthetic.tsv"),
         entity_type="metabolite",
         name_column="name",
         provided_id_columns=["INCHIKEY", "HMDB", "KEGG", "PUBCHEM", "CHEBI"],
@@ -28,7 +25,7 @@ def test_map_dataset_olink_proteins(shared_mapper: Mapper):
 
     # Map the dataset
     results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
-        dataset=str(PROJECT_ROOT_PATH / "data" / "examples" / "olink_protein_metadata.tsv"),
+        dataset=str(PROJECT_ROOT / "data" / "examples" / "olink_protein_metadata.tsv"),
         entity_type="protein",
         name_column="Assay",
         provided_id_columns=["UniProt"],
@@ -43,7 +40,7 @@ def test_map_dataset_diseases_groundtruth(shared_mapper: Mapper):
 
     # Map the dataset
     results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
-        dataset=str(PROJECT_ROOT_PATH / "data" / "groundtruth" / "diseases_handcrafted.tsv"),
+        dataset=str(PROJECT_ROOT / "data" / "groundtruth" / "diseases_handcrafted.tsv"),
         entity_type="disease",
         name_column="name",
         provided_id_columns=[],
@@ -62,7 +59,7 @@ def test_map_dataset_metabolites_synthetic_partial_provided(shared_mapper: Mappe
 
     # Map the dataset
     results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
-        dataset=str(PROJECT_ROOT_PATH / "data" / "examples" / "metabolites_synthetic_partial_provided.tsv"),
+        dataset=str(PROJECT_ROOT / "data" / "examples" / "metabolites_synthetic_partial_provided.tsv"),
         entity_type="metabolite",
         name_column="name",
         provided_id_columns=["INCHIKEY", "HMDB", "KEGG", "PUBCHEM", "CHEBI"],
@@ -78,7 +75,7 @@ def test_map_dataset_metabolites_synthetic_partial_provided(shared_mapper: Mappe
 
 def test_provide_pandas_df_to_mapper(shared_mapper: Mapper):
 
-    df = pd.read_csv(str(PROJECT_ROOT_PATH / "data" / "examples" / "olink_protein_metadata.tsv"), sep="\t")
+    df = pd.read_csv(str(PROJECT_ROOT / "data" / "examples" / "olink_protein_metadata.tsv"), sep="\t")
 
     # Map the dataset
     results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
@@ -93,3 +90,17 @@ def test_provide_pandas_df_to_mapper(shared_mapper: Mapper):
     result_df = pd.read_csv(results_tsv_path, sep="\t")
 
     assert result_df.shape[0] == df.shape[0]
+
+
+def test_user_provided_annotators(shared_mapper: Mapper):
+
+    results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
+        dataset=str(PROJECT_ROOT / "data" / "examples" / "metabolites_synthetic.tsv"),
+        entity_type="metabolite",
+        name_column="name",
+        provided_id_columns=["INCHIKEY", "HMDB", "KEGG", "PUBCHEM", "CHEBI"],
+        array_delimiters=[",", ";"],
+        annotation_mode="all",
+        annotators=["kestrel-hybrid-search"],
+    )
+    assert "kestrel-hybrid-search" in stats["performance"]["per_annotator"]

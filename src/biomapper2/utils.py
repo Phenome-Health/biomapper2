@@ -10,8 +10,9 @@ from typing import Any, TypeGuard, cast
 
 import pandas as pd
 import requests
+from bmt import Toolkit
 
-from .config import KESTREL_API_KEY, KESTREL_API_URL, LOG_LEVEL
+from .config import BIOLINK_VERSION_DEFAULT, KESTREL_API_KEY, KESTREL_API_URL, LOG_LEVEL
 
 # Type alias for annotation results structure
 # Structure: {annotator: {vocabulary: {local_id: result_metadata_dict}}}
@@ -36,6 +37,46 @@ def setup_logging():
 def text_is_not_empty(value: Any) -> TypeGuard[str]:
     """Check if a name/text field value is a valid non-empty string."""
     return isinstance(value, str) and value.strip() != ""
+
+
+def initialize_biolink_model_toolkit(biolink_version: str | None = None) -> Toolkit:
+    version = biolink_version if biolink_version else BIOLINK_VERSION_DEFAULT
+    url = f"https://raw.githubusercontent.com/biolink/biolink-model/refs/tags/v{version}/biolink-model.yaml"
+    logging.info("Initializing bmt (Biolink Model Toolkit)...")
+    bmt = Toolkit(schema=url)
+    return bmt
+
+
+def standardize_entity_type(entity_type: str, bmt: Toolkit) -> str:
+    # Map any aliases to their corresponding biolink category
+    entity_type_cleaned = "".join(c for c in entity_type.removeprefix("biolink:").lower() if c.isalpha())
+    aliases = {"metabolite": "SmallMolecule", "lipid": "SmallMolecule"}
+    category_raw = aliases.get(entity_type_cleaned, entity_type)
+
+    if bmt.is_category(category_raw):
+        category_element = bmt.get_element(category_raw)
+        if category_element:
+            return category_element["class_uri"]
+
+    message = (
+        f"Could not find valid Biolink category for entity type '{entity_type}'. "
+        f"Valid entity types are: {bmt.get_descendants('NamedThing')}. Or accepted aliases are: {aliases}."
+    )
+    logging.error(message)
+    raise ValueError(message)
+
+
+def get_descendants(biolink_category: str, bmt: Toolkit) -> set[str]:
+    # Get descendants of the given category (includes self)
+    if bmt.is_category(biolink_category):
+        return set(bmt.get_descendants(biolink_category, formatted=True, mixin=True, reflexive=True))
+    else:
+        message = (
+            f"Category '{biolink_category}' is not a valid biolink category. Valid categories are: "
+            f"{bmt.get_descendants('NamedThing')}."
+        )
+        logging.error(message)
+        raise ValueError(message)
 
 
 def to_list(
@@ -74,23 +115,6 @@ def safe_divide(numerator, denominator) -> float | None:
 
     result = numerator / denominator
     return result
-
-
-def calculate_f1_score(precision: float | None, recall: float | None) -> float | None:
-    """
-    Calculate F1 score from precision and recall.
-
-    Args:
-        precision: Precision value
-        recall: Recall value
-
-    Returns:
-        F1 score, or None if either input is None
-    """
-    if precision is None or recall is None:
-        return None
-    else:
-        return safe_divide(2 * (precision * recall), (precision + recall))
 
 
 # Kestrel API functions

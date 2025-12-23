@@ -5,6 +5,7 @@ Resolves cases where multiple KG nodes match an entity by selecting the best can
 """
 
 import logging
+from collections import defaultdict
 from typing import Any
 
 import pandas as pd
@@ -41,9 +42,15 @@ class Resolver:
         Returns:
             Named Series with fields: chosen_kg_id, chosen_kg_id_provided, chosen_kg_id_assigned
         """
-        chosen_kg_id = self._choose_best_kg_id(entity["kg_ids"])
         chosen_kg_id_provided = self._choose_best_kg_id(entity["kg_ids_provided"])
-        chosen_kg_id_assigned = self._choose_best_kg_id(entity["kg_ids_assigned"])
+        chosen_kg_id = self._choose_best_kg_id(entity["kg_ids"])
+
+        # Combine all annotators' KG IDs dict into one to choose preferred 'assigned' KG ID
+        kg_ids_assigned_combined = defaultdict(list)
+        for annotator_kg_ids_assigned in entity["kg_ids_assigned"].values():
+            for kg_id, curies in annotator_kg_ids_assigned.items():
+                kg_ids_assigned_combined[kg_id].extend(curies)
+        chosen_kg_id_assigned = self._choose_best_kg_id(kg_ids_assigned_combined)
 
         return pd.Series(
             {
