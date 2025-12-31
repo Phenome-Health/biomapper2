@@ -142,11 +142,7 @@ class Mapper:
         logging.info(f"Beginning to map dataset to KG ({dataset})")
         array_delimiters = array_delimiters if array_delimiters is not None else [",", ";"]
 
-        # TODO: Optionally allow people to input a Dataframe directly, as opposed to TSV path? #3
-        # Addressed below:
-        # Check if dataset is a pandas dataframe of a path to tsv/csv file
         # TODO: how to handle other data types, like .txt?
-
         # TODO: let file output location be configurable? #11
         # Issue: if dataset is a pandas df, need to create some default filename
         # naively create a default output filename (input_df_MAPPED) if output_prefix not provided
@@ -159,9 +155,9 @@ class Mapper:
             # Load tsv into pandas
             output_tsv_path = dataset.replace(".tsv", "_MAPPED.tsv").replace(".csv", "_MAPPED.tsv")
             if dataset.endswith(".tsv"):
-                df = pd.read_csv(dataset, sep="\t", dtype={id_col: str for id_col in provided_id_columns})
+                df = pd.read_csv(dataset, sep="\t", dtype={id_col: str for id_col in provided_id_columns}, comment="#")
             elif dataset.endswith(".csv"):
-                df = pd.read_csv(dataset, dtype={id_col: str for id_col in provided_id_columns})
+                df = pd.read_csv(dataset, dtype={id_col: str for id_col in provided_id_columns}, comment="#")
             else:
                 raise ValueError(f"Unsupported file extension for dataset: {dataset}")
         else:
