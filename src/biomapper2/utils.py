@@ -22,6 +22,10 @@ AssignedIDsDict = dict[str, dict[str, dict[str, dict[str, Any]]]]
 # Type hint for annotation mode
 AnnotationMode = Literal["all", "missing", "none"]
 
+VALIDATOR_PROP = "validator"
+CLEANER_PROP = "cleaner"
+ALIASES_PROP = "aliases"
+
 
 def setup_logging():
     """Configure logging based on LOG_LEVEL in config.py."""

@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 
 from ...config import BIOLINK_VERSION_DEFAULT
-from ...utils import to_list
+from ...utils import ALIASES_PROP, CLEANER_PROP, VALIDATOR_PROP, to_list
 from . import cleaners
 from .vocab_config import load_prefix_info, load_validator_map
 
@@ -28,9 +28,9 @@ class Normalizer:
     """
 
     def __init__(self, biolink_version: str | None = None):
-        self.validator_prop = "validator"
-        self.cleaner_prop = "cleaner"
-        self.aliases_prop = "aliases"
+        self.validator_prop = VALIDATOR_PROP
+        self.cleaner_prop = CLEANER_PROP
+        self.aliases_prop = ALIASES_PROP
         self.biolink_version = biolink_version if biolink_version else BIOLINK_VERSION_DEFAULT
         self.vocab_info_map = load_prefix_info(self.biolink_version)
         self.vocab_validator_map = load_validator_map()
