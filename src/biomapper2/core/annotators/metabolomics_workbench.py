@@ -8,8 +8,7 @@ from urllib.parse import quote
 import pandas as pd
 import requests
 import requests_cache
-from requests.adapters import HTTPAdapter
-from urllib3 import Retry
+from circuitbreaker import CircuitBreakerError, circuit
 
 from ...config import CACHE_DIR
 from ...utils import AssignedIDsDict
@@ -39,16 +38,6 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             CACHE_DIR / "metabolomics_workbench_http",
             expire_after=timedelta(days=7),
         )
-
-        # Add retry logic
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,  # waits 1s, 2s, 4s between retries
-            status_forcelist=[500, 502, 503, 504],
-            allowed_methods=["GET"],
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        self._session.mount("https://", adapter)
 
     def get_annotations(
         self, entity: dict | pd.Series, name_field: str, category: str, cache: dict | None = None
@@ -91,9 +80,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
 
         # Build cache with API results
         logging.info(f"Fetching RefMet data for {len(names)} unique metabolite names")
-        cache: dict[str, dict[str, Any] | None] = {}
-        for name in names:
-            cache[name] = self._fetch_refmet_data(name)
+        cache = {name: self._fetch_refmet_data(name) for name in names}
 
         # Apply get_annotations to each row using the cache
         assigned_ids_col = entities.apply(
@@ -111,19 +98,30 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         Returns:
             API response dict or None if not found
         """
-        url = f"{self.BASE_URL}/{quote(metabolite_name)}"
-
         try:
-            response = self._session.get(url, timeout=30)
-            response.raise_for_status()
-            data = response.json()
+            return self._do_refmet_request(metabolite_name)
+        except CircuitBreakerError:
+            logging.debug(f"RefMet API outage, skipping '{metabolite_name}' (circuit open)")
+            return None
         except requests.RequestException as e:
             logging.warning(f"Failed to fetch RefMet data for '{metabolite_name}': {e}")
             return None
 
-        # /match endpoint returns dict with "-" values when no match found
+    @circuit(failure_threshold=3, recovery_timeout=300)
+    def _do_refmet_request(self, metabolite_name: str) -> dict[str, Any] | None:
+        """
+        Make the actual HTTP request. Protected by circuit breaker - trips on repeated failures,
+        meaning it will skip requests until a cooldown period is over (recovery_timeout).
+        """
+        url = f"{self.BASE_URL}/{quote(metabolite_name)}"
+
+        response = self._session.get(url, timeout=3)
+        response.raise_for_status()
+        data = response.json()
+
         if isinstance(data, dict):
             if data.get("refmet_id") == "-":
+                # /match endpoint returns dict with "-" values when no match found
                 return None
             return data
 
