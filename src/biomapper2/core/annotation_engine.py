@@ -71,18 +71,27 @@ class AnnotationEngine:
         if mode not in valid_modes:
             raise ValueError(f"Invalid mode '{mode}'. Must be one of: {valid_modes}")
 
+        logging.info(f"Beginning annotation step.. (mode={mode}, annotators={annotators})")
+
         # Skip annotation if user requested it
         if mode == "none":
-            logging.debug(f"Skipping all annotation since mode={mode}")
+            logging.info(f"Skipping all annotation since mode={mode}")
             return self._get_empty_assigned_ids(item)
-
-        logging.debug("Beginning annotation step..")
 
         # Validate the entity type and convert it into a standard biolink category
         category = standardize_entity_type(entity_type, self.bmt)
-        logging.debug(f"Biolink category for entity type '{entity_type}' is: {category}")
+        logging.info(f"Biolink category for entity type '{entity_type}' is: {category}")
 
-        annotator_slugs = annotators if annotators else self._select_annotators(category)
+        if annotators is None:
+            annotator_slugs = self._select_annotators(category)
+        else:
+            if not annotators:
+                logging.warning(
+                    "Empty annotators list provided; skipping annotation "
+                    "(consider using annotation_mode='none' instead)"
+                )
+            annotator_slugs = annotators
+
         invalid_slugs = set(annotator_slugs).difference(set(self.annotator_registry.keys()))
         if invalid_slugs:
             raise ValueError(
@@ -92,20 +101,21 @@ class AnnotationEngine:
         annotators_to_use = [self.annotator_registry[slug] for slug in annotator_slugs]
 
         if annotators_to_use:
-            logging.debug(f"Using annotators: {annotator_slugs}")
-        else:
-            raise ValueError("Could not identify any annotators to use for input item.")
+            # Get annotations using selected annotators
+            logging.info(f"Using Annotators: {annotator_slugs}")
 
-        # Get annotations using selected annotators
-        if isinstance(item, pd.DataFrame):
-            return self._annotate_dataframe(item, name_field, provided_id_fields, mode, category, annotators_to_use)
+            if isinstance(item, pd.DataFrame):
+                return self._annotate_dataframe(item, name_field, provided_id_fields, mode, category, annotators_to_use)
+            else:
+                return self._annotate_single(item, name_field, provided_id_fields, mode, category, annotators_to_use)
         else:
-            return self._annotate_single(item, name_field, provided_id_fields, mode, category, annotators_to_use)
+            return self._get_empty_assigned_ids(item)
 
     # ------------------------------------- Helper methods --------------------------------------- #
 
     def _select_annotators(self, category: str) -> list[str]:
         """Select appropriate annotators based on entity type (returns their slugs)."""
+        logging.info(f"Selecting annotators for category '{category}'")
         annotators: list[str] = []
 
         # Choose which annotators to use considering biolink category and its descendants
