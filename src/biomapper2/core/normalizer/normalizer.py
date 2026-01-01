@@ -108,6 +108,11 @@ class Normalizer:
         curies_provided, invalid_ids_provided, unrecognized_vocabs_provided = self.get_curies(
             provided_ids, stop_on_invalid_id
         )
+        if unrecognized_vocabs_provided:
+            logging.warning(
+                f"Unrecognized vocabs detected - provided IDs will not be fully utilized:"
+                f" {unrecognized_vocabs_provided} fields could not be matched to a known vocab."
+            )
 
         # Get curies for the assigned IDs (per annotator, to track provenance)
         curies_assigned, invalid_ids_assigned, unrecognized_vocabs_assigned = dict(), dict(), set()
@@ -119,6 +124,12 @@ class Normalizer:
             if annotator_invalid_ids:
                 invalid_ids_assigned[annotator_slug] = annotator_invalid_ids
             unrecognized_vocabs_assigned |= annotator_unrecognized_vocabs
+
+        if unrecognized_vocabs_assigned:
+            logging.warning(
+                f"Unrecognized vocabs detected - assigned IDs will not be fully utilized:"
+                f" {unrecognized_vocabs_assigned} fields could not be matched to a known vocab."
+            )
 
         # Form final overall combined set of curies
         curies = set(curies_provided) | set().union(*curies_assigned.values())
@@ -187,7 +198,7 @@ class Normalizer:
         Uses heuristic matching against known vocab names and aliases.
 
         Args:
-            id_field_name: Name of ID field/column
+            id_field_name: Name of ID field/column (e.g., "CHEBI ID", "Labcorp LOINC id"
 
         Returns:
             Set of matching vocabulary names (in standardized form)
