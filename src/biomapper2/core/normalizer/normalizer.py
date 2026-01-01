@@ -221,7 +221,7 @@ class Normalizer:
             # We've already processed this field name before, so we return the cached mapping
             return self.field_name_to_vocab_name_cache[field_name_cleaned]
         else:
-            # Otherwise we inspect vocab aliases (explicit and implicit ones) to try to find a match
+            # Check explicit and implicit aliases
             matches_on_alias = set()
             for vocab, info in self.vocab_validator_map.items():
                 if info.get(self.aliases_prop) and field_name_cleaned in info[self.aliases_prop]:
@@ -233,12 +233,26 @@ class Normalizer:
                 elif vocab.replace(".", "") == field_name_cleaned:
                     # This field matches implicitly, after removing periods (e.g., 'keggcompound' for 'kegg.compound')
                     matches_on_alias.add(vocab)
+
             if matches_on_alias:
-                # Cache this mapping for quick lookup later
                 self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_alias
                 return matches_on_alias
-            else:
-                return None
+
+            # Final tier: check if any known vocab name appears within the field name
+            # This handles cases like "labcorploincid" -> "loinc"
+            matches_on_substring = set()
+            for vocab in self.vocab_validator_map:
+                # Use the root vocab name for substring matching
+                vocab_root = vocab.split(".")[0] if "." in vocab else vocab
+                if vocab_root in field_name_cleaned:
+                    matches_on_substring.add(vocab)
+
+            if matches_on_substring:
+                logging.debug(f"Found substring match(es) for '{id_field_name}': {matches_on_substring}")
+                self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_substring
+                return matches_on_substring
+
+            return None
 
     def is_valid_id(self, local_id: str, vocab_name_cleaned: str) -> tuple[bool, str]:
         """
