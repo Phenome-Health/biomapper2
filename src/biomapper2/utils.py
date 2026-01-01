@@ -178,7 +178,7 @@ def kestrel_request(method: str, endpoint: str, session: requests.Session | None
     if session is None:
         session = requests_cache.CachedSession(
             CACHE_DIR / "kestrel_http",
-            expire_after=timedelta(minutes=15),
+            expire_after=timedelta(hours=1),
             allowable_methods=["GET", "POST"],
         )
 
