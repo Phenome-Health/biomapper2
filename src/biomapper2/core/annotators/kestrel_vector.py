@@ -49,7 +49,6 @@ class KestrelVectorSearchAnnotator(BaseAnnotator):
 
         logging.info(f"Getting vector search results from Kestrel API for {len(entities)} entities")
         results = self._kestrel_vector_search(search_terms, category, limit=1)
-        logging.debug(f"Kestrel results: {results}")
 
         # Annotate each entity using the results from the bulk request
         assigned_ids_col = entities.apply(

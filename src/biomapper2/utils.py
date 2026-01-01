@@ -6,14 +6,16 @@ Provides logging setup and mathematical helpers for metric calculations.
 
 import logging
 from collections.abc import Iterable
+from datetime import timedelta
 from typing import Any, Literal, TypeGuard, cast
 
 import inflect
 import pandas as pd
 import requests
+import requests_cache
 from bmt import Toolkit
 
-from .config import BIOLINK_VERSION_DEFAULT, KESTREL_API_KEY, KESTREL_API_URL, LOG_LEVEL
+from .config import BIOLINK_VERSION_DEFAULT, KESTREL_API_KEY, KESTREL_API_URL, LOG_LEVEL, CACHE_DIR
 
 # Type alias for annotation results structure
 # Structure: {annotator: {vocabulary: {local_id: result_metadata_dict}}}
@@ -150,14 +152,14 @@ def safe_divide(numerator, denominator) -> float | None:
     return result
 
 
-# Kestrel API functions
-def kestrel_request(method: str, endpoint: str, **kwargs) -> Any:
+def kestrel_request(method: str, endpoint: str, session: requests.Session | None = None, **kwargs) -> Any:
     """
     Internal helper for making Kestrel API requests.
 
     Args:
         method: HTTP method ('GET' or 'POST')
         endpoint: API endpoint path
+        session: Optional requests session (defaults to cached session)
         **kwargs: Additional arguments to pass to requests (json, params, etc.)
 
     Returns:
@@ -167,8 +169,21 @@ def kestrel_request(method: str, endpoint: str, **kwargs) -> Any:
         requests.exceptions.HTTPError: If API returns error status
         requests.exceptions.RequestException: If request fails
     """
+    # Sort search_text in json payload for consistent cache keys (if handling a batch)
+    if "json" in kwargs and isinstance(kwargs["json"], dict):
+        payload = kwargs["json"]
+        if "search_text" in payload and isinstance(payload["search_text"], list):
+            payload["search_text"].sort()
+
+    if session is None:
+        session = requests_cache.CachedSession(
+            CACHE_DIR / "kestrel_http",
+            expire_after=timedelta(minutes=15),
+            allowable_methods=["GET", "POST"],
+        )
+
     try:
-        response = requests.request(
+        response = session.request(
             method, f"{KESTREL_API_URL}/{endpoint}", headers={"X-API-Key": KESTREL_API_KEY}, **kwargs
         )
         response.raise_for_status()
