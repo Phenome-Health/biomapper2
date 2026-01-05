@@ -282,8 +282,8 @@ class Visualizer:
                     annot[i, j] = f"$\\mathbf{{{val_float*100:.1f}\\%}}$\n\n({expl})"
 
         # Apply display labels (after ordering, after building annotations)
-        matrix.index = matrix.index.map(lambda x: _entity_labels.get(x, x))
-        matrix.columns = matrix.columns.map(lambda x: _dataset_labels.get(x, x))
+        matrix.index = matrix.index.map(lambda x: _entity_labels.get(x, x.title()))
+        matrix.columns = matrix.columns.map(lambda x: _dataset_labels.get(x, x.title()))
 
         # Calculate figure size based on grid dimensions, or use override
         n_rows, n_cols = matrix.shape
