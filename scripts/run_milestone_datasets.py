@@ -10,6 +10,7 @@ ids = "id_cols"
 vocab = "vocab"
 delimiters = "delimiters"
 
+
 datasets = {
     "arivale_proteins.tsv": {name: "gene_name", ids: ["uniprot", "gene_id"]},
     "arivale_labs.tsv": {name: "Display Name", ids: ["Labcorp LOINC ID", "Quest LOINC ID"]},
@@ -37,7 +38,8 @@ datasets_dir = PROJECT_ROOT / "data" / "milestone"
 
 mapper = Mapper()
 mode: AnnotationMode = "all"
-results_dir = datasets_dir / "results"
+kg_name = "kraken"
+results_dir = datasets_dir / "results" / kg_name
 
 for dataset_filename, params in datasets.items():
     entity_type = dataset_filename.split("_")[1].split(".")[0]
@@ -62,7 +64,7 @@ viz = Visualizer(
 viz_dir = results_dir / "viz"
 
 stats_df = viz.aggregate_stats(stats_dir=results_dir)
-suffix = f"- KRAKEN (mode={mode})"
+suffix = f"- {kg_name.upper()} (mode={mode})"
 
 viz.render_heatmap(df=stats_df, output_path=viz_dir / f"heatmap_{mode}", title=f"Mapping Coverage {suffix}")
 
