@@ -46,6 +46,7 @@ Then [run the pytest suite](#run-tests) to confirm all is working.
 ## Usage
 
 ### Map a single entity to knowledge graph
+
 ```python
 from biomapper2.mapper import Mapper
 
@@ -66,6 +67,7 @@ mapped_item = mapper.map_entity_to_kg(
 ```
 
 ### Map a dataset to knowledge graph
+
 ```python
 from biomapper2.mapper import Mapper
 

@@ -80,7 +80,7 @@ def test_map_entity_id_field_is_list(shared_mapper: Mapper):
 
 def test_custom_biolink_version(shared_mapper: Mapper):
     test_mapper = Mapper(biolink_version="4.2.4")
-    assert test_mapper.normalizer.biolink_version == "4.2.4"
+    assert test_mapper.biolink_client.biolink_version == "4.2.4"
     entity = {"name": "glucose", "kegg": "C00031"}
 
     mapped_entity = test_mapper.map_entity_to_kg(

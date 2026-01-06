@@ -5,14 +5,14 @@ Provides logging setup and mathematical helpers for metric calculations.
 """
 
 import logging
-from collections.abc import Iterable
-from typing import Any, Literal, TypeGuard, cast
+from datetime import timedelta
+from typing import Any, Literal, TypeGuard
 
 import pandas as pd
 import requests
-from bmt import Toolkit
+import requests_cache
 
-from .config import BIOLINK_VERSION_DEFAULT, KESTREL_API_KEY, KESTREL_API_URL, LOG_LEVEL
+from .config import CACHE_DIR, KESTREL_API_KEY, KESTREL_API_URL, LOG_LEVEL
 
 # Type alias for annotation results structure
 # Structure: {annotator: {vocabulary: {local_id: result_metadata_dict}}}
@@ -20,6 +20,10 @@ AssignedIDsDict = dict[str, dict[str, dict[str, dict[str, Any]]]]
 
 # Type hint for annotation mode
 AnnotationMode = Literal["all", "missing", "none"]
+
+VALIDATOR_PROP = "validator"
+CLEANER_PROP = "cleaner"
+ALIASES_PROP = "aliases"
 
 
 def setup_logging():
@@ -42,57 +46,26 @@ def text_is_not_empty(value: Any) -> TypeGuard[str]:
     return isinstance(value, str) and value.strip() != ""
 
 
-def initialize_biolink_model_toolkit(biolink_version: str | None = None) -> Toolkit:
-    version = biolink_version if biolink_version else BIOLINK_VERSION_DEFAULT
-    url = f"https://raw.githubusercontent.com/biolink/biolink-model/refs/tags/v{version}/biolink-model.yaml"
-    logging.info("Initializing bmt (Biolink Model Toolkit)...")
-    bmt = Toolkit(schema=url)
-    return bmt
-
-
-def standardize_entity_type(entity_type: str, bmt: Toolkit) -> str:
-    # Map any aliases to their corresponding biolink category
-    entity_type_cleaned = "".join(c for c in entity_type.removeprefix("biolink:").lower() if c.isalpha())
-    aliases = {"metabolite": "SmallMolecule", "lipid": "SmallMolecule"}
-    category_raw = aliases.get(entity_type_cleaned, entity_type)
-
-    if bmt.is_category(category_raw):
-        category_element = bmt.get_element(category_raw)
-        if category_element:
-            return category_element["class_uri"]
-
-    message = (
-        f"Could not find valid Biolink category for entity type '{entity_type}'. "
-        f"Valid entity types are: {bmt.get_descendants('NamedThing')}. Or accepted aliases are: {aliases}."
-    )
-    logging.error(message)
-    raise ValueError(message)
-
-
-def get_descendants(biolink_category: str, bmt: Toolkit) -> set[str]:
-    # Get descendants of the given category (includes self)
-    if bmt.is_category(biolink_category):
-        return set(bmt.get_descendants(biolink_category, formatted=True, mixin=True, reflexive=True))
-    else:
-        message = (
-            f"Category '{biolink_category}' is not a valid biolink category. Valid categories are: "
-            f"{bmt.get_descendants('NamedThing')}."
-        )
-        logging.error(message)
-        raise ValueError(message)
-
-
-def to_list(
-    item: str | Iterable[str] | int | Iterable[int] | float | Iterable[float] | None,
-) -> list[str | int | float]:
+def to_list(item: Any) -> list[Any]:
     if item is None:
         return []
     elif isinstance(item, list):
-        return cast(list[str | int | float], item)
+        return item
     elif isinstance(item, (str, int, float)):
         return [item]
     else:
         return list(item)
+
+
+def to_set(item: Any) -> set[Any]:
+    if item is None:
+        return set()
+    elif isinstance(item, set):
+        return item
+    elif isinstance(item, (str, int, float)):
+        return {item}
+    else:
+        return set(item)
 
 
 def safe_divide(numerator, denominator) -> float | None:
@@ -120,14 +93,14 @@ def safe_divide(numerator, denominator) -> float | None:
     return result
 
 
-# Kestrel API functions
-def kestrel_request(method: str, endpoint: str, **kwargs) -> Any:
+def kestrel_request(method: str, endpoint: str, session: requests.Session | None = None, **kwargs) -> Any:
     """
     Internal helper for making Kestrel API requests.
 
     Args:
         method: HTTP method ('GET' or 'POST')
         endpoint: API endpoint path
+        session: Optional requests session (defaults to cached session)
         **kwargs: Additional arguments to pass to requests (json, params, etc.)
 
     Returns:
@@ -137,8 +110,21 @@ def kestrel_request(method: str, endpoint: str, **kwargs) -> Any:
         requests.exceptions.HTTPError: If API returns error status
         requests.exceptions.RequestException: If request fails
     """
+    # Sort search_text in json payload for consistent cache keys (if handling a batch)
+    if "json" in kwargs and isinstance(kwargs["json"], dict):
+        payload = kwargs["json"]
+        if "search_text" in payload and isinstance(payload["search_text"], list):
+            payload["search_text"].sort()
+
+    if session is None:
+        session = requests_cache.CachedSession(
+            CACHE_DIR / "kestrel_http",
+            expire_after=timedelta(hours=1),
+            allowable_methods=["GET", "POST"],
+        )
+
     try:
-        response = requests.request(
+        response = session.request(
             method, f"{KESTREL_API_URL}/{endpoint}", headers={"X-API-Key": KESTREL_API_KEY}, **kwargs
         )
         response.raise_for_status()

@@ -9,6 +9,7 @@ import json
 import logging
 from collections.abc import Callable
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -16,7 +17,9 @@ import pandas as pd
 from ..utils import AnnotationMode, safe_divide
 
 
-def analyze_dataset_mapping(results_tsv_path: str, linker: Any, annotation_mode: AnnotationMode) -> dict[str, Any]:
+def analyze_dataset_mapping(
+    results_tsv_path: str | Path, linker: Any, annotation_mode: AnnotationMode
+) -> dict[str, Any]:
     """
     Analyze dataset mapping results and generate summary statistics.
 
@@ -31,6 +34,7 @@ def analyze_dataset_mapping(results_tsv_path: str, linker: Any, annotation_mode:
     Returns:
         Dictionary containing coverage, precision, recall, and F1 metrics
     """
+    results_tsv_path = str(results_tsv_path)
     logging.info(f"Analyzing dataset KG mapping in {results_tsv_path}")
 
     cols_to_literal_eval = [
