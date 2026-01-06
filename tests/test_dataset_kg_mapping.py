@@ -1,5 +1,7 @@
 """Tests for mapping datasets to the KG."""
 
+from pathlib import Path
+
 import pandas as pd
 
 from biomapper2.config import PROJECT_ROOT
@@ -84,13 +86,37 @@ def test_provide_pandas_df_to_mapper(shared_mapper: Mapper):
         name_column="Assay",
         provided_id_columns=["UniProt"],
         array_delimiters=["_"],
-        output_prefix="examples/",
+        output_prefix="olink_proteins",
     )
 
     # Based on provided ids alone, we get 2922 / 2923 proteins in this dataset
     result_df = pd.read_csv(results_tsv_path, sep="\t")
 
     assert result_df.shape[0] == df.shape[0]
+    output_file_name = results_tsv_path.split("/")[-1]
+    assert "olink_proteins" in output_file_name
+
+
+def test_provide_output_dir(shared_mapper: Mapper):
+
+    df = pd.read_csv(PROJECT_ROOT / "data" / "examples" / "olink_protein_metadata.tsv", sep="\t")
+
+    # Map the dataset
+    results_tsv_path, stats = shared_mapper.map_dataset_to_kg(
+        dataset=PROJECT_ROOT / "data" / "examples" / "olink_protein_metadata.tsv",
+        entity_type="protein",
+        name_column="Assay",
+        provided_id_columns=["UniProt"],
+        array_delimiters=["_"],
+        output_dir=PROJECT_ROOT / "data" / "examples" / "results",
+    )
+
+    result_df = pd.read_csv(results_tsv_path, sep="\t")
+
+    assert result_df.shape[0] == df.shape[0]
+    output_file_name = results_tsv_path.split("/")[-1]
+    assert "olink_protein_metadata" in output_file_name
+    assert Path(results_tsv_path).parent == PROJECT_ROOT / "data" / "examples" / "results"
 
 
 def test_user_provided_annotators(shared_mapper: Mapper):

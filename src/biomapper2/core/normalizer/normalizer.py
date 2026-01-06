@@ -13,8 +13,13 @@ from typing import Any
 
 import pandas as pd
 
-from ...config import BIOLINK_VERSION_DEFAULT
-from ...utils import to_list
+from ...biolink_client import BiolinkClient
+from ...utils import (
+    ALIASES_PROP,
+    CLEANER_PROP,
+    VALIDATOR_PROP,
+    to_list,
+)
 from . import cleaners
 from .vocab_config import load_prefix_info, load_validator_map
 
@@ -27,12 +32,12 @@ class Normalizer:
     using Biolink model prefix mappings.
     """
 
-    def __init__(self, biolink_version: str | None = None):
-        self.validator_prop = "validator"
-        self.cleaner_prop = "cleaner"
-        self.aliases_prop = "aliases"
-        self.biolink_version = biolink_version if biolink_version else BIOLINK_VERSION_DEFAULT
-        self.vocab_info_map = load_prefix_info(self.biolink_version)
+    def __init__(self, biolink_client: BiolinkClient | None = None):
+        self.validator_prop = VALIDATOR_PROP
+        self.cleaner_prop = CLEANER_PROP
+        self.aliases_prop = ALIASES_PROP
+        self.biolink_client = biolink_client if biolink_client else BiolinkClient()
+        self.vocab_info_map = load_prefix_info(self.biolink_client)
         self.vocab_validator_map = load_validator_map()
         self.field_name_to_vocab_name_cache: dict[str, set[str]] = dict()
         self.dashes = {"-", "–", "—", "−", "‐", "‑", "‒"}
@@ -108,6 +113,11 @@ class Normalizer:
         curies_provided, invalid_ids_provided, unrecognized_vocabs_provided = self.get_curies(
             provided_ids, stop_on_invalid_id
         )
+        if unrecognized_vocabs_provided:
+            logging.warning(
+                f"Unrecognized vocabs detected - provided IDs will not be fully utilized:"
+                f" {unrecognized_vocabs_provided} fields could not be matched to a known vocab."
+            )
 
         # Get curies for the assigned IDs (per annotator, to track provenance)
         curies_assigned, invalid_ids_assigned, unrecognized_vocabs_assigned = dict(), dict(), set()
@@ -119,6 +129,12 @@ class Normalizer:
             if annotator_invalid_ids:
                 invalid_ids_assigned[annotator_slug] = annotator_invalid_ids
             unrecognized_vocabs_assigned |= annotator_unrecognized_vocabs
+
+        if unrecognized_vocabs_assigned:
+            logging.warning(
+                f"Unrecognized vocabs detected - assigned IDs will not be fully utilized:"
+                f" {unrecognized_vocabs_assigned} fields could not be matched to a known vocab."
+            )
 
         # Form final overall combined set of curies
         curies = set(curies_provided) | set().union(*curies_assigned.values())
@@ -187,7 +203,7 @@ class Normalizer:
         Uses heuristic matching against known vocab names and aliases.
 
         Args:
-            id_field_name: Name of ID field/column
+            id_field_name: Name of ID field/column (e.g., "CHEBI ID", "Labcorp LOINC id")
 
         Returns:
             Set of matching vocabulary names (in standardized form)
@@ -210,7 +226,7 @@ class Normalizer:
             # We've already processed this field name before, so we return the cached mapping
             return self.field_name_to_vocab_name_cache[field_name_cleaned]
         else:
-            # Otherwise we inspect vocab aliases (explicit and implicit ones) to try to find a match
+            # Check explicit and implicit aliases
             matches_on_alias = set()
             for vocab, info in self.vocab_validator_map.items():
                 if info.get(self.aliases_prop) and field_name_cleaned in info[self.aliases_prop]:
@@ -222,12 +238,45 @@ class Normalizer:
                 elif vocab.replace(".", "") == field_name_cleaned:
                     # This field matches implicitly, after removing periods (e.g., 'keggcompound' for 'kegg.compound')
                     matches_on_alias.add(vocab)
+
             if matches_on_alias:
-                # Cache this mapping for quick lookup later
                 self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_alias
                 return matches_on_alias
+
+            # Final tier: check if any known vocab name appears within the field name
+            # This handles cases like "labcorploincid" -> "loinc"
+            matches_on_substring = set()
+            for vocab in self.vocab_validator_map:
+                # Use the root vocab name for substring matching
+                vocab_root = vocab.split(".")[0] if "." in vocab else vocab
+                if vocab_root in field_name_cleaned:
+                    matches_on_substring.add(vocab)
+
+            if matches_on_substring:
+                logging.debug(f"Found substring match(es) for '{id_field_name}': {matches_on_substring}")
+                self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_substring
+                return matches_on_substring
+
+            return None
+
+    def get_standard_prefix(self, vocab: str | list[str] | None) -> list[str]:
+        logging.info(f"Determining standard prefix for input vocab(s): {vocab}")
+        vocabs: list[str] = to_list(vocab)
+        prefixes = set()
+        for vocab_name in vocabs:
+            matching_normalized_vocabs = self.determine_vocab(vocab_name)
+            if matching_normalized_vocabs:
+                logging.info(f"Matching normalized names for vocab '{vocab_name}' are: {matching_normalized_vocabs}")
+                for matching_vocab in matching_normalized_vocabs:
+                    prefix = self.vocab_info_map[matching_vocab]["prefix"]
+                    prefixes.add(prefix)
+                    logging.info(f"Standardized prefix for normalized vocab '{matching_vocab}' is: {prefix}")
             else:
-                return None
+                raise ValueError(
+                    f"Failed to standardize vocab name '{vocab_name}' - valid vocabs are: "
+                    f"{self.vocab_validator_map.keys()}"
+                )
+        return list(prefixes)
 
     def is_valid_id(self, local_id: str, vocab_name_cleaned: str) -> tuple[bool, str]:
         """
