@@ -1,0 +1,390 @@
+{
+  "timestamp": "2026-01-21T16:34:58.094198",
+  "summary": {
+    "total_pairs_tested": 20,
+    "paths_found": 3,
+    "success_rate": 0.15,
+    "termination_reasons": {
+      "exhausted": 17,
+      "found": 3
+    },
+    "timeout_rate": 0.0,
+    "total_nodes_visited": 9662,
+    "total_api_calls": 1548
+  },
+  "safeguards": {
+    "max_visited_nodes": 1000,
+    "timeout_seconds": 30,
+    "max_queue_size": 5000
+  },
+  "paths": [
+    {
+      "start_id": "CHEBI:4167",
+      "start_name": "glucose",
+      "end_id": "CHEBI:15846",
+      "end_name": "NAD+",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 419,
+        "api_calls": 76,
+        "edges_examined": 4674,
+        "semantic_edges": 4098,
+        "equivalency_edges": 12
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:4167",
+      "start_name": "glucose",
+      "end_id": "CHEBI:16113",
+      "end_name": "cholesterol",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 419,
+        "api_calls": 76,
+        "edges_examined": 4674,
+        "semantic_edges": 4098,
+        "equivalency_edges": 12
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:4167",
+      "start_name": "glucose",
+      "end_id": "CHEBI:17234",
+      "end_name": "alanine",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 419,
+        "api_calls": 76,
+        "edges_examined": 4674,
+        "semantic_edges": 4098,
+        "equivalency_edges": 12
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:4167",
+      "start_name": "glucose",
+      "end_id": "CHEBI:30616",
+      "end_name": "ATP",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 419,
+        "api_calls": 76,
+        "edges_examined": 4674,
+        "semantic_edges": 4098,
+        "equivalency_edges": 12
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:4167",
+      "start_name": "glucose",
+      "end_id": "CHEBI:15377",
+      "end_name": "water",
+      "path_length": 3,
+      "path": [
+        {
+          "subject": "CHEBI:4167",
+          "predicate": "biolink:subclass_of",
+          "object": "D-glucose"
+        },
+        {
+          "subject": "CHEBI:17634",
+          "predicate": "biolink:has_part",
+          "object": "royal jelly"
+        },
+        {
+          "subject": "CHEBI:78665",
+          "predicate": "biolink:has_part",
+          "object": "water"
+        }
+      ],
+      "stats": {
+        "nodes_visited": 38,
+        "api_calls": 38,
+        "edges_examined": 2732,
+        "semantic_edges": 2537,
+        "equivalency_edges": 7
+      },
+      "termination_reason": "found"
+    },
+    {
+      "start_id": "CHEBI:4167",
+      "start_name": "glucose",
+      "end_id": "CHEBI:16015",
+      "end_name": "L-leucine",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 419,
+        "api_calls": 76,
+        "edges_examined": 4674,
+        "semantic_edges": 4098,
+        "equivalency_edges": 12
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:4167",
+      "start_name": "glucose",
+      "end_id": "CHEBI:17295",
+      "end_name": "L-tryptophan",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 419,
+        "api_calls": 76,
+        "edges_examined": 4674,
+        "semantic_edges": 4098,
+        "equivalency_edges": 12
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:4167",
+      "start_name": "glucose",
+      "end_id": "CHEBI:17823",
+      "end_name": "L-tyrosine",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 419,
+        "api_calls": 76,
+        "edges_examined": 4674,
+        "semantic_edges": 4098,
+        "equivalency_edges": 12
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:4167",
+      "start_name": "glucose",
+      "end_id": "CHEBI:33704",
+      "end_name": "L-valine",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 419,
+        "api_calls": 76,
+        "edges_examined": 4674,
+        "semantic_edges": 4098,
+        "equivalency_edges": 12
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:15846",
+      "start_name": "NAD+",
+      "end_id": "CHEBI:16113",
+      "end_name": "cholesterol",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 637,
+        "api_calls": 82,
+        "edges_examined": 4874,
+        "semantic_edges": 3837,
+        "equivalency_edges": 11
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:15846",
+      "start_name": "NAD+",
+      "end_id": "CHEBI:17234",
+      "end_name": "alanine",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 637,
+        "api_calls": 82,
+        "edges_examined": 4874,
+        "semantic_edges": 3837,
+        "equivalency_edges": 11
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:15846",
+      "start_name": "NAD+",
+      "end_id": "CHEBI:30616",
+      "end_name": "ATP",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 637,
+        "api_calls": 82,
+        "edges_examined": 4874,
+        "semantic_edges": 3837,
+        "equivalency_edges": 11
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:15846",
+      "start_name": "NAD+",
+      "end_id": "CHEBI:15377",
+      "end_name": "water",
+      "path_length": 3,
+      "path": [
+        {
+          "subject": "CHEBI:15846",
+          "predicate": "biolink:related_to",
+          "object": "NADH"
+        },
+        {
+          "subject": "CHEBI:16908",
+          "predicate": "biolink:related_to",
+          "object": "ALDH1A1"
+        },
+        {
+          "subject": "NCBIGene:216",
+          "predicate": "biolink:interacts_with",
+          "object": "water"
+        }
+      ],
+      "stats": {
+        "nodes_visited": 27,
+        "api_calls": 27,
+        "edges_examined": 1713,
+        "semantic_edges": 1323,
+        "equivalency_edges": 0
+      },
+      "termination_reason": "found"
+    },
+    {
+      "start_id": "CHEBI:15846",
+      "start_name": "NAD+",
+      "end_id": "CHEBI:16015",
+      "end_name": "L-leucine",
+      "path_length": 3,
+      "path": [
+        {
+          "subject": "CHEBI:15846",
+          "predicate": "biolink:related_to",
+          "object": "NADH"
+        },
+        {
+          "subject": "CHEBI:16908",
+          "predicate": "biolink:related_to",
+          "object": "GLUD1"
+        },
+        {
+          "subject": "NCBIGene:2746",
+          "predicate": "biolink:interacts_with",
+          "object": "L-glutamic acid"
+        }
+      ],
+      "stats": {
+        "nodes_visited": 32,
+        "api_calls": 32,
+        "edges_examined": 2039,
+        "semantic_edges": 1456,
+        "equivalency_edges": 0
+      },
+      "termination_reason": "found"
+    },
+    {
+      "start_id": "CHEBI:15846",
+      "start_name": "NAD+",
+      "end_id": "CHEBI:17295",
+      "end_name": "L-tryptophan",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 637,
+        "api_calls": 82,
+        "edges_examined": 4874,
+        "semantic_edges": 3837,
+        "equivalency_edges": 11
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:15846",
+      "start_name": "NAD+",
+      "end_id": "CHEBI:17823",
+      "end_name": "L-tyrosine",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 637,
+        "api_calls": 82,
+        "edges_examined": 4874,
+        "semantic_edges": 3837,
+        "equivalency_edges": 11
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:15846",
+      "start_name": "NAD+",
+      "end_id": "CHEBI:33704",
+      "end_name": "L-valine",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 637,
+        "api_calls": 82,
+        "edges_examined": 4874,
+        "semantic_edges": 3837,
+        "equivalency_edges": 11
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:16113",
+      "start_name": "cholesterol",
+      "end_id": "CHEBI:17234",
+      "end_name": "alanine",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 797,
+        "api_calls": 117,
+        "edges_examined": 6465,
+        "semantic_edges": 5832,
+        "equivalency_edges": 6
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:16113",
+      "start_name": "cholesterol",
+      "end_id": "CHEBI:30616",
+      "end_name": "ATP",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 797,
+        "api_calls": 117,
+        "edges_examined": 6465,
+        "semantic_edges": 5832,
+        "equivalency_edges": 6
+      },
+      "termination_reason": "exhausted"
+    },
+    {
+      "start_id": "CHEBI:16113",
+      "start_name": "cholesterol",
+      "end_id": "CHEBI:15377",
+      "end_name": "water",
+      "path_length": 0,
+      "path": [],
+      "stats": {
+        "nodes_visited": 797,
+        "api_calls": 117,
+        "edges_examined": 6465,
+        "semantic_edges": 5832,
+        "equivalency_edges": 6
+      },
+      "termination_reason": "exhausted"
+    }
+  ]
+}

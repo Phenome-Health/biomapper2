@@ -1,0 +1,68 @@
+{
+  "timestamp": "2026-01-21T17:08:40.778763",
+  "capability_comparison": {
+    "v2_vocabulary_qa": {
+      "method": "hybrid_search + reranking",
+      "exact_match": 0.952,
+      "use_case": "Entity resolution (same entity, different IDs)",
+      "example": "What HMDB ID corresponds to glucose?"
+    },
+    "v3_semantic_qa": {
+      "search_em": 0.0,
+      "graph_recall": 0.6320333432569217,
+      "use_case": "Multi-hop reasoning (different entities, semantic relations)",
+      "example": "What pathway does glucose participate in?"
+    }
+  },
+  "semantic_gap_assessment": {
+    "semantic_predicates": 26,
+    "equivalency_predicates": 1,
+    "semantic_edge_percent": 89.09382518043304,
+    "capability_level": "HIGH",
+    "capability_description": "KRAKEN has robust semantic capability",
+    "v2_conclusion": "KRAKEN is vocabulary-focused (v2 achieved 95.2% EM on entity resolution)",
+    "v3_finding": "Semantic capability is HIGH"
+  },
+  "insights": [
+    {
+      "finding": "Search performs worse on semantic QA",
+      "detail": "Search EM drops from 95.2% (vocabulary) to 0.0% (semantic) - a 95.2pp decrease",
+      "implication": "Search is optimized for entity resolution, not semantic reasoning"
+    },
+    {
+      "finding": "Graph traversal provides semantic capability",
+      "detail": "Graph recall of 63.2% on semantic QA",
+      "implication": "KRAKEN has semantic relations accessible via /one-hop"
+    },
+    {
+      "finding": "Complementary use cases",
+      "detail": "Search excels at entity resolution; graph traversal for semantic reasoning",
+      "implication": "Hybrid approach recommended: search for entities, graph for relations"
+    }
+  ],
+  "recommendations": [
+    {
+      "use_case": "Entity Resolution",
+      "recommended_method": "Hybrid Search + Reranking",
+      "expected_performance": "95% EM",
+      "rationale": "Search is optimized for finding same entity across vocabularies"
+    },
+    {
+      "use_case": "Semantic Queries (pathways, diseases, etc.)",
+      "recommended_method": "Graph Traversal via /one-hop",
+      "expected_performance": "63% Recall",
+      "rationale": "Graph traversal follows semantic edges directly"
+    },
+    {
+      "use_case": "Complex Queries",
+      "recommended_method": "Search + Graph Hybrid",
+      "expected_performance": "Depends on query type",
+      "rationale": "Use search to find entity, then graph to explore relations"
+    }
+  ],
+  "conclusion": {
+    "search_best_for": "Entity resolution (vocabulary QA)",
+    "graph_best_for": "Semantic reasoning (pathway/disease queries)",
+    "overall": "KRAKEN has robust semantic capability"
+  }
+}

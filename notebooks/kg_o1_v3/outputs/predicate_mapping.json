@@ -1,0 +1,938 @@
+{
+  "timestamp": "2026-01-21T16:34:50.806781",
+  "summary": {
+    "total_predicates": 88,
+    "semantic_predicates": 26,
+    "equivalency_predicates": 1,
+    "unknown_predicates": 61,
+    "total_edges_sampled": 2494,
+    "semantic_edge_percent": 89.09382518043304,
+    "biolink_coverage": 57.89473684210526
+  },
+  "classification": {
+    "semantic": [
+      "biolink:subclass_of",
+      "biolink:actively_involved_in",
+      "biolink:treats",
+      "biolink:coexists_with",
+      "biolink:correlated_with",
+      "biolink:associated_with",
+      "biolink:has_part",
+      "biolink:expressed_in",
+      "biolink:participates_in",
+      "biolink:close_match",
+      "biolink:capable_of",
+      "biolink:mentioned_in_clinical_trials_for",
+      "biolink:applied_to_treat",
+      "biolink:related_to",
+      "biolink:causes",
+      "biolink:located_in",
+      "biolink:has_chemical_role",
+      "biolink:has_metabolite",
+      "biolink:has_participant",
+      "biolink:has_input",
+      "biolink:chemically_similar_to",
+      "biolink:has_output",
+      "biolink:contributes_to",
+      "biolink:in_clinical_trials_for",
+      "biolink:catalyzes",
+      "biolink:affects"
+    ],
+    "equivalency": [
+      "biolink:same_as"
+    ],
+    "unknown": [
+      "biolink:ameliorates_condition",
+      "biolink:gene_associated_with_condition",
+      "biolink:manifestation_of",
+      "biolink:regulates",
+      "biolink:composed_primarily_of",
+      "biolink:affects_likelihood_of",
+      "biolink:physically_interacts_with",
+      "biolink:consumes",
+      "biolink:disrupts",
+      "biolink:associated_with_resistance_to",
+      "biolink:opposite_of",
+      "biolink:precedes",
+      "biolink:derives_into",
+      "biolink:develops_from",
+      "biolink:has_increased_amount",
+      "biolink:binds",
+      "biolink:is_sequence_variant_of",
+      "biolink:assesses",
+      "biolink:gene_product_of",
+      "biolink:lacks_part",
+      "biolink:mentions",
+      "biolink:overlaps",
+      "biolink:transcribed_from",
+      "biolink:has_not_completed",
+      "biolink:promotes_condition",
+      "biolink:related_to_at_instance_level",
+      "biolink:temporally_related_to",
+      "biolink:in_taxon",
+      "biolink:produces",
+      "biolink:disease_has_location",
+      "biolink:exacerbates_condition",
+      "biolink:model_of",
+      "biolink:has_molecular_consequence",
+      "biolink:indirectly_physically_interacts_with",
+      "biolink:has_member",
+      "biolink:decreases_response_to",
+      "biolink:related_to_at_concept_level",
+      "biolink:occurs_in",
+      "biolink:affects_response_to",
+      "biolink:disease_has_basis_in",
+      "biolink:enables",
+      "biolink:genetically_associated_with",
+      "biolink:biomarker_for",
+      "biolink:beneficial_in_models_for",
+      "biolink:exact_match",
+      "biolink:has_decreased_amount",
+      "biolink:similar_to",
+      "biolink:interacts_with",
+      "biolink:directly_physically_interacts_with",
+      "biolink:translates_to",
+      "biolink:broad_match",
+      "biolink:in_preclinical_trials_for",
+      "biolink:drug_regulatory_status_world_wide",
+      "biolink:contraindicated_in",
+      "biolink:studied_to_treat",
+      "biolink:has_plasma_membrane_part",
+      "biolink:colocalizes_with",
+      "biolink:has_phenotype",
+      "biolink:treats_or_applied_or_studied_to_treat",
+      "biolink:homologous_to",
+      "biolink:derives_from"
+    ]
+  },
+  "predicate_counts": {
+    "biolink:mentioned_in_clinical_trials_for": 38,
+    "biolink:in_clinical_trials_for": 87,
+    "biolink:treats": 57,
+    "biolink:related_to": 862,
+    "biolink:applied_to_treat": 12,
+    "biolink:subclass_of": 405,
+    "biolink:close_match": 115,
+    "biolink:same_as": 8,
+    "biolink:has_chemical_role": 70,
+    "biolink:has_part": 140,
+    "biolink:has_participant": 336,
+    "biolink:has_output": 16,
+    "biolink:produces": 4,
+    "biolink:physically_interacts_with": 102,
+    "biolink:interacts_with": 158,
+    "biolink:chemically_similar_to": 31,
+    "biolink:affects": 9,
+    "biolink:has_input": 40,
+    "biolink:causes": 3,
+    "biolink:located_in": 1
+  },
+  "predicate_examples": {
+    "biolink:mentioned_in_clinical_trials_for": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0004946",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0002909",
+        "object_name": "hyperglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0005148",
+        "object_name": "type 2 diabetes mellitus",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0011122",
+        "object_name": "obesity disorder",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0005147",
+        "object_name": "type 1 diabetes mellitus",
+        "object_category": ""
+      }
+    ],
+    "biolink:in_clinical_trials_for": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0004946",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0004946",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0002909",
+        "object_name": "hyperglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0005148",
+        "object_name": "type 2 diabetes mellitus",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0005148",
+        "object_name": "type 2 diabetes mellitus",
+        "object_category": ""
+      }
+    ],
+    "biolink:treats": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0004946",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0004946",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0005148",
+        "object_name": "type 2 diabetes mellitus",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0005148",
+        "object_name": "type 2 diabetes mellitus",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0011122",
+        "object_name": "obesity disorder",
+        "object_category": ""
+      }
+    ],
+    "biolink:related_to": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0004946",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0004946",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0004946",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      }
+    ],
+    "biolink:applied_to_treat": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0004946",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0005148",
+        "object_name": "type 2 diabetes mellitus",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "MONDO:0005300",
+        "object_name": "chronic kidney disease",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:17234",
+        "subject_name": "alanine",
+        "object_id": "MONDO:0004946",
+        "object_name": "hypoglycemia",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:17234",
+        "subject_name": "alanine",
+        "object_id": "MONDO:0005148",
+        "object_name": "type 2 diabetes mellitus",
+        "object_category": ""
+      }
+    ],
+    "biolink:subclass_of": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:17634",
+        "object_name": "D-glucose",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:17634",
+        "object_name": "D-glucose",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:17634",
+        "object_name": "D-glucose",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:17634",
+        "object_name": "D-glucose",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "D-glucose",
+        "object_category": ""
+      }
+    ],
+    "biolink:close_match": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "aldehydo-L-glucose",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "aldehydo-L-glucose",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:37626",
+        "object_name": "aldehydo-L-glucose",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:37626",
+        "object_name": "aldehydo-L-glucose",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:37626",
+        "object_name": "aldehydo-L-glucose",
+        "object_category": ""
+      }
+    ],
+    "biolink:same_as": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "beta-L-glucose",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:17234",
+        "subject_name": "alanine",
+        "object_id": "CHEBI:4167",
+        "object_name": "beta-L-glucose",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:17754",
+        "subject_name": "glycerol",
+        "object_id": "CHEBI:17522",
+        "object_name": "alditol",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:17754",
+        "subject_name": "glycerol",
+        "object_id": "CHEBI:17754",
+        "object_name": "alditol",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:17754",
+        "subject_name": "glycerol",
+        "object_id": "CHEBI:17522",
+        "object_name": "alditol",
+        "object_category": ""
+      }
+    ],
+    "biolink:has_chemical_role": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:78675",
+        "object_name": "fundamental metabolite",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:77746",
+        "object_name": "human metabolite",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:76971",
+        "object_name": "Escherichia coli metabolite",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:75772",
+        "object_name": "Saccharomyces cerevisiae metabolite",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:75771",
+        "object_name": "mouse metabolite",
+        "object_category": ""
+      }
+    ],
+    "biolink:has_part": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "Glucose 50 MG/ML includes Injectable Solution & Injection",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "Glucose 500 MG/ML includes Injection & Prefilled Syringe",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "glucose 100 MG/ML Injection",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "1000 ML glucose 50 MG/ML / potassium chloride 0.03 MEQ/ML Injection",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "1000 ML glucose 50 MG/ML / potassium chloride 0.03 MEQ/ML Injection",
+        "object_category": ""
+      }
+    ],
+    "biolink:has_participant": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "glucose metabolic process",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "glucose metabolic process",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "glucose metabolic process",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      }
+    ],
+    "biolink:has_output": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:17234",
+        "subject_name": "alanine",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:17234",
+        "subject_name": "alanine",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      }
+    ],
+    "biolink:produces": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:17234",
+        "subject_name": "alanine",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      },
+      {
+        "subject_id": "HMDB:HMDB0000122",
+        "subject_name": "glucose (HMDB)",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      },
+      {
+        "subject_id": "KEGG.COMPOUND:C00031",
+        "subject_name": "glucose (KEGG)",
+        "object_id": "CHEBI:4167",
+        "object_name": "gluconeogenesis",
+        "object_category": ""
+      }
+    ],
+    "biolink:physically_interacts_with": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "GCK",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "NCBIGene:2645",
+        "object_name": "GCK",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:16113",
+        "subject_name": "cholesterol",
+        "object_id": "NCBIGene:6095",
+        "object_name": "RORA",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:16113",
+        "subject_name": "cholesterol",
+        "object_id": "CHEBI:16113",
+        "object_name": "ABCA1",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:16113",
+        "subject_name": "cholesterol",
+        "object_id": "CHEBI:16113",
+        "object_name": "DHCR24",
+        "object_category": ""
+      }
+    ],
+    "biolink:interacts_with": [
+      {
+        "subject_id": "CHEBI:4167",
+        "subject_name": "glucose",
+        "object_id": "CHEBI:4167",
+        "object_name": "GCK",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:15846",
+        "subject_name": "NAD+",
+        "object_id": "CHEBI:13389",
+        "object_name": "SIRT4",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:15846",
+        "subject_name": "NAD+",
+        "object_id": "CHEBI:13389",
+        "object_name": "PARP3",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:15846",
+        "subject_name": "NAD+",
+        "object_id": "CHEBI:13389",
+        "object_name": "ADH1B",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:15846",
+        "subject_name": "NAD+",
+        "object_id": "CHEBI:13389",
+        "object_name": "CD38",
+        "object_category": ""
+      }
+    ],
+    "biolink:chemically_similar_to": [
+      {
+        "subject_id": "CHEBI:15846",
+        "subject_name": "NAD+",
+        "object_id": "CHEBI:14105",
+        "object_name": "deamido-NAD zwitterion",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:15846",
+        "subject_name": "NAD+",
+        "object_id": "CHEBI:14105",
+        "object_name": "deamido-NAD zwitterion",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:15846",
+        "subject_name": "NAD+",
+        "object_id": "CHEBI:18304",
+        "object_name": "deamido-NAD(+)",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:15846",
+        "subject_name": "NAD+",
+        "object_id": "CHEBI:18304",
+        "object_name": "deamido-NAD(+)",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:16113",
+        "subject_name": "cholesterol",
+        "object_id": "CHEBI:16113",
+        "object_name": "cholesteryl ester",
+        "object_category": ""
+      }
+    ],
+    "biolink:affects": [
+      {
+        "subject_id": "CHEBI:16113",
+        "subject_name": "cholesterol",
+        "object_id": "NCBIGene:6095",
+        "object_name": "RORA",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:16113",
+        "subject_name": "cholesterol",
+        "object_id": "CHEBI:16113",
+        "object_name": "ABCA1",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:15377",
+        "subject_name": "water",
+        "object_id": "CHEBI:15377",
+        "object_name": "AQP2",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:15377",
+        "subject_name": "water",
+        "object_id": "CHEBI:15377",
+        "object_name": "AQP1",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:15377",
+        "subject_name": "water",
+        "object_id": "CHEBI:15377",
+        "object_name": "AQP3",
+        "object_category": ""
+      }
+    ],
+    "biolink:has_input": [
+      {
+        "subject_id": "CHEBI:30616",
+        "subject_name": "ATP",
+        "object_id": "CHEBI:30616",
+        "object_name": "G protein-coupled ATP receptor activity",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:30616",
+        "subject_name": "ATP",
+        "object_id": "CHEBI:30616",
+        "object_name": "G protein-coupled ATP receptor activity",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:30616",
+        "subject_name": "ATP",
+        "object_id": "CHEBI:30616",
+        "object_name": "G protein-coupled ATP receptor activity",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:30616",
+        "subject_name": "ATP",
+        "object_id": "CHEBI:30616",
+        "object_name": "cellular response to ATP",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:30616",
+        "subject_name": "ATP",
+        "object_id": "CHEBI:30616",
+        "object_name": "cellular response to ATP",
+        "object_category": ""
+      }
+    ],
+    "biolink:causes": [
+      {
+        "subject_id": "CHEBI:16842",
+        "subject_name": "fructose",
+        "object_id": "MONDO:0023176",
+        "object_name": "formaldehyde poisoning",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:16842",
+        "subject_name": "fructose",
+        "object_id": "UMLS:C3485987",
+        "object_name": "Increased IgG Production",
+        "object_category": ""
+      },
+      {
+        "subject_id": "CHEBI:17754",
+        "subject_name": "glycerol",
+        "object_id": "HP:0012531",
+        "object_name": "Pain",
+        "object_category": ""
+      }
+    ],
+    "biolink:located_in": [
+      {
+        "subject_id": "CHEBI:16199",
+        "subject_name": "urea",
+        "object_id": "UBERON:0001088",
+        "object_name": "urine",
+        "object_category": ""
+      }
+    ]
+  },
+  "biolink_analysis": {
+    "available": [
+      [
+        "biolink:participates_in",
+        "Entity participates in a process/pathway",
+        0
+      ],
+      [
+        "biolink:has_participant",
+        "Process has this entity as participant",
+        336
+      ],
+      [
+        "biolink:actively_involved_in",
+        "Active involvement in process",
+        0
+      ],
+      [
+        "biolink:catalyzes",
+        "Enzyme catalyzes reaction",
+        0
+      ],
+      [
+        "biolink:has_metabolite",
+        "Entity has this metabolite",
+        0
+      ],
+      [
+        "biolink:affects",
+        "Entity affects another",
+        9
+      ],
+      [
+        "biolink:located_in",
+        "Entity is located in",
+        1
+      ],
+      [
+        "biolink:has_part",
+        "Entity has part",
+        140
+      ],
+      [
+        "biolink:associated_with",
+        "General association",
+        0
+      ],
+      [
+        "biolink:correlated_with",
+        "Correlation relationship",
+        0
+      ],
+      [
+        "biolink:related_to",
+        "General relation",
+        862
+      ]
+    ],
+    "missing": [
+      [
+        "biolink:is_substrate_of",
+        "Entity is substrate of enzyme"
+      ],
+      [
+        "biolink:has_substrate",
+        "Enzyme has this substrate"
+      ],
+      [
+        "biolink:has_product",
+        "Reaction produces this entity"
+      ],
+      [
+        "biolink:metabolite_of",
+        "Entity is metabolite of"
+      ],
+      [
+        "biolink:transports",
+        "Entity transports another"
+      ],
+      [
+        "biolink:transported_by",
+        "Entity is transported by"
+      ],
+      [
+        "biolink:location_of",
+        "Entity is location of"
+      ],
+      [
+        "biolink:part_of",
+        "Entity is part of"
+      ]
+    ]
+  },
+  "question_type_support": {
+    "pathway_participation": {
+      "supported": true,
+      "example": "What pathway does glucose participate in?"
+    },
+    "enzyme_substrate": {
+      "supported": true,
+      "example": "What enzyme catalyzes the phosphorylation of glucose?"
+    },
+    "disease_association": {
+      "supported": true,
+      "example": "What diseases are associated with high cholesterol?"
+    },
+    "drug_target": {
+      "supported": true,
+      "example": "What drugs target glucose metabolism?"
+    },
+    "metabolite_product": {
+      "supported": true,
+      "example": "What is produced from glucose in glycolysis?"
+    }
+  }
+}

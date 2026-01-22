@@ -1,0 +1,102 @@
+{
+  "timestamp": "2026-01-21T16:45:56.225762",
+  "v3_capability_level": "MINIMAL",
+  "decision_tree": {
+    "entity_resolution": {
+      "description": "Finding the same entity across different vocabulary IDs",
+      "examples": [
+        "What is the HMDB ID for glucose?",
+        "Map CHEBI:4167 to KEGG",
+        "Find DRUGBANK equivalents for this compound"
+      ],
+      "recommended_method": "hybrid_search + reranking",
+      "expected_performance": "95%+ EM",
+      "code_snippet": "hybrid_search(\"glucose\", limit=10)"
+    },
+    "semantic_1_hop": {
+      "description": "Finding entities related by semantic predicates",
+      "examples": [
+        "What pathways does glucose participate in?",
+        "What diseases are associated with cholesterol?",
+        "What genes are affected by this drug?"
+      ],
+      "recommended_method": "get_semantic_relations() via one-hop",
+      "expected_performance": "Varies by predicate coverage",
+      "code_snippet": "get_semantic_relations(\"CHEBI:4167\", predicate_filter=\"participates_in\")"
+    },
+    "semantic_multi_hop": {
+      "description": "Finding connections through multiple semantic hops",
+      "examples": [
+        "How is glucose connected to diabetes?",
+        "What pathways link these two metabolites?"
+      ],
+      "recommended_method": "BFS path finding with safeguards",
+      "expected_performance": "Depends on graph connectivity",
+      "code_snippet": "find_path_bfs(start_id, end_id, max_hops=3, semantic_only=True)"
+    },
+    "hybrid_query": {
+      "description": "Complex queries requiring both entity resolution and semantic traversal",
+      "examples": [
+        "Find pathways for \"vitamin B12\" (need to resolve name first)",
+        "Get disease associations for metabolites in my dataset"
+      ],
+      "recommended_method": "Search first, then graph traversal",
+      "expected_performance": "Compound accuracy",
+      "code_snippet": "# Step 1: Resolve entity\nresults = hybrid_search(\"vitamin B12\")\nentity_id = results[0][\"id\"]\n\n# Step 2: Get semantic relations\npathways = get_pathways_for_entity(entity_id)"
+    }
+  },
+  "integration_checklist": [
+    {
+      "task": "Add one-hop wrapper to biomapper2",
+      "file": "src/biomapper2/core/semantic_query.py",
+      "priority": "HIGH",
+      "status": "TODO"
+    },
+    {
+      "task": "Add hybrid query function",
+      "file": "src/biomapper2/core/semantic_query.py",
+      "priority": "HIGH",
+      "status": "TODO"
+    },
+    {
+      "task": "Add convenience functions (get_pathways, get_diseases)",
+      "file": "src/biomapper2/core/semantic_query.py",
+      "priority": "MEDIUM",
+      "status": "TODO"
+    },
+    {
+      "task": "Add BFS path finding with safeguards",
+      "file": "src/biomapper2/core/path_finder.py",
+      "priority": "LOW",
+      "status": "TODO"
+    },
+    {
+      "task": "Update Mapper class with semantic query methods",
+      "file": "src/biomapper2/mapper.py",
+      "priority": "MEDIUM",
+      "status": "TODO"
+    },
+    {
+      "task": "Add tests for semantic queries",
+      "file": "tests/test_semantic_query.py",
+      "priority": "HIGH",
+      "status": "TODO"
+    },
+    {
+      "task": "Document semantic query capabilities",
+      "file": "docs/semantic_queries.md",
+      "priority": "LOW",
+      "status": "TODO"
+    }
+  ],
+  "code_snippets": {
+    "one_hop_wrapper": "\n\"\"\"One-hop graph traversal for semantic queries.\"\"\"\n\nfrom typing import Optional\nfrom biomapper2.utils import kestrel_request\n\n\ndef get_semantic_relations(\n    entity_id: str,\n    direction: str = \"both\",\n    predicate_filter: Optional[str] = None,\n    category_filter: Optional[str] = None,\n    limit: int = 50,\n) -> list[dict]:\n    \"\"\"\n    Get semantic relations for an entity via one-hop traversal.\n\n    Use this for semantic queries like:\n    - \"What pathways does X participate in?\"\n    - \"What diseases are associated with X?\"\n    - \"What genes interact with X?\"\n\n    For entity resolution (vocabulary mapping), use hybrid_search instead.\n\n    Args:\n        entity_id: Entity ID (e.g., \"CHEBI:4167\")\n        direction: \"forward\", \"reverse\", or \"both\"\n        predicate_filter: Filter by predicate (e.g., \"participates_in\")\n        category_filter: Filter by end category (e.g., \"Pathway\")\n        limit: Maximum results\n\n    Returns:\n        List of relation dictionaries with predicate, object_id, object_name\n    \"\"\"\n    payload = {\n        \"start_node_ids\": entity_id,\n        \"direction\": direction,\n        \"limit\": limit,\n        \"mode\": \"slim\",\n    }\n\n    if predicate_filter:\n        payload[\"predicate_filter\"] = predicate_filter\n    if category_filter:\n        payload[\"end_category_filter\"] = category_filter\n\n    try:\n        response = kestrel_request(\"POST\", \"one-hop\", json=payload)\n\n        if isinstance(response, list):\n            return response\n        elif isinstance(response, dict) and \"error\" not in response:\n            return response.get(\"edges\", response.get(\"results\", []))\n        return []\n\n    except Exception:\n        return []\n\n\ndef get_pathways_for_entity(entity_id: str, limit: int = 20) -> list[dict]:\n    \"\"\"Convenience function to get pathways for a metabolite.\"\"\"\n    return get_semantic_relations(\n        entity_id,\n        direction=\"forward\",\n        predicate_filter=\"participates_in\",\n        category_filter=\"Pathway\",\n        limit=limit,\n    )\n\n\ndef get_associated_diseases(entity_id: str, limit: int = 20) -> list[dict]:\n    \"\"\"Convenience function to get diseases associated with an entity.\"\"\"\n    return get_semantic_relations(\n        entity_id,\n        direction=\"both\",\n        predicate_filter=\"associated_with\",\n        category_filter=\"Disease\",\n        limit=limit,\n    )\n",
+    "hybrid_query": "\n\"\"\"Hybrid query implementation combining search and graph traversal.\"\"\"\n\nfrom typing import Optional\n\n\ndef query_with_semantic_expansion(\n    query: str,\n    predicates: Optional[list[str]] = None,\n    search_limit: int = 5,\n    relation_limit: int = 20,\n) -> dict:\n    \"\"\"\n    Execute a hybrid query: search for entity, then expand semantically.\n\n    Args:\n        query: Natural language query or entity name\n        predicates: Predicates to expand (default: participates_in, associated_with)\n        search_limit: Max entities to consider from search\n        relation_limit: Max relations per entity\n\n    Returns:\n        Dict with resolved_entities and their semantic_relations\n    \"\"\"\n    if predicates is None:\n        predicates = [\"participates_in\", \"associated_with\", \"affects\"]\n\n    # Step 1: Resolve entity via search\n    search_results = hybrid_search(query, limit=search_limit)\n\n    if not search_results:\n        return {\"resolved_entities\": [], \"semantic_relations\": []}\n\n    # Step 2: Get semantic relations for top entities\n    all_relations = []\n\n    for entity in search_results[:search_limit]:\n        entity_id = entity.get(\"id\")\n        entity_name = entity.get(\"name\", entity_id)\n\n        for predicate in predicates:\n            relations = get_semantic_relations(\n                entity_id,\n                predicate_filter=predicate,\n                limit=relation_limit,\n            )\n\n            for rel in relations:\n                all_relations.append({\n                    \"source_entity\": entity_name,\n                    \"source_id\": entity_id,\n                    \"predicate\": predicate,\n                    \"target_entity\": rel.get(\"object_name\", rel.get(\"end_node_name\")),\n                    \"target_id\": rel.get(\"object_id\", rel.get(\"end_node_id\")),\n                    \"target_category\": rel.get(\"object_category\", rel.get(\"category\")),\n                })\n\n    return {\n        \"resolved_entities\": search_results[:search_limit],\n        \"semantic_relations\": all_relations,\n    }\n\n\n# Example usage:\n# result = query_with_semantic_expansion(\n#     \"glucose\",\n#     predicates=[\"participates_in\", \"affects\"],\n# )\n# print(f\"Found {len(result['semantic_relations'])} relations\")\n"
+  },
+  "key_recommendations": [
+    "Continue using search for entity resolution (95%+ EM)",
+    "Add one-hop wrapper for semantic queries",
+    "Implement hybrid approach for complex queries",
+    "Use BFS with safeguards for multi-hop paths"
+  ]
+}

@@ -1,0 +1,603 @@
+{
+  "timestamp": "2026-01-21T15:49:45.206622",
+  "go_no_go_decision": {
+    "timestamp": "2026-01-21T15:49:45.182545",
+    "endpoint_exists": true,
+    "total_edges_found": 1432,
+    "unique_predicates": 18,
+    "semantic_predicate_count": 15,
+    "equivalency_predicate_count": 1,
+    "semantic_edge_percent": 98.95251396648045,
+    "decision": "GO",
+    "reasoning": "Found 15 semantic predicates with 99.0% semantic edges. Proceed with v3."
+  },
+  "endpoint_tests": {
+    "one_hop_exists": true,
+    "test_entities": [
+      [
+        "CHEBI:4167",
+        "glucose"
+      ],
+      [
+        "CHEBI:15846",
+        "NAD+"
+      ],
+      [
+        "CHEBI:16113",
+        "cholesterol"
+      ],
+      [
+        "CHEBI:17234",
+        "alanine"
+      ],
+      [
+        "CHEBI:30616",
+        "ATP"
+      ],
+      [
+        "CHEBI:15377",
+        "water"
+      ]
+    ],
+    "results_per_entity": [
+      {
+        "entity_id": "CHEBI:4167",
+        "entity_name": "glucose",
+        "direction": "forward",
+        "num_edges": 105
+      },
+      {
+        "entity_id": "CHEBI:4167",
+        "entity_name": "glucose",
+        "direction": "reverse",
+        "num_edges": 78
+      },
+      {
+        "entity_id": "CHEBI:4167",
+        "entity_name": "glucose",
+        "direction": "both",
+        "num_edges": 141
+      },
+      {
+        "entity_id": "CHEBI:15846",
+        "entity_name": "NAD+",
+        "direction": "forward",
+        "num_edges": 52
+      },
+      {
+        "entity_id": "CHEBI:15846",
+        "entity_name": "NAD+",
+        "direction": "reverse",
+        "num_edges": 46
+      },
+      {
+        "entity_id": "CHEBI:15846",
+        "entity_name": "NAD+",
+        "direction": "both",
+        "num_edges": 64
+      },
+      {
+        "entity_id": "CHEBI:16113",
+        "entity_name": "cholesterol",
+        "direction": "forward",
+        "num_edges": 84
+      },
+      {
+        "entity_id": "CHEBI:16113",
+        "entity_name": "cholesterol",
+        "direction": "reverse",
+        "num_edges": 62
+      },
+      {
+        "entity_id": "CHEBI:16113",
+        "entity_name": "cholesterol",
+        "direction": "both",
+        "num_edges": 98
+      },
+      {
+        "entity_id": "CHEBI:17234",
+        "entity_name": "alanine",
+        "direction": "forward",
+        "num_edges": 105
+      },
+      {
+        "entity_id": "CHEBI:17234",
+        "entity_name": "alanine",
+        "direction": "reverse",
+        "num_edges": 78
+      },
+      {
+        "entity_id": "CHEBI:17234",
+        "entity_name": "alanine",
+        "direction": "both",
+        "num_edges": 141
+      },
+      {
+        "entity_id": "CHEBI:30616",
+        "entity_name": "ATP",
+        "direction": "forward",
+        "num_edges": 16
+      },
+      {
+        "entity_id": "CHEBI:30616",
+        "entity_name": "ATP",
+        "direction": "reverse",
+        "num_edges": 44
+      },
+      {
+        "entity_id": "CHEBI:30616",
+        "entity_name": "ATP",
+        "direction": "both",
+        "num_edges": 55
+      },
+      {
+        "entity_id": "CHEBI:15377",
+        "entity_name": "water",
+        "direction": "forward",
+        "num_edges": 87
+      },
+      {
+        "entity_id": "CHEBI:15377",
+        "entity_name": "water",
+        "direction": "reverse",
+        "num_edges": 63
+      },
+      {
+        "entity_id": "CHEBI:15377",
+        "entity_name": "water",
+        "direction": "both",
+        "num_edges": 113
+      }
+    ]
+  },
+  "predicate_analysis": {
+    "unique_predicates": [
+      "biolink:mentioned_in_clinical_trials_for",
+      "biolink:in_clinical_trials_for",
+      "biolink:treats",
+      "biolink:related_to",
+      "biolink:applied_to_treat",
+      "biolink:has_chemical_role",
+      "biolink:subclass_of",
+      "biolink:close_match",
+      "biolink:has_output",
+      "biolink:has_participant",
+      "biolink:produces",
+      "biolink:has_part",
+      "biolink:same_as",
+      "biolink:has_input",
+      "biolink:chemically_similar_to",
+      "biolink:affects",
+      "biolink:physically_interacts_with",
+      "biolink:causes"
+    ],
+    "predicate_counts": {
+      "biolink:mentioned_in_clinical_trials_for": 34,
+      "biolink:in_clinical_trials_for": 80,
+      "biolink:treats": 46,
+      "biolink:related_to": 490,
+      "biolink:applied_to_treat": 11,
+      "biolink:has_chemical_role": 50,
+      "biolink:subclass_of": 359,
+      "biolink:close_match": 67,
+      "biolink:has_output": 18,
+      "biolink:has_participant": 129,
+      "biolink:produces": 4,
+      "biolink:has_part": 10,
+      "biolink:same_as": 4,
+      "biolink:has_input": 92,
+      "biolink:chemically_similar_to": 28,
+      "biolink:affects": 2,
+      "biolink:physically_interacts_with": 7,
+      "biolink:causes": 1
+    },
+    "classification": {
+      "semantic": [
+        "biolink:mentioned_in_clinical_trials_for",
+        "biolink:in_clinical_trials_for",
+        "biolink:treats",
+        "biolink:related_to",
+        "biolink:applied_to_treat",
+        "biolink:has_chemical_role",
+        "biolink:subclass_of",
+        "biolink:close_match",
+        "biolink:has_output",
+        "biolink:has_participant",
+        "biolink:has_part",
+        "biolink:has_input",
+        "biolink:chemically_similar_to",
+        "biolink:affects",
+        "biolink:causes"
+      ],
+      "equivalency": [
+        "biolink:same_as"
+      ],
+      "unknown": [
+        "biolink:produces",
+        "biolink:physically_interacts_with"
+      ]
+    },
+    "predicate_examples": {
+      "biolink:mentioned_in_clinical_trials_for": [
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0004946"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0005148"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0002909"
+        }
+      ],
+      "biolink:in_clinical_trials_for": [
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0004946"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0004946"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0005148"
+        }
+      ],
+      "biolink:treats": [
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0004946"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0004946"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0005148"
+        }
+      ],
+      "biolink:related_to": [
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0004946"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0004946"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0004946"
+        }
+      ],
+      "biolink:applied_to_treat": [
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0004946"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0005148"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "MONDO:0005300"
+        }
+      ],
+      "biolink:has_chemical_role": [
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "CHEBI:78675"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "CHEBI:77746"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "CHEBI:75771"
+        }
+      ],
+      "biolink:subclass_of": [
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "CHEBI:33917"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "CHEBI:33917"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "CHEBI:33917"
+        }
+      ],
+      "biolink:close_match": [
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "CHEBI:37626"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "CHEBI:37626"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:4167",
+          "object_id": "CHEBI:37626"
+        }
+      ],
+      "biolink:has_output": [
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0006094",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0006094",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0006094",
+          "object_id": "CHEBI:4167"
+        }
+      ],
+      "biolink:has_participant": [
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0006094",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0006094",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0006006",
+          "object_id": "CHEBI:4167"
+        }
+      ],
+      "biolink:produces": [
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0006094",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0006094",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "alanine",
+          "subject_id": "GO:0006094",
+          "object_id": "CHEBI:4167"
+        }
+      ],
+      "biolink:has_part": [
+        {
+          "subject": "glucose",
+          "subject_id": "UMLS:C4082776",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "UMLS:C2962694",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "UMLS:C4082776",
+          "object_id": "CHEBI:4167"
+        }
+      ],
+      "biolink:same_as": [
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:37631",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:37631",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "alanine",
+          "subject_id": "CHEBI:37631",
+          "object_id": "CHEBI:4167"
+        }
+      ],
+      "biolink:has_input": [
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0055056",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0055056",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "GO:0055056",
+          "object_id": "CHEBI:4167"
+        }
+      ],
+      "biolink:chemically_similar_to": [
+        {
+          "subject": "glucose",
+          "subject_id": "UNII:9G2MP84A8W",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "UNII:9G2MP84A8W",
+          "object_id": "CHEBI:4167"
+        },
+        {
+          "subject": "glucose",
+          "subject_id": "CHEBI:42896",
+          "object_id": "CHEBI:4167"
+        }
+      ],
+      "biolink:affects": [
+        {
+          "subject": "NAD+",
+          "subject_id": "CHEBI:13389",
+          "object_id": "NCBIGene:7226"
+        },
+        {
+          "subject": "cholesterol",
+          "subject_id": "CHEBI:16113",
+          "object_id": "NCBIGene:6095"
+        }
+      ],
+      "biolink:physically_interacts_with": [
+        {
+          "subject": "cholesterol",
+          "subject_id": "CHEBI:16113",
+          "object_id": "NCBIGene:6095"
+        },
+        {
+          "subject": "ATP",
+          "subject_id": "UniProtKB:D4N3P2",
+          "object_id": "CHEBI:30616"
+        },
+        {
+          "subject": "ATP",
+          "subject_id": "NCBIGene:9943",
+          "object_id": "CHEBI:30616"
+        }
+      ],
+      "biolink:causes": [
+        {
+          "subject": "cholesterol",
+          "subject_id": "CHEBI:16113",
+          "object_id": "UMLS:C1372744"
+        }
+      ]
+    }
+  },
+  "api_predicates": [
+    "biolink:actively_involved_in",
+    "biolink:affects",
+    "biolink:affects_likelihood_of",
+    "biolink:affects_response_to",
+    "biolink:ameliorates_condition",
+    "biolink:applied_to_treat",
+    "biolink:assesses",
+    "biolink:associated_with",
+    "biolink:associated_with_resistance_to",
+    "biolink:beneficial_in_models_for",
+    "biolink:binds",
+    "biolink:biomarker_for",
+    "biolink:broad_match",
+    "biolink:capable_of",
+    "biolink:catalyzes",
+    "biolink:causes",
+    "biolink:chemically_similar_to",
+    "biolink:close_match",
+    "biolink:coexists_with",
+    "biolink:colocalizes_with",
+    "biolink:composed_primarily_of",
+    "biolink:consumes",
+    "biolink:contraindicated_in",
+    "biolink:contributes_to",
+    "biolink:correlated_with",
+    "biolink:decreases_response_to",
+    "biolink:derives_from",
+    "biolink:derives_into",
+    "biolink:develops_from",
+    "biolink:directly_physically_interacts_with",
+    "biolink:disease_has_basis_in",
+    "biolink:disease_has_location",
+    "biolink:disrupts",
+    "biolink:drug_regulatory_status_world_wide",
+    "biolink:enables",
+    "biolink:exacerbates_condition",
+    "biolink:exact_match",
+    "biolink:expressed_in",
+    "biolink:gene_associated_with_condition",
+    "biolink:gene_product_of",
+    "biolink:genetically_associated_with",
+    "biolink:has_chemical_role",
+    "biolink:has_decreased_amount",
+    "biolink:has_increased_amount",
+    "biolink:has_input",
+    "biolink:has_member",
+    "biolink:has_metabolite",
+    "biolink:has_molecular_consequence",
+    "biolink:has_not_completed",
+    "biolink:has_output",
+    "biolink:has_part",
+    "biolink:has_participant",
+    "biolink:has_phenotype",
+    "biolink:has_plasma_membrane_part",
+    "biolink:homologous_to",
+    "biolink:in_clinical_trials_for",
+    "biolink:in_preclinical_trials_for",
+    "biolink:in_taxon",
+    "biolink:indirectly_physically_interacts_with",
+    "biolink:interacts_with",
+    "biolink:is_sequence_variant_of",
+    "biolink:lacks_part",
+    "biolink:located_in",
+    "biolink:manifestation_of",
+    "biolink:mentions",
+    "biolink:model_of",
+    "biolink:occurs_in",
+    "biolink:opposite_of",
+    "biolink:overlaps",
+    "biolink:participates_in",
+    "biolink:physically_interacts_with",
+    "biolink:precedes",
+    "biolink:produces",
+    "biolink:promotes_condition",
+    "biolink:regulates",
+    "biolink:related_to",
+    "biolink:related_to_at_concept_level",
+    "biolink:related_to_at_instance_level",
+    "biolink:same_as",
+    "biolink:similar_to",
+    "biolink:studied_to_treat",
+    "biolink:subclass_of",
+    "biolink:temporally_related_to",
+    "biolink:transcribed_from",
+    "biolink:translates_to",
+    "biolink:treats",
+    "biolink:treats_or_applied_or_studied_to_treat"
+  ]
+}
