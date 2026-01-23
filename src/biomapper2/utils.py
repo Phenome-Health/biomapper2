@@ -5,6 +5,7 @@ Provides logging setup and mathematical helpers for metric calculations.
 """
 
 import logging
+from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any, Literal, TypeGuard
 
@@ -12,7 +13,7 @@ import pandas as pd
 import requests
 import requests_cache
 
-from .config import CACHE_DIR, KESTREL_API_KEY, KESTREL_API_URL, LOG_LEVEL
+from .config import CACHE_DIR, KESTREL_API_KEY, KESTREL_API_URL, KESTREL_BATCHING_ENABLED, LOG_LEVEL
 
 # Type alias for annotation results structure
 # Structure: {annotator: {vocabulary: {local_id: result_metadata_dict}}}
@@ -24,6 +25,21 @@ AnnotationMode = Literal["all", "missing", "none"]
 VALIDATOR_PROP = "validator"
 CLEANER_PROP = "cleaner"
 ALIASES_PROP = "aliases"
+
+
+def chunk_list(items: list, chunk_size: int) -> Iterator[list]:
+    """
+    Split a list into chunks of specified size.
+
+    Args:
+        items: List to split
+        chunk_size: Maximum size of each chunk
+
+    Yields:
+        List chunks of at most chunk_size items
+    """
+    for i in range(0, len(items), chunk_size):
+        yield items[i : i + chunk_size]
 
 
 def setup_logging():
@@ -93,9 +109,12 @@ def safe_divide(numerator, denominator) -> float | None:
     return result
 
 
-def kestrel_request(method: str, endpoint: str, session: requests.Session | None = None, **kwargs) -> Any:
+def bulk_kestrel_request(method: str, endpoint: str, session: requests.Session | None = None, **kwargs) -> Any:
     """
-    Internal helper for making Kestrel API requests.
+    Make a single Kestrel API request with the full payload.
+
+    This is the low-level function that sends one request. For batching support,
+    use kestrel_request() instead.
 
     Args:
         method: HTTP method ('GET' or 'POST')
@@ -135,6 +154,65 @@ def kestrel_request(method: str, endpoint: str, session: requests.Session | None
     except requests.exceptions.RequestException as e:
         logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
         raise
+
+
+def kestrel_request(
+    method: str,
+    endpoint: str,
+    batch_field: str,
+    batch_items: list,
+    batch_size: int,
+    session: requests.Session | None = None,
+    **kwargs,
+) -> dict:
+    """
+    Make Kestrel API requests with automatic batching for large payloads.
+
+    Splits batch_items into chunks, makes separate API calls for each chunk,
+    and merges the results. Assumes API returns dict keyed by input items.
+
+    When KESTREL_BATCHING_ENABLED is False, sends all items in a single request
+    (useful for performance testing).
+
+    Args:
+        method: HTTP method ('GET' or 'POST')
+        endpoint: API endpoint path
+        batch_field: JSON field name for batch items (e.g., 'search_text', 'curies')
+        batch_items: List of items to batch
+        batch_size: Maximum items per request (ignored if batching disabled)
+        session: Optional requests session
+        **kwargs: Additional arguments (json, params, etc.)
+
+    Returns:
+        Merged dict of results from all batches
+    """
+    if not batch_items:
+        return {}
+
+    json_payload = kwargs.pop("json", {})
+
+    # If batching is disabled, send all items in a single request
+    if not KESTREL_BATCHING_ENABLED:
+        full_payload = {**json_payload, batch_field: batch_items}
+        result = bulk_kestrel_request(method, endpoint, session=session, json=full_payload, **kwargs)
+        return result if isinstance(result, dict) else {}
+
+    # Batch the request
+    chunks = list(chunk_list(batch_items, batch_size))
+    num_chunks = len(chunks)
+
+    if num_chunks > 1:
+        logging.info(f"Batching {len(batch_items)} items into {num_chunks} chunks of {batch_size} for {endpoint}")
+
+    merged_results: dict = {}
+    for chunk in chunks:
+        chunk_payload = {**json_payload, batch_field: chunk}
+        chunk_results = bulk_kestrel_request(method, endpoint, session=session, json=chunk_payload, **kwargs)
+
+        if isinstance(chunk_results, dict):
+            merged_results.update(chunk_results)
+
+    return merged_results
 
 
 def merge_into_entity(entity: pd.Series | dict[str, Any], series_to_merge: pd.Series) -> pd.Series | dict[str, Any]:

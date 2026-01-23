@@ -34,3 +34,8 @@ _kestrel_api_key = os.getenv("KESTREL_API_KEY")
 if not _kestrel_api_key:
     raise ValueError("KESTREL_API_KEY environment variable is not set")
 KESTREL_API_KEY = cast(str, _kestrel_api_key)
+
+# Batching for Kestrel API requests (to prevent timeouts on large datasets)
+KESTREL_BATCHING_ENABLED = True  # Set to False to disable batching (for performance testing)
+KESTREL_BATCH_SIZE_SEARCH = 1000  # For text-search, vector-search, hybrid-search
+KESTREL_BATCH_SIZE_CANONICALIZE = 2000  # For canonicalize endpoint

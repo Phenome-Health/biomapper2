@@ -3,6 +3,7 @@ from typing import Any
 
 import pandas as pd
 
+from ...config import KESTREL_BATCH_SIZE_SEARCH
 from ...utils import AssignedIDsDict, kestrel_request, text_is_not_empty
 from .base import BaseAnnotator
 
@@ -72,6 +73,14 @@ class KestrelVectorSearchAnnotator(BaseAnnotator):
     def _kestrel_vector_search(
         search_text: str | list[str], category: str, prefixes: list[str] | None, limit: int = 10
     ) -> dict[str, list[dict]]:
-        """Call Kestrel vector search endpoint."""
-        payload = {"search_text": search_text, "limit": limit, "category_filter": category, "prefix_filter": prefixes}
-        return kestrel_request("POST", "vector-search", json=payload)
+        """Call Kestrel vector search endpoint (with batching for large lists)."""
+        search_list = [search_text] if isinstance(search_text, str) else list(search_text)
+
+        return kestrel_request(
+            method="POST",
+            endpoint="vector-search",
+            batch_field="search_text",
+            batch_items=search_list,
+            batch_size=KESTREL_BATCH_SIZE_SEARCH,
+            json={"limit": limit, "category_filter": category, "prefix_filter": prefixes},
+        )

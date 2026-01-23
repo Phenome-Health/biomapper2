@@ -10,6 +10,7 @@ from typing import Any
 
 import pandas as pd
 
+from ..config import KESTREL_BATCH_SIZE_CANONICALIZE
 from ..utils import kestrel_request
 
 
@@ -84,7 +85,7 @@ class Linker:
     @staticmethod
     def get_kg_ids(curies: list[str]) -> dict[str, str]:
         """
-        Query knowledge graph API for canonical node IDs (in bulk).
+        Query knowledge graph API for canonical node IDs (in bulk, with batching).
 
         Args:
             curies: List of curies to look up
@@ -92,12 +93,13 @@ class Linker:
         Returns:
             Dictionary mapping curies to canonical KG node IDs
         """
-        if curies:
-            results = kestrel_request("POST", "canonicalize", json={"curies": curies})
-        else:
-            results = dict()
-
-        return results
+        return kestrel_request(
+            method="POST",
+            endpoint="canonicalize",
+            batch_field="curies",
+            batch_items=curies,
+            batch_size=KESTREL_BATCH_SIZE_CANONICALIZE,
+        )
 
     def _format_kg_id_fields(
         self, entity: pd.Series | dict[str, Any], curie_to_kg_id_map: dict[str, str]

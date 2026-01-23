@@ -3,6 +3,7 @@ from typing import Any
 
 import pandas as pd
 
+from ...config import KESTREL_BATCH_SIZE_SEARCH
 from ...utils import AssignedIDsDict, kestrel_request, text_is_not_empty
 from .base import BaseAnnotator
 
@@ -72,8 +73,16 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
     def _kestrel_hybrid_search(
         search_text: str | list[str], category: str, prefixes: list[str] | None, limit: int = 10
     ) -> dict[str, list[dict]]:
-        """Call Kestrel hybrid search endpoint."""
-        payload = {"search_text": search_text, "limit": limit, "category_filter": category, "prefix_filter": prefixes}
-        results = kestrel_request("POST", "hybrid-search", json=payload)
+        """Call Kestrel hybrid search endpoint (with batching for large lists)."""
+        search_list = [search_text] if isinstance(search_text, str) else list(search_text)
+
+        results = kestrel_request(
+            method="POST",
+            endpoint="hybrid-search",
+            batch_field="search_text",
+            batch_items=search_list,
+            batch_size=KESTREL_BATCH_SIZE_SEARCH,
+            json={"limit": limit, "category_filter": category, "prefix_filter": prefixes},
+        )
         # Filter out very low-scoring results (hybrid search scores range from 0-5)
         return {s: [match for match in matches if match["score"] >= 0.5] for s, matches in results.items()}
