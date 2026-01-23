@@ -9,7 +9,6 @@ from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any, Literal, TypeGuard
 
-import pandas as pd
 import requests
 import requests_cache
 
@@ -20,10 +19,7 @@ from .config import (
     LOG_LEVEL,
     get_kestrel_api_key,
 )
-
-# Type alias for annotation results structure
-# Structure: {annotator: {vocabulary: {local_id: result_metadata_dict}}}
-AssignedIDsDict = dict[str, dict[str, dict[str, dict[str, Any]]]]
+from .models import AssignedIDsDict as AssignedIDsDict  # Re-export for backward compatibility
 
 # Type hint for annotation mode
 AnnotationMode = Literal["all", "missing", "none"]
@@ -219,11 +215,3 @@ def kestrel_request(
             merged_results.update(chunk_results)
 
     return merged_results
-
-
-def merge_into_entity(entity: pd.Series | dict[str, Any], series_to_merge: pd.Series) -> pd.Series | dict[str, Any]:
-    """Merge fields from series_to_merge into entity, returning the updated entity."""
-    if isinstance(entity, pd.Series):
-        return pd.concat([entity, series_to_merge])
-    else:  # Dict
-        return {**entity, **series_to_merge.to_dict()}
