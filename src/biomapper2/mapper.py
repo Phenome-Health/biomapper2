@@ -5,7 +5,6 @@ Provides the Mapper class for harmonizing biological entities to knowledge graph
 through annotation, normalization, linking, and resolution steps.
 """
 
-import copy
 import logging
 from pathlib import Path
 from typing import Any
@@ -20,7 +19,8 @@ from .core.annotation_engine import AnnotationEngine
 from .core.linker import Linker
 from .core.normalizer import Normalizer
 from .core.resolver import Resolver
-from .utils import AnnotationMode, merge_into_entity, setup_logging
+from .models import Entity
+from .utils import AnnotationMode, setup_logging
 
 setup_logging()
 
@@ -78,7 +78,10 @@ class Mapper:
         """
         logging.debug(f"Item at beginning of map_entity_to_kg() is {item}")
         array_delimiters = array_delimiters if array_delimiters is not None else [",", ";"]
-        mapped_item = copy.deepcopy(item)  # Use a copy to avoid editing input item
+
+        # Convert input to Entity for type-safe internal processing
+        input_is_series = isinstance(item, pd.Series)
+        entity = Entity.from_input(item, name_field=name_field)
 
         # Validate/standardize the input entity type and vocab(s) on Biolink
         entity_type = self.biolink_client.standardize_entity_type(entity_type)
@@ -86,7 +89,7 @@ class Mapper:
 
         # Do Step 1: annotate with vocab IDs
         annotation_result = self.annotation_engine.annotate(
-            item=mapped_item,
+            item=entity.to_series(),
             name_field=name_field,
             provided_id_fields=provided_id_fields,
             category=entity_type,
@@ -95,29 +98,32 @@ class Mapper:
             annotators=annotators,
         )
         assert isinstance(annotation_result, pd.Series)
-        mapped_item = merge_into_entity(mapped_item, annotation_result)
+        entity = entity.update_from(annotation_result)
 
         # Do Step 2: normalize vocab IDs to form proper curies
         normalization_result = self.normalizer.normalize(
-            item=mapped_item,
+            item=entity.to_series(),
             provided_id_fields=provided_id_fields,
             array_delimiters=array_delimiters,
             stop_on_invalid_id=stop_on_invalid_id,
         )
         assert isinstance(normalization_result, pd.Series)
-        mapped_item = merge_into_entity(mapped_item, normalization_result)
+        entity = entity.update_from(normalization_result)
 
         # Do Step 3: link curies to KG nodes
-        linked_result = self.linker.link(mapped_item)
+        linked_result = self.linker.link(entity.to_series())
         assert isinstance(linked_result, pd.Series)
-        mapped_item = merge_into_entity(mapped_item, linked_result)
+        entity = entity.update_from(linked_result)
 
         # Do Step 4: resolve one-to-many KG matches
-        resolved_result = self.resolver.resolve(mapped_item)
+        resolved_result = self.resolver.resolve(entity.to_series())
         assert isinstance(resolved_result, pd.Series)
-        mapped_item = merge_into_entity(mapped_item, resolved_result)
+        entity = entity.update_from(resolved_result)
 
-        return mapped_item
+        # Convert back to original input type for API compatibility
+        if input_is_series:
+            return entity.to_series()
+        return entity.to_dict()
 
     def map_dataset_to_kg(
         self,

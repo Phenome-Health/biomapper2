@@ -8,15 +8,11 @@ import logging
 from datetime import timedelta
 from typing import Any, Literal, TypeGuard
 
-import pandas as pd
 import requests
 import requests_cache
 
 from .config import CACHE_DIR, KESTREL_API_KEY, KESTREL_API_URL, LOG_LEVEL
-
-# Type alias for annotation results structure
-# Structure: {annotator: {vocabulary: {local_id: result_metadata_dict}}}
-AssignedIDsDict = dict[str, dict[str, dict[str, dict[str, Any]]]]
+from .models import AssignedIDsDict as AssignedIDsDict  # Re-export for backward compatibility
 
 # Type hint for annotation mode
 AnnotationMode = Literal["all", "missing", "none"]
@@ -135,11 +131,3 @@ def kestrel_request(method: str, endpoint: str, session: requests.Session | None
     except requests.exceptions.RequestException as e:
         logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
         raise
-
-
-def merge_into_entity(entity: pd.Series | dict[str, Any], series_to_merge: pd.Series) -> pd.Series | dict[str, Any]:
-    """Merge fields from series_to_merge into entity, returning the updated entity."""
-    if isinstance(entity, pd.Series):
-        return pd.concat([entity, series_to_merge])
-    else:  # Dict
-        return {**entity, **series_to_merge.to_dict()}
