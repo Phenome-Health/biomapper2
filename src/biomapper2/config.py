@@ -6,7 +6,6 @@ Customize these values to change API endpoints, model versions, and logging beha
 
 import os
 from pathlib import Path
-from typing import cast
 
 from dotenv import load_dotenv
 
@@ -30,10 +29,17 @@ BIOLINK_VERSION_DEFAULT = "4.2.5"
 LOG_LEVEL = "INFO"
 
 # Secrets (from environment variables)
-_kestrel_api_key = os.getenv("KESTREL_API_KEY")
-if not _kestrel_api_key:
-    raise ValueError("KESTREL_API_KEY environment variable is not set")
-KESTREL_API_KEY = cast(str, _kestrel_api_key)
+_kestrel_api_key: str | None = None
+
+
+def get_kestrel_api_key() -> str:
+    global _kestrel_api_key
+    if _kestrel_api_key is None:
+        _kestrel_api_key = os.getenv("KESTREL_API_KEY")
+        if not _kestrel_api_key:
+            raise ValueError("KESTREL_API_KEY environment variable is not set")
+    return _kestrel_api_key
+
 
 # Batching for Kestrel API requests (to prevent timeouts on large datasets)
 KESTREL_BATCHING_ENABLED = True  # Set to False to disable batching (for performance testing)

@@ -13,7 +13,13 @@ import pandas as pd
 import requests
 import requests_cache
 
-from .config import CACHE_DIR, KESTREL_API_KEY, KESTREL_API_URL, KESTREL_BATCHING_ENABLED, LOG_LEVEL
+from .config import (
+    CACHE_DIR,
+    KESTREL_API_URL,
+    KESTREL_BATCHING_ENABLED,
+    LOG_LEVEL,
+    get_kestrel_api_key,
+)
 
 # Type alias for annotation results structure
 # Structure: {annotator: {vocabulary: {local_id: result_metadata_dict}}}
@@ -144,7 +150,7 @@ def bulk_kestrel_request(method: str, endpoint: str, session: requests.Session |
 
     try:
         response = session.request(
-            method, f"{KESTREL_API_URL}/{endpoint}", headers={"X-API-Key": KESTREL_API_KEY}, **kwargs
+            method, f"{KESTREL_API_URL}/{endpoint}", headers={"X-API-Key": get_kestrel_api_key()}, **kwargs
         )
         response.raise_for_status()
         return response.json()
