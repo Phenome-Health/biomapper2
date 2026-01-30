@@ -32,11 +32,19 @@ class Normalizer:
     using Biolink model prefix mappings.
     """
 
-    def __init__(self, biolink_client: BiolinkClient | None = None):
+    def __init__(self, biolink_client: BiolinkClient | None = None, biolink_version: str | None = None):
         self.validator_prop = VALIDATOR_PROP
         self.cleaner_prop = CLEANER_PROP
         self.aliases_prop = ALIASES_PROP
-        self.biolink_client = biolink_client if biolink_client else BiolinkClient()
+
+        # Set up biolink client flexibly (kraken uses Normalizer directly, so needs to pass in biolink version)
+        if biolink_client:
+            self.biolink_client = biolink_client
+        elif biolink_version:
+            self.biolink_client = BiolinkClient(biolink_version=biolink_version)
+        else:
+            self.biolink_client = BiolinkClient()
+
         self.vocab_info_map = load_prefix_info(self.biolink_client)
         self.vocab_validator_map = load_validator_map()
         self.field_name_to_vocab_name_cache: dict[str, set[str]] = dict()
