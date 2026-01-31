@@ -161,7 +161,11 @@ class Normalizer:
         )
 
     def get_curies(
-        self, local_ids_dict: dict[Any, Any], stop_on_invalid_id: bool = False, log_warnings: bool = True
+        self,
+        local_ids_dict: dict[Any, Any],
+        stop_on_invalid_id: bool = False,
+        log_warnings: bool = True,
+        fuzzy_match_vocab: bool = True,
     ) -> tuple[dict[str, str], dict[str | tuple, list[str]], set[str]]:
         """
         Convert local IDs to curies for all fields in dictionary.
@@ -169,6 +173,8 @@ class Normalizer:
         Args:
             local_ids_dict: Dictionary mapping vocab field names to local IDs
             stop_on_invalid_id: Halt on invalid IDs (default: False)
+            log_warnings: Whether to log warnings for invalid IDs
+            fuzzy_match_vocab: Whether to get more creative when identifying the ID's vocab
 
         Returns:
             Tuple of (valid_curies_dict_with_iris, invalid_ids_dict, unrecognized_vocabs_set)
@@ -181,7 +187,7 @@ class Normalizer:
             id_field_names = [id_field_name] if isinstance(id_field_name, str) else id_field_name
             vocab_names = set()
             for field_name in id_field_names:
-                matching_vocabs = self.determine_vocab(field_name)
+                matching_vocabs = self.determine_vocab(field_name, do_fuzzy_matching=fuzzy_match_vocab)
                 if matching_vocabs:
                     vocab_names |= matching_vocabs
                 else:
@@ -204,7 +210,7 @@ class Normalizer:
 
         return curies, dict(invalid_ids), unrecognized_vocabs
 
-    def determine_vocab(self, id_field_name: str) -> set[str] | None:
+    def determine_vocab(self, id_field_name: str, do_fuzzy_matching: bool = True) -> set[str] | None:
         """
         Determine which vocabulary corresponds to an ID field/column name.
 
@@ -212,6 +218,7 @@ class Normalizer:
 
         Args:
             id_field_name: Name of ID field/column (e.g., "CHEBI ID", "Labcorp LOINC id")
+            do_fuzzy_matching: Whether to get more creative in identifying a vocab (look for substrings)
 
         Returns:
             Set of matching vocabulary names (in standardized form)
@@ -251,19 +258,20 @@ class Normalizer:
                 self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_alias
                 return matches_on_alias
 
-            # Final tier: check if any known vocab name appears within the field name
-            # This handles cases like "labcorploincid" -> "loinc"
-            matches_on_substring = set()
-            for vocab in self.vocab_validator_map:
-                # Use the root vocab name for substring matching
-                vocab_root = vocab.split(".")[0] if "." in vocab else vocab
-                if vocab_root in field_name_cleaned:
-                    matches_on_substring.add(vocab)
+            if do_fuzzy_matching:
+                # Final tier: check if any known vocab name appears within the field name
+                # This handles cases like "labcorploincid" -> "loinc"
+                matches_on_substring = set()
+                for vocab in self.vocab_validator_map:
+                    # Use the root vocab name for substring matching
+                    vocab_root = vocab.split(".")[0] if "." in vocab else vocab
+                    if vocab_root in field_name_cleaned:
+                        matches_on_substring.add(vocab)
 
-            if matches_on_substring:
-                logging.debug(f"Found substring match(es) for '{id_field_name}': {matches_on_substring}")
-                self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_substring
-                return matches_on_substring
+                if matches_on_substring:
+                    logging.debug(f"Found substring match(es) for '{id_field_name}': {matches_on_substring}")
+                    self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_substring
+                    return matches_on_substring
 
             return None
 

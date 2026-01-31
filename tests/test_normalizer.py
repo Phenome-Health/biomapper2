@@ -143,3 +143,27 @@ class TestNormalizeIntegration:
         assert "UniProtKB:Q8NEV9" in result["curies_provided"]
         assert "HMDB:HMDB0000122" in result["curies_provided"]
         assert "HMDB:HMDB0000190" in result["curies_provided"]
+
+
+class TestGetCuries:
+    """Tests for Normalizer.get_curies method."""
+
+    @pytest.fixture
+    def normalizer(self):
+        return Normalizer()
+
+    def test_get_curies_all_params(self, normalizer):
+        curies, invalid_ids, unrecognized_vocabs = normalizer.get_curies(
+            {"unii": "01MP33F412"}, stop_on_invalid_id=False, log_warnings=False, fuzzy_match_vocab=False
+        )
+        assert curies
+        assert not invalid_ids
+        assert not unrecognized_vocabs
+        assert "UNII:01MP33F412" in curies
+
+    def test_get_curies_uppercase_cleaners(self, normalizer):
+        curies, invalid_ids, unrecognized_vocabs = normalizer.get_curies(
+            {"UNII": "01mP33f412", "CHEMBL.COMPOUND": "chembl112"}
+        )
+        assert "UNII:01MP33F412" in curies
+        assert "CHEMBL.COMPOUND:CHEMBL112" in curies
