@@ -161,7 +161,7 @@ class Normalizer:
         )
 
     def get_curies(
-        self, local_ids_dict: dict[Any, Any], stop_on_invalid_id: bool = False
+        self, local_ids_dict: dict[Any, Any], stop_on_invalid_id: bool = False, log_warnings: bool = True
     ) -> tuple[dict[str, str], dict[str | tuple, list[str]], set[str]]:
         """
         Convert local IDs to curies for all fields in dictionary.
@@ -195,7 +195,7 @@ class Normalizer:
                     # Get the curie for this local ID
                     if local_id:  # Sometimes cleaning the local ID can make it empty (like if it was just a space)
                         curie, iri = self._construct_curie(
-                            local_id, list(vocab_names), stop_on_failure=stop_on_invalid_id
+                            local_id, list(vocab_names), stop_on_failure=stop_on_invalid_id, log_warnings=log_warnings
                         )
                         if curie:
                             curies[curie] = iri
@@ -309,7 +309,11 @@ class Normalizer:
         return validator(local_id), local_id
 
     def _construct_curie(
-        self, local_id: str, vocab_name_cleaned: str | list[str], stop_on_failure: bool = False
+        self,
+        local_id: str,
+        vocab_name_cleaned: str | list[str],
+        stop_on_failure: bool = False,
+        log_warnings: bool = True,
     ) -> tuple[str, str]:
         """
         Construct standardized curie from local ID and vocabulary.
@@ -345,7 +349,7 @@ class Normalizer:
             if stop_on_failure:
                 logging.error(f"Local id '{local_id}' is invalid for {vocab_name_cleaned}")
                 sys.exit(1)
-            else:
+            elif log_warnings:
                 logging.warning(f"Local id '{local_id}' is invalid for {vocab_name_cleaned}. Skipping.")
 
         return curie, iri
