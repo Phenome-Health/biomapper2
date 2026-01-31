@@ -169,7 +169,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "lipidbank": {validator: validators.is_lipidbank_id},
         "lm": {
             validator: validators.is_lipidmaps_id,
-            cleaner: lambda x: x.removeprefix("LM"),
+            cleaner: lambda x: x.upper().removeprefix("LM"),
             aliases: ["lipidmaps"],
         },
         "loinc": {validator: validators.is_loinc_id},
