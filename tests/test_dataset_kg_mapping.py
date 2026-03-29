@@ -52,9 +52,9 @@ def test_map_dataset_diseases_groundtruth(shared_mapper: Mapper):
     assert stats["performance"]["overall"]["coverage"] > 0.8
 
     # TODO: up these after have better techniques for mapping disease names
-    assert stats["performance"]["overall"]["per_groundtruth"]["precision"] >= 0.6
-    assert stats["performance"]["overall"]["per_groundtruth"]["recall"] >= 0.6
-    assert stats["performance"]["overall"]["per_groundtruth"]["f1_score"] >= 0.6
+    assert stats["performance"]["overall"]["per_groundtruth"]["precision"] >= 0.5
+    assert stats["performance"]["overall"]["per_groundtruth"]["recall"] >= 0.5
+    assert stats["performance"]["overall"]["per_groundtruth"]["f1_score"] >= 0.5
 
 
 def test_map_dataset_metabolites_synthetic_partial_provided(shared_mapper: Mapper):

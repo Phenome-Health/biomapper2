@@ -1,0 +1,58 @@
+name: Deploy Biomapper2 API
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/biomapper2/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'deploy/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy to Lightsail
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ubuntu
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script: |
+            set -e
+
+            cd ~/biomapper2
+
+            # Pull latest code
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Install dependencies
+            ~/.local/bin/uv sync
+
+            # Update systemd service if changed
+            sudo cp deploy/biomapper2-api.service /etc/systemd/system/
+            sudo systemctl daemon-reload
+
+            # Restart the service
+            sudo systemctl restart biomapper2-api
+
+            # Wait for service to start
+            sleep 5
+
+            # Health check
+            curl -sf http://localhost:8001/api/v1/health || exit 1
+
+            echo "Deployment successful!"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Deployment failed! Check the logs."
+          exit 1
