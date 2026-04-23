@@ -180,7 +180,10 @@ class Mapper:
         elif isinstance(dataset, (str, Path)):
             dataset = str(dataset)
             # Load tsv into pandas
-            output_tsv_name = Path(dataset).name.replace(".tsv", output_suffix).replace(".csv", output_suffix)
+            if output_prefix is not None:
+                output_tsv_name = f"{output_prefix}{output_suffix}"
+            else:
+                output_tsv_name = Path(dataset).name.replace(".tsv", output_suffix).replace(".csv", output_suffix)
             if dataset.endswith(".tsv"):
                 df = pd.read_csv(dataset, sep="\t", dtype={id_col: str for id_col in provided_id_columns}, comment="#")
             elif dataset.endswith(".csv"):

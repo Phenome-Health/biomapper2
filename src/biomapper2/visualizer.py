@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from adjustText import adjust_text
 from matplotlib.figure import Figure
 
 # Fields that must be present in every stats JSON
@@ -29,6 +30,7 @@ REQUIRED_STATS_FIELDS = frozenset(
 _STATS_RECORD_COLUMNS = (
     "dataset",
     "entity",
+    "annotator",
     "coverage",
     "coverage_explanation",
     "n_total",
@@ -39,6 +41,12 @@ _STATS_RECORD_COLUMNS = (
     "has_only_provided_ids",
     "has_only_assigned_ids",
     "has_both_provided_and_assigned_ids",
+    "precision",
+    "recall",
+    "f1",
+    "precision_adj",
+    "recall_adj",
+    "f1_adj",
     "_source_file",
 )
 
@@ -122,7 +130,11 @@ class Visualizer:
     def aggregate_stats(self, stats_dir: str | Path, fill_missing: bool = True) -> pd.DataFrame:
         """
         Aggregate stats JSONs into tidy DataFrame.
-        Single pass: extracts metadata, stats, and tracks combinations for gap-filling.
+
+        Each JSON produces one ``_overall`` row and one row per annotator found
+        in ``performance.per_annotator``.  Precision / recall / F1 are extracted
+        from ``performance.assigned_ids.per_provided_ids`` (overall) and each
+        annotator's ``per_provided_ids`` block.
         """
         stats_dir = Path(stats_dir)
         file_glob = self.config["file_glob"]
@@ -131,7 +143,7 @@ class Visualizer:
         if not json_files:
             raise ValueError(f"No stats JSON files matching '{file_glob}' found in {stats_dir}")
 
-        records = []
+        records: list[dict[str, Any]] = []
         all_datasets: set[str] = set()
         all_entities: set[str] = set()
 
@@ -153,28 +165,67 @@ class Visualizer:
             else:
                 coverage, coverage_explanation = None, None
 
+            base_kwargs: dict[str, Any] = dict(
+                dataset=dataset,
+                entity=entity,
+                coverage=coverage,
+                coverage_explanation=coverage_explanation,
+                n_total=n_total,
+                n_mapped=n_mapped,
+                one_to_one=data.get("one_to_one_mappings"),
+                multi_mappings=data.get("multi_mappings"),
+                has_valid_ids=data.get("has_valid_ids"),
+                has_only_provided_ids=data.get("has_only_provided_ids"),
+                has_only_assigned_ids=data.get("has_only_assigned_ids"),
+                has_both_provided_and_assigned_ids=data.get("has_both_provided_and_assigned_ids"),
+                source_file=json_file.name,
+            )
+
+            # --- Extract performance metrics ---
+            perf = data.get("performance") or {}
+            assigned = perf.get("assigned_ids") or {}
+            per_provided = assigned.get("per_provided_ids") or {}
+            after_resolve = per_provided.get("after_resolving_one_to_manys") or {}
+
+            # Overall row (always created)
             records.append(
                 self._make_stats_record(
-                    dataset=dataset,
-                    entity=entity,
-                    coverage=coverage,
-                    coverage_explanation=coverage_explanation,
-                    n_total=n_total,
-                    n_mapped=n_mapped,
-                    one_to_one=data.get("one_to_one_mappings"),
-                    multi_mappings=data.get("multi_mappings"),
-                    has_valid_ids=data.get("has_valid_ids"),
-                    has_only_provided_ids=data.get("has_only_provided_ids"),
-                    has_only_assigned_ids=data.get("has_only_assigned_ids"),
-                    has_both_provided_and_assigned_ids=data.get("has_both_provided_and_assigned_ids"),
-                    source_file=json_file.name,
+                    **base_kwargs,
+                    annotator="_overall",
+                    precision=per_provided.get("precision"),
+                    recall=per_provided.get("recall"),
+                    f1=per_provided.get("f1_score"),
+                    precision_adj=after_resolve.get("precision"),
+                    recall_adj=after_resolve.get("recall"),
+                    f1_adj=after_resolve.get("f1_score"),
                 )
             )
+
+            # Per-annotator rows
+            per_annotator = perf.get("per_annotator") or {}
+            for ann_name, ann_data in per_annotator.items():
+                ann_data = ann_data or {}
+                ann_per_provided = ann_data.get("per_provided_ids") or {}
+                ann_after = ann_per_provided.get("after_resolving_one_to_manys") or {}
+
+                records.append(
+                    self._make_stats_record(
+                        **base_kwargs,
+                        annotator=ann_name,
+                        precision=ann_per_provided.get("precision"),
+                        recall=ann_per_provided.get("recall"),
+                        f1=ann_per_provided.get("f1_score"),
+                        precision_adj=ann_after.get("precision"),
+                        recall_adj=ann_after.get("recall"),
+                        f1_adj=ann_after.get("f1_score"),
+                    )
+                )
 
         df = pd.DataFrame(records)
 
         if fill_missing:
-            existing = set(zip(df["dataset"], df["entity"]))
+            overall_rows = df[df["annotator"] == "_overall"]
+            existing = set(zip(overall_rows["dataset"], overall_rows["entity"]))
             missing = set(itertools.product(all_datasets, all_entities)) - existing
 
             if missing:
@@ -216,11 +267,19 @@ class Visualizer:
         has_only_assigned_ids: int | None = None,
         has_both_provided_and_assigned_ids: int | None = None,
         source_file: str = "UNKNOWN",
+        annotator: str = "_overall",
+        precision: float | None = None,
+        recall: float | None = None,
+        f1: float | None = None,
+        precision_adj: float | None = None,
+        recall_adj: float | None = None,
+        f1_adj: float | None = None,
     ) -> dict[str, Any]:
         """Create a stats record dict with consistent schema."""
         return {
             "dataset": dataset,
             "entity": entity,
+            "annotator": annotator,
             "coverage": coverage,
             "coverage_explanation": coverage_explanation,
             "n_total": n_total,
@@ -231,6 +290,12 @@ class Visualizer:
             "has_only_provided_ids": has_only_provided_ids,
             "has_only_assigned_ids": has_only_assigned_ids,
             "has_both_provided_and_assigned_ids": has_both_provided_and_assigned_ids,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "precision_adj": precision_adj,
+            "recall_adj": recall_adj,
+            "f1_adj": f1_adj,
             "_source_file": source_file,
         }
 
@@ -252,6 +317,9 @@ class Visualizer:
             entity_labels: Optional display names for entities
             figsize: Optional (width, height) override; if None, calculated from grid size
         """
+        if "annotator" in df.columns:
+            df = df[df["annotator"] == "_overall"]
+
         _dataset_labels = dataset_labels or {}
         _entity_labels = {**self.config["entity_labels"], **(entity_labels or {})}
 
@@ -279,7 +347,7 @@ class Visualizer:
                     )
                     expl = expl_series.iloc[0]
                     val_float = cast(float, val)
-                    annot[i, j] = f"$\\mathbf{{{val_float*100:.1f}\\%}}$\n\n({expl})"
+                    annot[i, j] = f"$\\mathbf{{{val_float * 100:.1f}\\%}}$\n\n({expl})"
 
         # Apply display labels (after ordering, after building annotations)
         matrix.index = matrix.index.map(lambda x: _entity_labels.get(x, x.title()))
@@ -360,6 +428,9 @@ class Visualizer:
             figsize: Optional (width, height) override; if None, calculated from grid size
         Each cell shows 3 bars: Total -> Valid IDs -> Mapped to KG
         """
+        if "annotator" in df.columns:
+            df = df[df["annotator"] == "_overall"]
+
         _dataset_labels = dataset_labels or {}
         _entity_labels = {**self.config["entity_labels"], **(entity_labels or {})}
 
@@ -559,6 +630,153 @@ class Visualizer:
             ax.set_title(dataset_disp, fontsize=10, fontweight="bold", pad=10)
         if col_idx == 0:
             ax.set_ylabel(entity_disp, fontsize=10, fontweight="bold")
+
+    # -------------------------------------------------------------------------
+    # Precision / Recall / F1 Visualizations
+    # -------------------------------------------------------------------------
+
+    def render_metric_heatmaps(
+        self,
+        df: pd.DataFrame,
+        annotator: str = "_overall",
+        output_path: str | Path | None = None,
+        figsize: tuple[float, float] = (14, 4),
+    ) -> Figure:
+        """Faceted heatmap showing Precision, Recall, F1 for a single annotator.
+
+        Args:
+            df: Tidy DataFrame from ``aggregate_stats`` (must include annotator column).
+            annotator: Which annotator slice to display (``"_overall"`` or a specific name).
+            output_path: Optional path to save figure (without extension).
+            figsize: Figure size ``(width, height)``.
+        """
+        df_filt = df[df["annotator"] == annotator].copy()
+
+        metrics = ["precision", "recall", "f1"]
+        titles = ["Precision", "Recall", "F1 Score"]
+
+        fig, axes = plt.subplots(1, 3, figsize=figsize, layout="constrained")
+
+        cmap = sns.diverging_palette(10, 130, as_cmap=True)
+
+        for ax, metric, title in zip(axes, metrics, titles):
+            matrix = df_filt.pivot(index="entity", columns="dataset", values=metric) * 100
+
+            if self.config["col_order"]:
+                matrix = matrix.reindex(columns=self.config["col_order"])
+            if self.config["row_order"]:
+                matrix = matrix.reindex(self.config["row_order"])
+
+            annot = matrix.map(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
+
+            sns.heatmap(
+                matrix,
+                annot=annot,
+                fmt="",
+                cmap=cmap,
+                vmin=0,
+                vmax=100,
+                cbar_kws={"label": "%", "shrink": 0.8},
+                annot_kws={"fontsize": 10},
+                square=True,
+                linewidths=0.5,
+                linecolor="white",
+                ax=ax,
+            )
+            ax.set_title(title, fontweight="bold", fontsize=12)
+            ax.set_ylabel("" if ax != axes[0] else "Entity")
+            ax.set_xlabel("Dataset")
+            ax.tick_params(axis="y", rotation=0)
+
+        annotator_label = "Overall" if annotator == "_overall" else annotator.title()
+        fig.suptitle(f"Mapping Quality Metrics — {annotator_label}", fontsize=14, fontweight="bold")
+
+        if output_path:
+            self._save_fig(fig, output_path)
+
+        return fig
+
+    def render_pr_scatter(
+        self,
+        df: pd.DataFrame,
+        annotator: str = "_overall",
+        output_path: str | Path | None = None,
+        figsize: tuple[float, float] = (8, 7),
+    ) -> Figure:
+        """Precision vs Recall scatter plot with iso-F1 contour lines.
+
+        Points are colored by entity type and labeled with dataset name.
+
+        Args:
+            df: Tidy DataFrame from ``aggregate_stats``.
+            annotator: Which annotator slice to display.
+            output_path: Optional path to save figure (without extension).
+            figsize: Figure size ``(width, height)``.
+        """
+        df_filt = df[(df["annotator"] == annotator) & df["precision"].notna() & df["recall"].notna()].copy()
+
+        fig, ax = plt.subplots(figsize=figsize, layout="constrained")
+
+        # Draw iso-F1 contours
+        p_range = np.linspace(0.01, 1, 100)
+        for f1_val in [0.3, 0.5, 0.7, 0.9]:
+            denom = 2 * p_range - f1_val
+            with np.errstate(divide="ignore", invalid="ignore"):
+                r_vals = np.where(denom != 0, (f1_val * p_range) / denom, np.inf)
+            valid = (r_vals > 0) & (r_vals <= 1)
+            ax.plot(p_range[valid], r_vals[valid], ":", color="gray", alpha=0.5, linewidth=1)
+            idx = int(np.argmin(np.abs(r_vals - 0.95)))
+            if valid[idx]:
+                ax.text(p_range[idx], r_vals[idx], f"F1={f1_val}", fontsize=8, color="gray", alpha=0.7)
+
+        # Scatter points by entity
+        entities = df_filt["entity"].unique()
+        colors = plt.cm.Set2(np.linspace(0, 1, max(len(entities), 1)))  # type: ignore[attr-defined]
+
+        texts = []
+        for entity, color in zip(entities, colors):
+            subset = df_filt[df_filt["entity"] == entity]
+            ax.scatter(
+                subset["precision"],
+                subset["recall"],
+                c=[color],
+                s=120,
+                label=entity.title(),
+                edgecolors="black",
+                linewidths=0.5,
+                alpha=0.8,
+                zorder=5,
+            )
+            for _, row in subset.iterrows():
+                texts.append(
+                    ax.annotate(
+                        row["dataset"],
+                        (row["precision"], row["recall"]),
+                        fontsize=8,
+                        zorder=6,
+                    )
+                )
+
+        adjust_text(
+            texts,
+            ax=ax,
+            force_text=(1.5, 1.5),
+            arrowprops=dict(arrowstyle="-", color="gray", alpha=0.5, lw=0.8),
+        )
+
+        ax.set_xlim(0, 1.05)
+        ax.set_ylim(0, 1.05)
+        ax.set_xlabel("Precision", fontsize=11)
+        ax.set_ylabel("Recall", fontsize=11)
+        ax.set_title("Precision vs Recall (with F1 Contours)", fontweight="bold", fontsize=12)
+        ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), framealpha=0.9)
+        ax.set_aspect("equal")
+        ax.grid(True, alpha=0.3)
+
+        if output_path:
+            self._save_fig(fig, output_path)
+
+        return fig
 
     def _save_fig(self, fig: Figure, output_path: str | Path):
         output_path = Path(output_path)

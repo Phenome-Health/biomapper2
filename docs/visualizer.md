@@ -2,10 +2,12 @@
 
 ## Overview
 
-The `Visualizer` is a helper class, used to visually compare KG-harmonization performance across multiple datasets. Currently, it produces two visualization types:
+The `Visualizer` is a helper class, used to visually compare KG-harmonization performance across multiple datasets. It produces four visualization types:
 
 1. **Coverage heatmap** – a matrix showing mapping success rates across dataset/entity combinations
 2. **Breakdown chart** – a grid of stacked bar charts showing the pipeline stages (total → valid IDs → mapped to KG)
+3. **Metric heatmaps** – faceted heatmaps showing precision, recall, and F1 score (overall or per-annotator)
+4. **Precision-recall scatter** – scatter plot with iso-F1 contour lines, colored by entity type
 
 ---
 
@@ -44,13 +46,13 @@ Before rendering, aggregate your stats JSONs into a tidy DataFrame:
 df = viz.aggregate_stats("path/to/stats_dir/")
 ```
 
-This expects files matching `*_MAPPED_a_summary_stats.json`, which should be created automatically when mapper is run via:
+This expects files matching `*_MAPPED_a_summary_stats.json`, which are created automatically by `mapper.map_dataset_to_kg()`.
 
-```python
-mapper.map_dataset_to_kg()
-```
+The returned DataFrame includes an `annotator` column: one `_overall` row per dataset/entity combination, plus one row per annotator found in the `performance.per_annotator` section of the stats JSON. Precision, recall, F1 (and their post-one-to-many-resolution adjusted variants) are extracted from `performance.assigned_ids.per_provided_ids`.
 
 ## Rendering Methods
+
+### Coverage & Breakdown
 
 Both methods share a common signature pattern:
 
@@ -90,12 +92,32 @@ fig = viz.render_breakdown(
 
 **Output**: Grid of subplots. Each cell contains three bars showing the funnel from total items → valid IDs (broken down by source) → mapped to KG (broken down by 1:1 vs multi-mappings).
 
+### Metric Heatmaps (Precision / Recall / F1)
+
+```python
+# Overall metrics
+fig = viz.render_metric_heatmaps(df, annotator="_overall")
+
+# Per-annotator metrics
+fig = viz.render_metric_heatmaps(df, annotator="kestrel-hybrid-search")
+```
+
+**Output**: Three side-by-side heatmaps (Precision, Recall, F1 Score) for the selected annotator. Each cell shows the metric as a percentage.
+
+### Precision-Recall Scatter
+
+```python
+fig = viz.render_pr_scatter(df, annotator="_overall")
+```
+
+**Output**: Scatter plot with precision on the x-axis and recall on the y-axis. Points are colored by entity type and labeled with dataset names (labels are automatically repositioned to avoid overlap). Dashed iso-F1 contour lines at 0.3, 0.5, 0.7, and 0.9 provide reference.
+
 ---
 
 ## Typical Workflow
 
 ```python
-from visualizer import Visualizer
+from biomapper2.visualizer import Visualizer
 
 viz = Visualizer(config={
     "row_order": ["proteins", "metabolites", "lipids", "clinical-labs"],
@@ -105,9 +127,14 @@ viz = Visualizer(config={
 # Aggregate
 df = viz.aggregate_stats("results/stats/")
 
-# Generate both figures
+# Coverage & breakdown
 viz.render_heatmap(df, output_path="figures/coverage")
 viz.render_breakdown(df, output_path="figures/breakdown")
+
+# Precision / Recall / F1
+viz.render_metric_heatmaps(df, output_path="figures/prf1_overall")
+viz.render_metric_heatmaps(df, annotator="kestrel-hybrid-search", output_path="figures/prf1_kestrel")
+viz.render_pr_scatter(df, output_path="figures/pr_scatter")
 ```
 
 ---

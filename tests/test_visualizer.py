@@ -50,6 +50,38 @@ def make_valid_stats(
     }
 
 
+def make_stats_with_performance(
+    total_items: int = 100,
+    mapped_to_kg: int = 80,
+    precision: float = 0.9,
+    recall: float = 0.85,
+    f1_score: float = 0.874,
+    precision_adj: float = 0.88,
+    recall_adj: float = 0.83,
+    f1_adj: float = 0.854,
+    annotators: dict | None = None,
+) -> dict:
+    """Create a valid stats dict that includes performance/P-R-F1 data."""
+    stats = make_valid_stats(total_items=total_items, mapped_to_kg=mapped_to_kg)
+    stats["performance"] = {
+        "overall": {"coverage": mapped_to_kg / total_items if total_items else 0},
+        "assigned_ids": {
+            "per_provided_ids": {
+                "precision": precision,
+                "recall": recall,
+                "f1_score": f1_score,
+                "after_resolving_one_to_manys": {
+                    "precision": precision_adj,
+                    "recall": recall_adj,
+                    "f1_score": f1_adj,
+                },
+            },
+        },
+        "per_annotator": annotators or {},
+    }
+    return stats
+
+
 @pytest.fixture
 def stats_dir(tmp_path: Path) -> Path:
     """Create a temporary stats directory."""
@@ -678,5 +710,155 @@ class TestEdgeCases:
 
         df = visualizer.aggregate_stats(stats_dir)
         fig = visualizer.render_heatmap(df)
+
+        assert isinstance(fig, Figure)
+
+
+# =============================================================================
+# Precision / Recall / F1 Aggregation Tests
+# =============================================================================
+
+
+class TestPrecisionRecallF1Aggregation:
+    """Tests for P/R/F1 extraction in aggregate_stats."""
+
+    def test_overall_prf1_extracted(self, stats_dir: Path, visualizer: Visualizer):
+        """Overall precision/recall/F1 are extracted from performance section."""
+        stats_dir.mkdir()
+        stats = make_stats_with_performance(precision=0.9, recall=0.85, f1_score=0.874)
+        (stats_dir / "datasetA_proteins_MAPPED_a_summary_stats.json").write_text(json.dumps(stats))
+
+        df = visualizer.aggregate_stats(stats_dir)
+        overall = df[df["annotator"] == "_overall"]
+
+        assert len(overall) == 1
+        assert overall.iloc[0]["precision"] == pytest.approx(0.9)
+        assert overall.iloc[0]["recall"] == pytest.approx(0.85)
+        assert overall.iloc[0]["f1"] == pytest.approx(0.874)
+
+    def test_adjusted_metrics_extracted(self, stats_dir: Path, visualizer: Visualizer):
+        """Post-one-to-many-resolution adjusted metrics are extracted."""
+        stats_dir.mkdir()
+        stats = make_stats_with_performance(precision_adj=0.88, recall_adj=0.83, f1_adj=0.854)
+        (stats_dir / "datasetA_proteins_MAPPED_a_summary_stats.json").write_text(json.dumps(stats))
+
+        df = visualizer.aggregate_stats(stats_dir)
+        overall = df[df["annotator"] == "_overall"]
+
+        assert overall.iloc[0]["precision_adj"] == pytest.approx(0.88)
+        assert overall.iloc[0]["recall_adj"] == pytest.approx(0.83)
+        assert overall.iloc[0]["f1_adj"] == pytest.approx(0.854)
+
+    def test_per_annotator_rows_created(self, stats_dir: Path, visualizer: Visualizer):
+        """Per-annotator rows are created alongside the _overall row."""
+        stats_dir.mkdir()
+        annotators = {
+            "kestrel-hybrid-search": {
+                "per_provided_ids": {
+                    "precision": 0.93,
+                    "recall": 0.91,
+                    "f1_score": 0.92,
+                }
+            },
+            "kestrel-text-search": {
+                "per_provided_ids": {
+                    "precision": 0.80,
+                    "recall": 0.75,
+                    "f1_score": 0.774,
+                }
+            },
+        }
+        stats = make_stats_with_performance(annotators=annotators)
+        (stats_dir / "datasetA_proteins_MAPPED_a_summary_stats.json").write_text(json.dumps(stats))
+
+        df = visualizer.aggregate_stats(stats_dir)
+
+        # 1 overall + 2 annotators
+        assert len(df) == 3
+        assert set(df["annotator"]) == {"_overall", "kestrel-hybrid-search", "kestrel-text-search"}
+
+        hybrid = df[df["annotator"] == "kestrel-hybrid-search"].iloc[0]
+        assert hybrid["precision"] == pytest.approx(0.93)
+        assert hybrid["f1"] == pytest.approx(0.92)
+
+    def test_no_performance_section_gives_null_metrics(self, stats_dir: Path, visualizer: Visualizer):
+        """Without a performance section, P/R/F1 columns are null but row still exists."""
+        stats_dir.mkdir()
+        stats = make_valid_stats()  # no performance key
+        (stats_dir / "datasetA_proteins_MAPPED_a_summary_stats.json").write_text(json.dumps(stats))
+
+        df = visualizer.aggregate_stats(stats_dir)
+
+        assert len(df) == 1
+        assert df.iloc[0]["annotator"] == "_overall"
+        assert pd.isna(df.iloc[0]["precision"])
+        assert pd.isna(df.iloc[0]["recall"])
+        assert pd.isna(df.iloc[0]["f1"])
+
+    def test_fill_missing_adds_overall_rows_only(self, stats_dir: Path, visualizer: Visualizer):
+        """Gap-filling creates _overall rows for missing dataset/entity combos."""
+        stats_dir.mkdir()
+        annotators = {"ann1": {"per_provided_ids": {"precision": 0.9, "recall": 0.8, "f1_score": 0.85}}}
+        stats_a = make_stats_with_performance(annotators=annotators)
+        stats_b = make_valid_stats()
+
+        (stats_dir / "datasetA_proteins_MAPPED_a_summary_stats.json").write_text(json.dumps(stats_a))
+        (stats_dir / "datasetB_metabolites_MAPPED_a_summary_stats.json").write_text(json.dumps(stats_b))
+
+        df = visualizer.aggregate_stats(stats_dir, fill_missing=True)
+
+        # datasetA/proteins: 1 overall + 1 annotator = 2
+        # datasetB/metabolites: 1 overall = 1
+        # missing combos (datasetA/metabolites, datasetB/proteins): 2 overall = 2
+        assert len(df) == 5
+        overall_rows = df[df["annotator"] == "_overall"]
+        assert len(overall_rows) == 4  # all 4 dataset/entity combos
+
+
+# =============================================================================
+# P/R/F1 Rendering Smoke Tests
+# =============================================================================
+
+
+class TestMetricHeatmapsRendering:
+    """Smoke tests for the faceted P/R/F1 heatmap."""
+
+    def test_metric_heatmaps_returns_figure(self, stats_dir: Path, visualizer: Visualizer):
+        """render_metric_heatmaps should return a Figure with performance data."""
+        stats_dir.mkdir()
+        stats = make_stats_with_performance()
+        (stats_dir / "datasetA_proteins_MAPPED_a_summary_stats.json").write_text(json.dumps(stats))
+        (stats_dir / "datasetB_metabolites_MAPPED_a_summary_stats.json").write_text(json.dumps(stats))
+
+        df = visualizer.aggregate_stats(stats_dir)
+        fig = visualizer.render_metric_heatmaps(df, annotator="_overall")
+
+        assert isinstance(fig, Figure)
+
+    def test_metric_heatmaps_per_annotator(self, stats_dir: Path, visualizer: Visualizer):
+        """render_metric_heatmaps works when filtering to a specific annotator."""
+        stats_dir.mkdir()
+        annotators = {"ann1": {"per_provided_ids": {"precision": 0.9, "recall": 0.8, "f1_score": 0.85}}}
+        stats = make_stats_with_performance(annotators=annotators)
+        (stats_dir / "datasetA_proteins_MAPPED_a_summary_stats.json").write_text(json.dumps(stats))
+
+        df = visualizer.aggregate_stats(stats_dir)
+        fig = visualizer.render_metric_heatmaps(df, annotator="ann1")
+
+        assert isinstance(fig, Figure)
+
+
+class TestPRScatterRendering:
+    """Smoke tests for precision-recall scatter plot."""
+
+    def test_pr_scatter_returns_figure(self, stats_dir: Path, visualizer: Visualizer):
+        """render_pr_scatter should return a Figure."""
+        stats_dir.mkdir()
+        stats = make_stats_with_performance()
+        (stats_dir / "datasetA_proteins_MAPPED_a_summary_stats.json").write_text(json.dumps(stats))
+        (stats_dir / "datasetB_metabolites_MAPPED_a_summary_stats.json").write_text(json.dumps(stats))
+
+        df = visualizer.aggregate_stats(stats_dir)
+        fig = visualizer.render_pr_scatter(df)
 
         assert isinstance(fig, Figure)
