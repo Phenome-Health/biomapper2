@@ -245,7 +245,7 @@ class Mapper:
             equiv_map = self.linker.get_equivalent_ids(unique_kg_ids)
             df["kg_equivalent_ids"] = df["chosen_kg_id"].map(lambda kid: {} if pd.isna(kid) else equiv_map.get(kid, {}))
         else:
-            df["kg_equivalent_ids"] = [{} for _ in range(len(df))]
+            df["kg_equivalent_ids"] = pd.Series([{} for _ in range(len(df))], index=df.index)
         logging.info(f"After step 5 (equivalent IDs enrichment), df is: \n{df}")
 
         # Do a little validation of results dataframe
