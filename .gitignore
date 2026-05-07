@@ -48,8 +48,13 @@ data/**/*.json
 !data/examples/olink_protein_metadata.tsv
 !data/groundtruth/diseases_handcrafted.tsv
 
+# Allow release-please config and versioning files
+!release-please-config.json
+!.release-please-manifest.json
+
 # Other app-specific items
 cache/
+reports/
 .env
 
 # Serena AI tool
