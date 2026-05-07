@@ -5,6 +5,8 @@ import pytest
 
 from biomapper2.core.normalizer import Normalizer
 
+pytestmark = pytest.mark.unit
+
 
 class TestParseDelimitedString:
     """Tests for Normalizer._parse_delimited_string method."""

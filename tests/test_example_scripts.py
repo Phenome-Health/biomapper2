@@ -4,6 +4,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+pytestmark = [pytest.mark.integration, pytest.mark.requires_api, pytest.mark.slow]
+
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
 

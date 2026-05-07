@@ -64,6 +64,21 @@ known-first-party = ["biomapper2"]
 
 [tool.pytest.ini_options]
 markers = [
-    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
-    "external: tests that depend on third-party APIs we don't control",
+    # Pyramid levels (Tier A = required/commit, Tier B = nightly, Tier C = opt-in)
+    "unit: Tier A - Pure functions, no external dependencies",
+    "component: Tier A - Single pipeline step, may mock dependencies",
+    "integration: Tier B/C - Multiple steps or real API calls",
+    "e2e: Tier C - Full end-to-end pipeline with live KG",
+    # Cross-cutting markers
+    "performance: Tier B - Timing and memory benchmarks",
+    "kg_regression: Tier B/C - Knowledge graph version change detection",
+    "slow: Tier B - Tests taking >10 seconds",
+    "requires_api: Tier B/C - Requires live Kestrel API (our infrastructure)",
+    "third_party: Tier C - Requires third-party APIs we don't own or control",
 ]
+# Use scripts/test-{fast,full,performance,all}.sh instead of raw pytest -m flags.
+# CI gating commands (for reference):
+#   Fast (unit only):      pytest -m "not requires_api and not third_party and not performance"
+#   Full (CI/check.sh):    pytest -m "not third_party and not performance"
+#   Performance:           pytest -m performance -v -s
+#   All:                   pytest -m performance -v -s && pytest -m "not performance"

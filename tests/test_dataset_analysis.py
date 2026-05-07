@@ -10,6 +10,8 @@ import pytest
 
 from biomapper2.core.analysis import analyze_dataset_mapping
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture
 def mock_linker():

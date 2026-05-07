@@ -3,8 +3,11 @@
 import json
 
 import pandas as pd
+import pytest
 
 from biomapper2.mapper import Mapper
+
+pytestmark = [pytest.mark.integration, pytest.mark.requires_api]
 
 
 def print_entity(entity: dict | pd.Series):
@@ -27,6 +30,10 @@ def test_map_entity_basic(shared_mapper: Mapper):
     assert "curies" in mapped_entity
     assert isinstance(mapped_entity["curies"], list)
     assert "kg_ids" in mapped_entity
+
+    # Step 5: field must always be present and be a dict (empty when no KG match)
+    assert "kg_equivalent_ids" in mapped_entity
+    assert isinstance(mapped_entity["kg_equivalent_ids"], dict)
 
 
 def test_map_entity_preserves_input(shared_mapper: Mapper):
@@ -65,6 +72,13 @@ def test_map_entity_multiple_identifiers(shared_mapper: Mapper):
 
     assert "curies" in mapped_entity
     assert len(mapped_entity["curies"]) > 1
+
+    # Step 5: aspirin maps reliably; equivalent IDs must be populated
+    assert isinstance(mapped_entity["kg_equivalent_ids"], dict)
+    assert mapped_entity["chosen_kg_id"] is not None, "aspirin should always map to a KG node"
+    assert len(mapped_entity["kg_equivalent_ids"]) > 0, (
+        f"kg_equivalent_ids empty for aspirin (chosen_kg_id={mapped_entity.get('chosen_kg_id')})"
+    )
 
 
 def test_map_entity_id_field_is_list(shared_mapper: Mapper):

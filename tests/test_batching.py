@@ -3,8 +3,12 @@
 import logging
 from unittest.mock import patch
 
+import pytest
+
 from biomapper2.config import KESTREL_BATCH_SIZE_CANONICALIZE, KESTREL_BATCH_SIZE_SEARCH, KESTREL_BATCHING_ENABLED
 from biomapper2.utils import chunk_list, kestrel_request
+
+pytestmark = pytest.mark.unit
 
 
 def test_batch_size_constants_exist():

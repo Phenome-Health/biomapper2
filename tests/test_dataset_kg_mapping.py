@@ -3,9 +3,12 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from biomapper2.config import PROJECT_ROOT
 from biomapper2.mapper import Mapper
+
+pytestmark = [pytest.mark.integration, pytest.mark.requires_api, pytest.mark.slow]
 
 
 def test_map_dataset_metabolites_synthetic(shared_mapper: Mapper):

@@ -35,7 +35,7 @@ class TestMetabolomicsWorkbenchAnnotator:
     # Test 2: Core annotation behavior
     # =========================================================================
     @patch("biomapper2.core.annotators.metabolomics_workbench.requests.get")
-    @pytest.mark.external
+    @pytest.mark.third_party
     def test_get_annotations_returns_refmet_id(self, mock_get: MagicMock):
         """Test that annotations return refmet_id (KRAKEN has all equivalencies)."""
         # Arrange - /match endpoint response format
@@ -150,7 +150,7 @@ class TestMetabolomicsWorkbenchAnnotator:
     # Test 7: Real API call (integration)
     # =========================================================================
     @pytest.mark.integration
-    @pytest.mark.external
+    @pytest.mark.third_party
     def test_real_api_match_endpoint(self):
         """Test real API call: exact match and fuzzy match."""
         annotator = MetabolomicsWorkbenchAnnotator()
@@ -173,7 +173,8 @@ class TestMetabolomicsWorkbenchAnnotator:
     # Test 8: Full Mapper pipeline (end-to-end)
     # =========================================================================
     @pytest.mark.integration
-    @pytest.mark.external
+    @pytest.mark.third_party
+    @pytest.mark.requires_api
     def test_mapper_end_to_end(self):
         """Test full pipeline using Mapper.map_entity_to_kg() with MW annotator."""
         from biomapper2.mapper import Mapper

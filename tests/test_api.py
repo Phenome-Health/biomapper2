@@ -16,6 +16,8 @@ def client():
 class TestHealthEndpoint:
     """Tests for the /health endpoint."""
 
+    pytestmark = pytest.mark.unit
+
     def test_health_check(self, client: TestClient):
         """Health endpoint returns status and version."""
         response = client.get("/api/v1/health")
@@ -34,6 +36,8 @@ class TestHealthEndpoint:
 
 class TestDiscoveryEndpoints:
     """Tests for discovery endpoints."""
+
+    pytestmark = pytest.mark.unit
 
     def test_list_entity_types(self, client: TestClient):
         """Entity types endpoint returns valid types and aliases."""
@@ -75,6 +79,7 @@ class TestMappingEndpoints:
     """Tests for mapping endpoints."""
 
     @pytest.mark.integration
+    @pytest.mark.requires_api
     def test_map_single_entity(self, client: TestClient):
         """Map a single entity with known identifiers."""
         response = client.post(
@@ -97,6 +102,7 @@ class TestMappingEndpoints:
         assert "processing_time_ms" in data["metadata"]
 
     @pytest.mark.integration
+    @pytest.mark.requires_api
     def test_map_entity_without_identifiers(self, client: TestClient):
         """Map an entity by name only (triggers annotation)."""
         response = client.post(
@@ -114,6 +120,7 @@ class TestMappingEndpoints:
         assert data["result"]["name"] == "glucose"
 
     @pytest.mark.integration
+    @pytest.mark.requires_api
     def test_map_batch_entities(self, client: TestClient):
         """Map multiple entities in a batch."""
         response = client.post(
@@ -158,6 +165,8 @@ class TestMappingEndpoints:
 class TestAPIAuthentication:
     """Tests for API authentication."""
 
+    pytestmark = pytest.mark.unit
+
     def test_auth_not_required_when_no_key_set(self, client: TestClient, monkeypatch):
         """When BIOMAPPER_API_KEY is not set, auth is not required."""
         monkeypatch.delenv("BIOMAPPER_API_KEY", raising=False)
@@ -196,6 +205,8 @@ class TestAPIAuthentication:
 
 class TestAPIMetadata:
     """Tests for API metadata and headers."""
+
+    pytestmark = pytest.mark.unit
 
     def test_response_includes_timing_header(self, client: TestClient):
         """Responses include X-Process-Time-Ms header."""

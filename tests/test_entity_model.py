@@ -7,6 +7,7 @@ from biomapper2.mapper import Mapper
 from biomapper2.models import Entity
 
 
+@pytest.mark.unit
 def test_entity_creation_minimal():
     """Entity can be created with just a name."""
     entity = Entity(name="glucose")
@@ -16,6 +17,7 @@ def test_entity_creation_minimal():
     assert entity.chosen_kg_id is None
 
 
+@pytest.mark.unit
 def test_entity_creation_with_fields():
     """Entity can be created with pipeline fields."""
     entity = Entity(
@@ -30,6 +32,7 @@ def test_entity_creation_with_fields():
     assert entity.chosen_kg_id == "CHEBI:16737"
 
 
+@pytest.mark.unit
 def test_entity_allows_extra_fields():
     """Entity allows user-provided extra fields (provided_id columns)."""
     # Extra kwargs allowed by ConfigDict(extra="allow")
@@ -40,6 +43,7 @@ def test_entity_allows_extra_fields():
     assert entity.model_extra["pubchem_cid"] == "5793"
 
 
+@pytest.mark.unit
 def test_entity_from_dict():
     """Entity can be created from a dict."""
     data = {"name": "glucose", "kegg_id": "C00031"}
@@ -49,6 +53,7 @@ def test_entity_from_dict():
     assert entity.model_extra["kegg_id"] == "C00031"
 
 
+@pytest.mark.unit
 def test_entity_from_series():
     """Entity can be created from a pandas Series."""
     series = pd.Series({"name": "glucose", "kegg_id": "C00031"})
@@ -58,6 +63,7 @@ def test_entity_from_series():
     assert entity.model_extra["kegg_id"] == "C00031"
 
 
+@pytest.mark.unit
 def test_entity_to_dict():
     """Entity can be converted to dict."""
     entity = Entity(name="glucose", kegg_id="C00031", curies=["KEGG.COMPOUND:C00031"])  # type: ignore[call-arg]
@@ -68,6 +74,7 @@ def test_entity_to_dict():
     assert result["curies"] == ["KEGG.COMPOUND:C00031"]
 
 
+@pytest.mark.unit
 def test_entity_to_series():
     """Entity can be converted to pandas Series."""
     entity = Entity(name="glucose", kegg_id="C00031", curies=["KEGG.COMPOUND:C00031"])  # type: ignore[call-arg]
@@ -78,6 +85,7 @@ def test_entity_to_series():
     assert result["curies"] == ["KEGG.COMPOUND:C00031"]
 
 
+@pytest.mark.unit
 def test_entity_update_from_series():
     """Entity can be updated with fields from a pandas Series (pipeline step output)."""
     entity = Entity.from_input({"name": "glucose", "kegg_id": "C00031"})
@@ -107,6 +115,7 @@ def test_entity_update_from_series():
     assert updated.model_extra["kegg_id"] == "C00031"
 
 
+@pytest.mark.unit
 def test_entity_update_preserves_extra():
     """Entity update preserves user-provided extra fields."""
     entity = Entity.from_input({"name": "glucose", "kegg_id": "C00031", "pubchem_cid": "5793"})
@@ -127,6 +136,7 @@ def test_entity_update_preserves_extra():
     assert "CHEBI:17234" in updated.kg_ids
 
 
+@pytest.mark.unit
 def test_entity_from_input_with_name_field():
     """Entity.from_input can rename a field to 'name'."""
     data = {"chemical_name": "glucose", "kegg_id": "C00031"}
@@ -138,6 +148,7 @@ def test_entity_from_input_with_name_field():
     assert entity.model_extra["kegg_id"] == "C00031"
 
 
+@pytest.mark.unit
 def test_entity_from_input_name_field_default():
     """Entity.from_input uses 'name' field by default."""
     data = {"name": "glucose", "kegg_id": "C00031"}
@@ -156,6 +167,7 @@ def mapper():
 
 
 @pytest.mark.integration
+@pytest.mark.requires_api
 def test_map_entity_returns_dict(mapper: Mapper):
     """map_entity_to_kg still returns dict for API compatibility."""
     entity = {"name": "creatinine", "kegg_ids": "C00791"}

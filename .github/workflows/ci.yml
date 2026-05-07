@@ -44,4 +44,4 @@ jobs:
 
     - name: Run tests
       run: |
-        uv run pytest -v -m "not external"
+        uv run pytest -v -m "not third_party and not performance"

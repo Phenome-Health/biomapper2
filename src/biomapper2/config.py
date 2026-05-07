@@ -20,6 +20,19 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 # KG API configuration — override via KESTREL_API_URL in .env
 KESTREL_API_URL = os.getenv("KESTREL_API_URL", "https://kestrel.nathanpricelab.com/api")
 
+_DEFAULT_KESTREL_API_URL = "https://kestrel.nathanpricelab.com/api"
+
+
+def get_kestrel_api_url() -> str:
+    """Return the current Kestrel API URL, reading os.environ on every call.
+
+    Unlike the module-level KESTREL_API_URL constant (captured at import time),
+    this function reflects any os.environ overrides applied after import — e.g.
+    the --kestrel-url pytest option used in KG regression testing.
+    """
+    return os.environ.get("KESTREL_API_URL", _DEFAULT_KESTREL_API_URL)
+
+
 # Biolink model version
 BIOLINK_VERSION_DEFAULT = "4.2.5"
 

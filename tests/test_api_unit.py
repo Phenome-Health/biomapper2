@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 
 from biomapper2.api.main import app
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture
 def client():
