@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 import requests
 
-from biomapper2.config import PROJECT_ROOT, get_kestrel_api_url as _get_kestrel_url
+from biomapper2.config import PROJECT_ROOT
+from biomapper2.config import get_kestrel_api_url as _get_kestrel_url
 from biomapper2.mapper import Mapper
 from biomapper2.utils import setup_logging
 
@@ -125,7 +126,11 @@ def test_run_metadata(request: pytest.FixtureRequest) -> dict:
     kestrel_url = _get_kestrel_url()
     # Skip the live /health call for offline tiers (e.g. test-fast.sh passes
     # 'not requires_api'); the report will still record which URL would be used.
-    kestrel_info = _fetch_kestrel_info(kestrel_url) if _api_tests_selected(request) else {"kestrel_version": "unknown", "kg_build": {}}
+    kestrel_info = (
+        _fetch_kestrel_info(kestrel_url)
+        if _api_tests_selected(request)
+        else {"kestrel_version": "unknown", "kg_build": {}}
+    )
 
     metadata = {
         "biomapper2_version": importlib.metadata.version("biomapper2"),

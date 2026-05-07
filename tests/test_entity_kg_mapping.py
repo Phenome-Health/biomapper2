@@ -76,9 +76,9 @@ def test_map_entity_multiple_identifiers(shared_mapper: Mapper):
     # Step 5: aspirin maps reliably; equivalent IDs must be populated
     assert isinstance(mapped_entity["kg_equivalent_ids"], dict)
     assert mapped_entity["chosen_kg_id"] is not None, "aspirin should always map to a KG node"
-    assert len(mapped_entity["kg_equivalent_ids"]) > 0, (
-        f"kg_equivalent_ids empty for aspirin (chosen_kg_id={mapped_entity.get('chosen_kg_id')})"
-    )
+    assert (
+        len(mapped_entity["kg_equivalent_ids"]) > 0
+    ), f"kg_equivalent_ids empty for aspirin (chosen_kg_id={mapped_entity.get('chosen_kg_id')})"
 
 
 def test_map_entity_id_field_is_list(shared_mapper: Mapper):

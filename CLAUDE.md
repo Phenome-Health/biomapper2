@@ -10,6 +10,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install dependencies (uses uv package manager)
 uv sync --dev
 
+# Install git hooks (one-time per clone)
+cp scripts/hooks/pre-push .git/hooks/pre-push
+
 # Run all code quality checks (ruff, black, pyright, pytest)
 ./scripts/check.sh
 
