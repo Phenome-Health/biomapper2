@@ -1,0 +1,20 @@
+#!/bin/bash
+# Pre-push hook: lint, type-check, and fast unit tests (offline, ~25s).
+# Does NOT run requires_api tests — those run in CI where the Kestrel key is available.
+# To skip in an emergency: git push --no-verify
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+echo "→ ruff check..."
+uv run ruff check
+
+echo "→ black check..."
+uv run black --check .
+
+echo "→ pyright..."
+uv run pyright
+
+echo "→ fast tests (unit, no API)..."
+uv run pytest -v -m "not requires_api and not third_party and not performance"
+
+echo "✅ Pre-push checks passed."

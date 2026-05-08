@@ -10,7 +10,7 @@ Usage:
 """
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -22,17 +22,57 @@ from biomapper2.mapper import Mapper
 pytestmark = [pytest.mark.performance, pytest.mark.requires_api]
 
 DATA_DIR = Path(PROJECT_ROOT) / "data" / "examples"
+MILESTONE_DATA_DIR = Path(PROJECT_ROOT) / "data" / "milestone"
+
+
+@dataclass
+class MilestoneDataset:
+    filename: str
+    entity_type: str
+    name_field: str
+    provided_id_fields: list[str]
+    array_delimiters: list[str] = field(default_factory=list)
+    sep: str = "\t"
+
+    @property
+    def label(self) -> str:
+        return self.filename.rsplit(".", 1)[0]
+
+
+_MILESTONE_DATASETS: list[MilestoneDataset] = [
+    MilestoneDataset("arivale_proteins.tsv", "protein", "gene_name", ["uniprot", "gene_id"]),
+    MilestoneDataset("arivale_labs.tsv", "lab", "Display Name", ["Labcorp LOINC ID", "Quest LOINC ID"]),
+    MilestoneDataset(
+        "arivale_metabolites.tsv",
+        "metabolite",
+        "CHEMICAL_NAME",
+        ["CAS", "KEGG", "HMDB", "PUBCHEM", "INCHIKEY", "SMILES"],
+    ),
+    MilestoneDataset("arivale_lipids.tsv", "lipid", "CHEMICAL_NAME", ["HMDB", "KEGG"]),
+    MilestoneDataset("ukbb_proteins.tsv", "protein", "Assay", ["UniProt"], array_delimiters=["_"]),
+    MilestoneDataset("ukbb_labs.tsv", "lab", "field_name", []),
+    MilestoneDataset(
+        "ukbb_metabolites.tsv",
+        "metabolite",
+        "nightingale_name",
+        ["source_chebi_id", "source_hmdb_id", "source_pubchem_id"],
+    ),
+    MilestoneDataset("hpp_proteins.tsv", "protein", "nightingale_name", []),
+    MilestoneDataset("hpp_labs.csv", "lab", "Description", [], sep=","),
+    MilestoneDataset("hpp_metabolites.tsv", "metabolite", "nightingale_description", []),
+    MilestoneDataset("hpp_lipids.tsv", "lipid", "Input.name", []),
+]
 
 _KESTREL_CACHE = Path(CACHE_DIR) / "kestrel_http.sqlite"
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def clear_kestrel_cache():
-    """Delete the Kestrel HTTP cache before performance tests run.
+    """Delete the Kestrel HTTP cache before each performance test.
 
-    Other test files (test_dataset_kg_mapping, etc.) run alphabetically before
-    this one and warm the cache. Without this fixture every 'API call' is a SQLite
-    read, making timings meaningless for measuring real network latency.
+    Clears before every test (not just once per session) so that earlier tests
+    — both other test files and preceding performance tests — cannot warm the
+    cache and produce artificially fast timings for later tests.
     """
     if _KESTREL_CACHE.exists():
         _KESTREL_CACHE.unlink()
@@ -211,6 +251,28 @@ class TestPipelinePerformance:
         assert by_step["normalization"].duration_ms < 5_000, "Normalization >5s for metabolite dataset"
         assert by_step["linking"].duration_ms < 10_000, "Linking >10s for metabolite dataset"
         assert by_step["equivalent_ids"].duration_ms < 10_000, "Equivalent IDs >10s for metabolite dataset"
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize("cfg", _MILESTONE_DATASETS, ids=[d.label for d in _MILESTONE_DATASETS])
+    def test_step_timings_milestone(
+        self, request: pytest.FixtureRequest, shared_mapper: Mapper, cfg: MilestoneDataset
+    ) -> None:
+        """Profile each pipeline step for every milestone dataset."""
+        tsv_path = MILESTONE_DATA_DIR / cfg.filename
+        if not tsv_path.exists():
+            pytest.skip(f"Dataset not found: {tsv_path}")
+
+        df = pd.read_csv(tsv_path, sep=cfg.sep, comment="#")
+        timings = _time_pipeline_steps(
+            mapper=shared_mapper,
+            df=df,
+            entity_type=cfg.entity_type,
+            name_field=cfg.name_field,
+            provided_id_fields=cfg.provided_id_fields,
+            array_delimiters=cfg.array_delimiters,
+        )
+        _print_timing_report(cfg.label, timings)
+        _store_timings(request.config, cfg.label, timings)
 
     def test_normalizer_throughput_metabolites(self, request: pytest.FixtureRequest, shared_mapper: Mapper) -> None:
         """Normalizer alone on the metabolite dataset — no API calls."""

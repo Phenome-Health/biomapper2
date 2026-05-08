@@ -181,4 +181,4 @@ Every test session writes `reports/{timestamp}_{kg_version}.json` (gitignored):
 | `test_run_metadata` | yes | Fetches versions from Kestrel `/health`, captures git commit + timestamp; triggers report write at session end |
 | `kestrel_url` | no | Reads `--kestrel-url` CLI option |
 | `tag` | no | Reads `--tag` CLI option (report filename label) |
-| `clear_kestrel_cache` | yes | (`test_performance.py` only) Deletes HTTP cache before benchmarks run |
+| `clear_kestrel_cache` | yes | (`test_performance.py` only) Deletes HTTP cache before **each** benchmark so tests don't warm the cache for each other |
