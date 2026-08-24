@@ -15,6 +15,7 @@ import requests_cache
 
 from ..config import (
     CACHE_DIR,
+    CACHE_IGNORED_PARAMETERS,
     MW_INCHIKEY_URL,
     PUBCHEM_INCHIKEY_URL,
     STRUCTURE_LOOKUP_TIMEOUT_S,
@@ -27,18 +28,39 @@ class StructureResolver:
 
     def __init__(self, linker: Linker) -> None:
         self.linker = linker
-        self._session = requests_cache.CachedSession(str(CACHE_DIR / "structure_http"))
+        self._session = requests_cache.CachedSession(
+            str(CACHE_DIR / "structure_http"),
+            ignored_parameters=CACHE_IGNORED_PARAMETERS,
+        )
         self._name_cache: dict[str, str | None] = {}  # inchikey block by node name (per process)
 
     def connectivity_match(self, node_a: str, node_b: str) -> bool | None:
-        """True if both nodes resolve to the same first InChIKey block, False if they
-        resolve and differ, None if either is unresolvable across all layers."""
+        """True if the nodes share ANY InChIKey first block, False if both resolve and share none,
+        None if either is unresolvable across all layers.
+
+        Set intersection, not equality against ``keys[0]``: a KG node's INCHIKEY list is multi-valued
+        (neutral parent, conjugate anion, salt, stereoisomers) and its ordering is arbitrary, so
+        comparing one arbitrary representation to another reports a false structural conflict when the
+        shared block simply sits at a different index. This is the same artifact PR #36 fixed in the
+        Hajjar scorer (the gold key sat at position 2-4 in 12 of 19 apparent misses).
+
+        The loosening is one-directional and its cost is a **false agreement**, not a false conflict:
+        a False can only become True, never the reverse. Where the old form could report a spurious
+        conflict, this form can report a spurious match — if a KG node's ``equivalent_ids.INCHIKEY``
+        list is itself conflated (entries for two genuinely different molecules), any single shared
+        entry now reads as "same molecule" and the divergent-RefMet flag is suppressed. That is the
+        accepted trade: KG INCHIKEY lists are dominated by protonation/salt/stereo variants of one
+        structure, and a suppressed flag is a missed review prompt whereas the old false conflict was
+        an actively wrong adjudication. Nodes sharing no block at all still return False, and
+        ``inchikey_blocks`` keeps the MW/PubChem name fallback, so ``conflict_no_structure`` cannot
+        inflate either.
+        """
         records = self.linker.get_node_records([node_a, node_b])
-        block_a = self.inchikey_block(node_a, (records.get(node_a) or {}).get("name"), records)
-        block_b = self.inchikey_block(node_b, (records.get(node_b) or {}).get("name"), records)
-        if block_a is None or block_b is None:
+        blocks_a = self.inchikey_blocks(node_a, (records.get(node_a) or {}).get("name"), records)
+        blocks_b = self.inchikey_blocks(node_b, (records.get(node_b) or {}).get("name"), records)
+        if not blocks_a or not blocks_b:
             return None
-        return block_a == block_b
+        return bool(blocks_a & blocks_b)
 
     def inchikey_block(self, node_id: str, node_name: str | None, records: dict[str, Any] | None = None) -> str | None:
         """First InChIKey block for a node: KG record -> MW by name -> PubChem by name."""
@@ -83,8 +105,14 @@ class StructureResolver:
         return inchikey.split("-")[0] if inchikey else None
 
     def _fetch_mw_inchikey(self, name: str) -> str | None:
-        """Metabolomics Workbench: GET /rest/refmet/name/{name}/inchi_key."""
-        url = f"{MW_INCHIKEY_URL}/{quote(name)}/inchi_key"
+        """Metabolomics Workbench: GET /rest/refmet/name/{name}/inchi_key.
+
+        ``safe=""`` is load-bearing. ``quote`` defaults to ``safe="/"``, which leaves a slash in the
+        name UNESCAPED -- so a lipid-shorthand name splits into extra URL path segments, the request
+        404s, and the caller records the name as structurally unresolvable rather than as a failed
+        lookup. Share of affected names, per arm: artifact field ``slash_bearing_name_rate``.
+        """
+        url = f"{MW_INCHIKEY_URL}/{quote(name, safe='')}/inchi_key"
         resp = self._session.get(url, timeout=STRUCTURE_LOOKUP_TIMEOUT_S)
         resp.raise_for_status()
         data = resp.json()
@@ -94,8 +122,12 @@ class StructureResolver:
         return None
 
     def _fetch_pubchem_inchikey(self, name: str) -> str | None:
-        """PubChem: GET /rest/pug/compound/name/{name}/property/InChIKey/JSON."""
-        url = f"{PUBCHEM_INCHIKEY_URL}/{quote(name)}/property/InChIKey/JSON"
+        """PubChem: GET /rest/pug/compound/name/{name}/property/InChIKey/JSON.
+
+        ``safe=""`` for the same reason as :meth:`_fetch_mw_inchikey` -- an unescaped slash injects
+        URL path segments and turns a resolvable name into a silent 404.
+        """
+        url = f"{PUBCHEM_INCHIKEY_URL}/{quote(name, safe='')}/property/InChIKey/JSON"
         resp = self._session.get(url, timeout=STRUCTURE_LOOKUP_TIMEOUT_S)
         resp.raise_for_status()
         data = resp.json()

@@ -151,6 +151,9 @@ class Linker:
         This is a non-critical enrichment step. On API failure, logs a warning
         and returns an empty dict rather than raising.
 
+        Callers that need to tell an API failure apart from a node the graph genuinely lists
+        nothing for should use :meth:`get_equivalent_ids_checked`.
+
         Args:
             kg_node_ids: List of KG node CURIEs to look up
             prefixes: Optional CURIE prefixes to include. When None (default),
@@ -160,8 +163,26 @@ class Linker:
             Dictionary mapping each node CURIE to a dict of {prefix: [local_ids]},
             e.g. {"CHEBI:15365": {"HMDB": ["HMDB0001879"], "KEGG.COMPOUND": ["C01405"]}}
         """
+        return Linker.get_equivalent_ids_checked(kg_node_ids, prefixes)[0]
+
+    @staticmethod
+    def get_equivalent_ids_checked(
+        kg_node_ids: list[str],
+        prefixes: list[str] | None = None,
+    ) -> tuple[dict[str, dict[str, list[str]]], bool]:
+        """As :meth:`get_equivalent_ids`, plus whether the lookup actually succeeded.
+
+        The flag exists because the two failure shapes are otherwise identical downstream. An empty
+        payload means either "the graph lists no equivalent ids for this node" or "the /get-nodes
+        call raised and we swallowed it", and the resolution certificate must not read the second as
+        the first: doing so would mark an entire outage-affected run ``structure_absent`` and no
+        offline rerun on the resulting TSV could tell.
+
+        Returns:
+            ``(mapping, ok)`` -- ``ok`` is False only when the API call itself failed.
+        """
         if not kg_node_ids:
-            return {}
+            return {}, True
 
         try:
             raw_results = kestrel_request(
@@ -174,7 +195,7 @@ class Linker:
             )
         except Exception:
             logging.warning("Failed to fetch equivalent IDs from Kestrel /get-nodes; returning empty", exc_info=True)
-            return {}
+            return {}, False
 
         result: dict[str, dict[str, list[str]]] = {}
         for curie, node_obj in raw_results.items():
@@ -196,7 +217,7 @@ class Linker:
             # Sort local IDs within each prefix for deterministic output
             result[curie] = {prefix: sorted(ids) for prefix, ids in sorted(grouped.items())}
 
-        return result
+        return result, True
 
     def _format_kg_id_fields(
         self, entity: pd.Series | dict[str, Any], curie_to_kg_id_map: dict[str, str]
