@@ -43,11 +43,16 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
     if isinstance(mapped_item, pd.Series):
         mapped_item = mapped_item.to_dict()
 
+    # The mapper emits the certificate as a plain dict already; pydantic rejects a raw dataclass
+    # here, so nothing may re-wrap it on the way out.
+    certificate = mapped_item.get("resolution_certificate") or None
+
     return EntityMappingResult(
         name=original_name,
         curies=mapped_item.get("curies", []) or [],
         chosen_kg_id=mapped_item.get("chosen_kg_id"),
         chosen_kg_id_review=mapped_item.get("chosen_kg_id_review"),
+        resolution_certificate=certificate,
         kg_equivalent_ids=mapped_item.get("kg_equivalent_ids", {}) or {},
         kg_ids=mapped_item.get("kg_ids", {}) or {},
         assigned_ids=mapped_item.get("assigned_ids", {}) or {},
@@ -347,6 +352,10 @@ async def map_dataset_stream(
                     "kg_equivalent_ids": mapped.get("kg_equivalent_ids", {}),
                     "curies": mapped.get("curies", []),
                     "kg_ids": mapped.get("kg_ids", {}),
+                    # Plain dict, never the dataclass: this payload is json.dumps'd below, OUTSIDE
+                    # the try/except, so a non-serializable value here fails mid-stream after a 200
+                    # has already been sent and the client sees a truncated body.
+                    "resolution_certificate": mapped.get("resolution_certificate"),
                 }
 
             except Exception as e:

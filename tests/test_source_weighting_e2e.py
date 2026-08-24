@@ -35,7 +35,10 @@ def _offline_mapper(connectivity):
             "kg_ids_assigned": {"metabolomics-workbench": {"CHEBI:refmet": ["RM:1"]}},
         }
     )
-    m.linker.get_equivalent_ids = lambda ids: {}
+    # Returns (mapping, lookup_ok): the certificate has to tell a Kestrel outage apart from a node
+    # the graph genuinely lists nothing for.
+    m.linker.get_equivalent_ids_checked = lambda ids, prefixes=None: ({}, True)
+    m.tier_b = None  # Tier B is opt-in and must stay off on the default path
 
     m.resolver = Resolver(linker=m.linker, biolink_client=m.biolink_client)
     m.resolver.structure_resolver = MagicMock()

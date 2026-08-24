@@ -14,9 +14,15 @@ import numpy as np
 import pandas as pd
 
 from .biolink_client import BiolinkClient
-from .config import PROJECT_ROOT, get_kestrel_api_url
+from .config import PROJECT_ROOT, TIER_B_ENABLED, get_kestrel_api_url
 from .core.analysis import analyze_dataset_mapping
 from .core.annotation_engine import AnnotationEngine
+from .core.certificate import (
+    ResolutionCertificate,
+    derive_chosen_kg_id_review,
+    issue,
+    node_blocks_from_equivalent_ids,
+)
 from .core.linker import Linker
 from .core.normalizer import Normalizer
 from .core.resolver import Resolver
@@ -25,6 +31,16 @@ from .provenance import build_run_provenance
 from .utils import AnnotationMode, setup_logging
 
 setup_logging()
+
+
+def _scalar_or_none(value: Any) -> Any:
+    """Normalize a pandas missing value to None.
+
+    ``pd.NA``/``NaN`` is not ``None``, and the certificate's guards are identity checks against
+    None. Without this a missing ``chosen_kg_id`` reads as a committed node whose id happens to be
+    NaN, which is the quiet version of the bug the certificate exists to remove.
+    """
+    return None if value is None or (isinstance(value, float) and value != value) or value is pd.NA else value
 
 
 class Mapper:
@@ -45,6 +61,81 @@ class Mapper:
         self.normalizer = Normalizer(biolink_client=self.biolink_client)
         self.linker = Linker()
         self.resolver = Resolver(linker=self.linker, biolink_client=self.biolink_client)
+        self.tier_b = self._build_tier_b()
+
+    @staticmethod
+    def _build_tier_b():
+        """The opt-in independent-structure lookup, or None.
+
+        Constructed only when enabled, so a default run holds no session against Metabolomics
+        Workbench or PubChem and cannot drift into making calls.
+        """
+        if not TIER_B_ENABLED:
+            return None
+        from .core.tier_b import IndependentStructureLookup
+
+        logging.info("Tier B independent structure evidence is ENABLED for this run")
+        return IndependentStructureLookup()
+
+    def _issue_certificate(
+        self,
+        *,
+        query_name: str | None,
+        category: str | None,
+        chosen_kg_id: str | None,
+        kg_equivalent_ids: dict[str, list[str]] | None,
+        equivalent_ids_lookup_ok: bool,
+        selection_conflict: str | None,
+        kg_ids_assigned: dict[str, dict[str, list[str]]] | None,
+    ) -> ResolutionCertificate:
+        """Assemble one certificate. Shared by both emission paths so they cannot drift apart.
+
+        Tier A reads ``kg_equivalent_ids`` and nothing else — the structure the GRAPH asserts for
+        the node the pipeline already committed. Tier B, when enabled, resolves the QUERY NAME (not
+        the node's name) against an independent registry.
+        """
+        assigned = kg_ids_assigned or {}
+        # Which annotators supplied the committed node. Needed for the independence claim (L26):
+        # a Tier B verdict from the same registry that produced the winning candidate is circular.
+        committed_sources = {
+            annotator for annotator, kg_ids in assigned.items() if chosen_kg_id is not None and chosen_kg_id in kg_ids
+        }
+        # Only look up rows the certificate can actually be about. Calling first and discarding
+        # later would spend a throttled external round trip on every gene symbol and every
+        # uncommitted row, and would put those names into the resolution-rate denominator that
+        # must accompany each operating point -- diluting it with names never in scope.
+        # Must be the SAME predicate ``issue()`` uses for the population, including the lookup-ok
+        # term: during a /get-nodes outage a committed small-molecule row is still out of scope,
+        # and looking it up anyway would pay a throttled round trip whose result is discarded and
+        # would put the name into the resolution-rate denominator this scoping exists to protect.
+        #
+        # The blocks term is on the same footing (L21). A committed node the GRAPH asserts no
+        # InChIKey for is ``structure_absent`` -> ``unavailable``, and no Tier B verdict can move it:
+        # there is nothing to compare against. Looking it up anyway would (a) spend a rate-limited
+        # MW/PubChem round trip per unverifiable row, on exactly the population that is largest where
+        # the KG is thinnest, (b) put those names into the Tier B resolution-rate denominator that
+        # travels with every operating point, and (c) hang ``independent_source`` /
+        # ``independent_inchikey_block`` on a row where no structural comparison was made -- a
+        # certificate that shows independent evidence beside a state that ignored it.
+        is_small_molecule = self.resolver.is_small_molecule(category)
+        in_population = (
+            is_small_molecule
+            and chosen_kg_id is not None
+            and equivalent_ids_lookup_ok
+            # Same producer ``issue()`` uses, so "the graph asserts a structure" cannot mean two
+            # things: a bare ``.get("INCHIKEY")`` truth test would count a whitespace-only key.
+            and bool(node_blocks_from_equivalent_ids(kg_equivalent_ids))
+        )
+        tier_b_result = self.tier_b.lookup(query_name) if (self.tier_b is not None and in_population) else None
+        return issue(
+            chosen_kg_id=chosen_kg_id,
+            is_small_molecule=is_small_molecule,
+            kg_equivalent_ids=kg_equivalent_ids,
+            equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
+            selection_conflict=selection_conflict,
+            tier_b=tier_b_result,
+            committed_node_sources=committed_sources,
+        )
 
     def map_entity_to_kg(
         self,
@@ -125,9 +216,37 @@ class Mapper:
         entity = entity.update_from(resolved_result)
 
         # Do Step 5: enrich with equivalent IDs from the chosen KG node
+        kg_equivalent_ids: dict[str, list[str]] = {}
+        equivalent_ids_lookup_ok = True
         if entity.chosen_kg_id is not None:
-            equiv_ids = self.linker.get_equivalent_ids([entity.chosen_kg_id])
-            entity = entity.update_from(pd.Series({"kg_equivalent_ids": equiv_ids.get(entity.chosen_kg_id, {})}))
+            equiv_ids, equivalent_ids_lookup_ok = self.linker.get_equivalent_ids_checked([entity.chosen_kg_id])
+            kg_equivalent_ids = equiv_ids.get(entity.chosen_kg_id, {})
+            entity = entity.update_from(pd.Series({"kg_equivalent_ids": kg_equivalent_ids}))
+
+        # Do Step 6: issue the resolution certificate.
+        #
+        # Deliberately OUTSIDE the null guard above: the rows the certificate most needs to describe
+        # are the ones with no committed node, and building it inside would leave that population
+        # undescribed here while the dataset path described it.
+        certificate = self._issue_certificate(
+            query_name=entity.name,
+            category=entity_type,
+            chosen_kg_id=entity.chosen_kg_id,
+            kg_equivalent_ids=kg_equivalent_ids,
+            equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
+            selection_conflict=entity.chosen_kg_id_review,
+            kg_ids_assigned=entity.kg_ids_assigned,
+        )
+        # Emitted as a plain dict, not the dataclass: pydantic rejects a raw dataclass at the
+        # response model, and the NDJSON endpoint json.dumps's this value outside its try/except.
+        entity = entity.update_from(
+            pd.Series(
+                {
+                    "resolution_certificate": certificate.to_api_dict(),
+                    "chosen_kg_id_review": derive_chosen_kg_id_review(certificate),
+                }
+            )
+        )
 
         if input_is_series:
             return entity.to_series()
@@ -251,12 +370,43 @@ class Mapper:
 
         # Do Step 5: enrich with equivalent IDs from chosen KG nodes
         unique_kg_ids = [kid for kid in df["chosen_kg_id"].dropna().unique()]
+        equivalent_ids_lookup_ok = True
         if unique_kg_ids:
-            equiv_map = self.linker.get_equivalent_ids(unique_kg_ids)
+            equiv_map, equivalent_ids_lookup_ok = self.linker.get_equivalent_ids_checked(unique_kg_ids)
             df["kg_equivalent_ids"] = df["chosen_kg_id"].map(lambda kid: {} if pd.isna(kid) else equiv_map.get(kid, {}))
         else:
             df["kg_equivalent_ids"] = pd.Series([{} for _ in range(len(df))], index=df.index)
         logging.info(f"After step 5 (equivalent IDs enrichment), df is: \n{df}")
+
+        # Do Step 6: issue a resolution certificate per row.
+        #
+        # This is the path every published artifact comes from (the audit, the suite arms, the
+        # figure), so it carries the same certificate the single-entity path does — flattened.
+        # Flat scalar columns, assembled as plain dicts: an object column surviving to df.to_csv
+        # would write `ResolutionCertificate(state=...)` and reintroduce exactly the
+        # ast.literal_eval-only column the certificate exists to replace.
+        certificate_rows = [
+            self._issue_certificate(
+                query_name=_scalar_or_none(row.get(name_column)),
+                category=entity_type,
+                chosen_kg_id=_scalar_or_none(row.get("chosen_kg_id")),
+                kg_equivalent_ids=row.get("kg_equivalent_ids") or {},
+                equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
+                selection_conflict=_scalar_or_none(row.get("chosen_kg_id_review")),
+                kg_ids_assigned=row.get("kg_ids_assigned") or {},
+            )
+            for _, row in df.iterrows()
+        ]
+        df = df.join(pd.DataFrame([c.to_flat_columns() for c in certificate_rows], index=df.index))
+        # The legacy flag is now DERIVED from the certificate (C4/L20) rather than passed through,
+        # so the two can never disagree. Identical for one release; deprecation is a follow-up.
+        # object dtype and an explicit index: the review is str | None per row, and a bare list with
+        # Nones is both rejected by pandas' typed __setitem__ and, at runtime, coerced to a float NaN
+        # column that later identity checks (`is None`) would silently miss.
+        df["chosen_kg_id_review"] = pd.Series(
+            [derive_chosen_kg_id_review(c) for c in certificate_rows], index=df.index, dtype=object
+        )
+        logging.info(f"After step 6 (resolution certificate), df is: \n{df}")
 
         # Do a little validation of results dataframe
         num_rows_end = len(df)
