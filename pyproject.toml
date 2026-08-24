@@ -47,9 +47,13 @@ dev = [
 
 [tool.black]
 line-length = 120
+force-exclude = "studies/.*"
 
 [tool.ruff]
 line-length = 120
+# studies/ is exploratory benchmarking code, not the shipped package. Kept in sync with the fork,
+# where the full harness lives; a no-op here (org carries only a 3-file studies/ stub).
+extend-exclude = ["studies/**"]
 
 [tool.ruff.lint]
 select = [
@@ -62,6 +66,11 @@ select = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["biomapper2"]
+
+[tool.pyright]
+# studies/ is exploratory benchmarking code (the full harness lives on the fork). Exclude it from
+# type-checking for parity with the fork; src/ + tests/ stay gated.
+exclude = ["studies/**"]
 
 [tool.pytest.ini_options]
 # Repo root on the path so standalone studies import as real packages
