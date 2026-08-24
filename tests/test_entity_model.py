@@ -183,3 +183,36 @@ def test_map_entity_returns_dict(mapper: Mapper):
     assert "name" in result
     assert "curies" in result
     assert "kg_ids" in result
+
+
+def test_update_from_coerces_nan_to_none():
+    """A pandas Series carries NaN (float) for empty cells; the str|None resolution fields must
+    round-trip it as None, not raise a pydantic ValidationError. Regression: this hung the Phase-0
+    gate's single-entity smoke as a false 'Kestrel unreachable'."""
+    entity = Entity(name="glucose")
+    series = pd.Series(
+        {
+            "chosen_kg_id": "CHEBI:4167",
+            "chosen_kg_id_provided": float("nan"),
+            "chosen_kg_id_review": float("nan"),
+        }
+    )
+    updated = entity.update_from(series)
+    assert updated.chosen_kg_id == "CHEBI:4167"
+    assert updated.chosen_kg_id_provided is None
+    assert updated.chosen_kg_id_review is None
+
+
+def test_from_input_coerces_nan_to_none():
+    """from_input(Series) with NaN cells must not raise; NaN -> None."""
+    series = pd.Series({"name": "glucose", "chosen_kg_id_provided": float("nan")})
+    entity = Entity.from_input(series)
+    assert entity.name == "glucose"
+    assert entity.chosen_kg_id_provided is None
+
+
+def test_nan_coercion_leaves_real_values_untouched():
+    """The coercion only touches float NaN — real strings and other values pass through unchanged."""
+    entity = Entity(name="x")
+    updated = entity.update_from(pd.Series({"chosen_kg_id_provided": "CHEBI:1", "confidence": 0.9}))
+    assert updated.chosen_kg_id_provided == "CHEBI:1"

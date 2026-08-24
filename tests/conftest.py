@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from biomapper2 import utils
 from biomapper2.config import PROJECT_ROOT
 from biomapper2.config import get_kestrel_api_url as _get_kestrel_url
 from biomapper2.mapper import Mapper
@@ -88,6 +89,22 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default="production",
         help="Label for this test run — used in report filename and metadata (e.g. kraken-with-spoke, staging)",
     )
+
+
+@pytest.fixture(autouse=True)
+def _reset_process_globals():
+    """Clear every process-global in the client between tests.
+
+    This tree had no autouse fixture at all, and the client is accumulating process-globals: the
+    single lazily-built session, the per-endpoint request counters, and the one-shot credential
+    warning. Shared state without a reset makes results depend on test ORDER -- a test that primes
+    a session or a counter silently satisfies a later test that expected neither.
+    """
+    utils.reset_session()
+    utils.reset_request_counters()
+    yield
+    utils.reset_session()
+    utils.reset_request_counters()
 
 
 @pytest.fixture(scope="session")

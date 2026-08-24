@@ -19,13 +19,28 @@ class _SpyAnnotator(BaseAnnotator):
         self.received = []
 
     def get_annotations(
-        self, entity, name_field, category, prefixes=None, prefer_human=True, preferred_prefixes=None, cache=None
+        self,
+        entity,
+        name_field,
+        category,
+        prefixes=None,
+        prefer_human=True,
+        preferred_prefixes=None,
+        accepted_categories=None,
+        cache=None,
     ):
         self.received.append(preferred_prefixes)
         return {self.slug: {}}
 
     def get_annotations_bulk(
-        self, entities, name_field, category, prefixes=None, prefer_human=True, preferred_prefixes=None
+        self,
+        entities,
+        name_field,
+        category,
+        prefixes=None,
+        prefer_human=True,
+        preferred_prefixes=None,
+        accepted_categories=None,
     ):
         self.received.append(preferred_prefixes)
         return pd.Series([{self.slug: {}} for _ in range(len(entities))], index=entities.index)

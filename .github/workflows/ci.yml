@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 # Cancel superseded runs on the same ref — caps redundant live-Kestrel calls when
 # a PR gets several quick pushes.
@@ -56,7 +56,12 @@ jobs:
   # an external service we don't fully control, so a failure must not block unrelated
   # PRs. continue-on-error keeps the workflow green; read the step summary / artifact
   # for the real outcome. On main this still runs and surfaces regressions.
+  #
+  # Restricted to main. dev PRs get the offline gate only — the live tier is
+  # informational anyway, and running it on every dev PR multiplies calls against a
+  # service we don't control for signal nobody blocks on.
   live-kestrel:
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
     runs-on: ubuntu-latest
     continue-on-error: true
     env:

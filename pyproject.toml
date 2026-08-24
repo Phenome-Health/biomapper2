@@ -22,6 +22,7 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
     "python-multipart>=0.0.20",
     "adjusttext>=1.3.0",
+    "pygoslin>=2.0",
 ]
 
 [build-system]
@@ -63,6 +64,9 @@ select = [
 known-first-party = ["biomapper2"]
 
 [tool.pytest.ini_options]
+# Repo root on the path so standalone studies import as real packages
+# (studies.analysis.*), no per-test sys.path hacks.
+pythonpath = ["."]
 markers = [
     # Pyramid levels (Tier A = required/commit, Tier B = nightly, Tier C = opt-in)
     "unit: Tier A - Pure functions, no external dependencies",

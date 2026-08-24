@@ -2,6 +2,10 @@
 One-to-many resolution module for selecting single KG nodes.
 
 Resolves cases where multiple KG nodes match an entity by selecting the best candidate.
+For small-molecule ChEBI conflicts the naive curie-count vote is source-weighted toward the
+RefMet (``metabolomics-workbench``) annotator under an InChIKey-connectivity guard, so the
+common protonation/stereo variant conflict is fixed while genuine divergences are flagged
+for review rather than committed silently.
 """
 
 import logging
@@ -10,71 +14,170 @@ from typing import Any
 
 import pandas as pd
 
+from .structure_resolver import StructureResolver
+
+# The annotator whose vote is authoritative for small-molecule ChEBI conflicts: it queries the
+# RefMet /match endpoint by name and emits the RefMet-anchored node.
+REFMET_ANNOTATOR = "metabolomics-workbench"
+
 
 class Resolver:
     """Resolves one-to-many KG mappings to single chosen nodes."""
 
-    def resolve(self, item: pd.Series | dict[str, Any] | pd.DataFrame) -> pd.Series | pd.DataFrame:
+    def __init__(self, linker: Any = None, biolink_client: Any = None) -> None:
+        """
+        Args:
+            linker: Linker used by the connectivity test (get-nodes InChIKey enrichment). When
+                None, source-weighting is inactive and resolution is the plain majority vote.
+            biolink_client: Used to test small-molecule category membership.
+        """
+        self.linker = linker
+        self.biolink_client = biolink_client
+        self.structure_resolver = StructureResolver(linker) if linker is not None else None
+
+    def resolve(
+        self, item: pd.Series | dict[str, Any] | pd.DataFrame, category: str | None = None
+    ) -> pd.Series | pd.DataFrame:
         """
         Resolve one-to-many KG mappings to single chosen node.
 
         Args:
             item: Entity or entities with kg_ids fields
+            category: Standardized Biolink category (e.g. 'biolink:SmallMolecule'); enables
+                source-weighting for small-molecule ChEBI conflicts. None falls through to voting.
 
         Returns:
-            Named Series for single entity or DataFrame for multiple entities,
-            containing fields: chosen_kg_id, chosen_kg_id_provided, chosen_kg_id_assigned
+            Named Series for single entity or DataFrame for multiple entities, containing fields:
+            chosen_kg_id, chosen_kg_id_provided, chosen_kg_id_assigned, chosen_kg_id_review
         """
         logging.debug("Beginning one-to-many resolution step..")
 
         if isinstance(item, pd.DataFrame):
-            return item.apply(self._resolve_entity, axis=1, result_type="expand")
+            return item.apply(lambda row: self._resolve_entity(row, category=category), axis=1, result_type="expand")
         else:
-            return self._resolve_entity(item)
+            return self._resolve_entity(item, category=category)
 
-    def _resolve_entity(self, entity: pd.Series | dict[str, Any]) -> pd.Series:
+    def _resolve_entity(self, entity: pd.Series | dict[str, Any], category: str | None = None) -> pd.Series:
         """
         Resolve one-to-many KG mappings for a single entity.
 
         Args:
             entity: Entity with kg_ids fields
+            category: Standardized Biolink category (threaded from the mapper)
 
         Returns:
-            Named Series with fields: chosen_kg_id, chosen_kg_id_provided, chosen_kg_id_assigned
+            Named Series with fields: chosen_kg_id, chosen_kg_id_provided, chosen_kg_id_assigned,
+            chosen_kg_id_review
         """
-        chosen_kg_id_provided = self._choose_best_kg_id(entity["kg_ids_provided"])
-        chosen_kg_id = self._choose_best_kg_id(entity["kg_ids"])
+        chosen_kg_id_provided, _ = self._choose_best_kg_id(entity["kg_ids_provided"])
+        chosen_kg_id, chosen_kg_id_review = self._choose_best_kg_id(
+            entity["kg_ids"], kg_ids_assigned=entity["kg_ids_assigned"], category=category
+        )
 
         # Combine all annotators' KG IDs dict into one to choose preferred 'assigned' KG ID
         kg_ids_assigned_combined = defaultdict(list)
         for annotator_kg_ids_assigned in entity["kg_ids_assigned"].values():
             for kg_id, curies in annotator_kg_ids_assigned.items():
                 kg_ids_assigned_combined[kg_id].extend(curies)
-        chosen_kg_id_assigned = self._choose_best_kg_id(kg_ids_assigned_combined)
+        chosen_kg_id_assigned, _ = self._choose_best_kg_id(kg_ids_assigned_combined)
 
         return pd.Series(
             {
                 "chosen_kg_id": chosen_kg_id,
                 "chosen_kg_id_provided": chosen_kg_id_provided,
                 "chosen_kg_id_assigned": chosen_kg_id_assigned,
+                "chosen_kg_id_review": chosen_kg_id_review,
             }
         )
 
-    @staticmethod
-    def _choose_best_kg_id(kg_ids_dict: dict[str, list[str]]) -> str | None:
+    def _choose_best_kg_id(
+        self,
+        kg_ids_dict: dict[str, list[str]],
+        kg_ids_assigned: dict[str, dict[str, list[str]]] | None = None,
+        category: str | None = None,
+    ) -> tuple[str | None, str | None]:
         """
-        Select single KG ID from multiple candidates using voting.
+        Select a single KG ID from multiple candidates.
+
+        The default is a majority vote by count of supporting curies. For small-molecule ChEBI
+        conflicts (RefMet annotator disagreeing with the majority) the choice is source-weighted
+        toward RefMet under a three-way InChIKey-connectivity rule:
+        - same connectivity  -> RefMet, no flag (same molecule, no accuracy loss)
+        - different connectivity -> RefMet, flag 'divergent_refmet' (error-prone bucket)
+        - InChIKey unavailable -> majority, flag 'conflict_no_structure'
+        Non-metabolite, no-RefMet-vote, and no-conflict cases fall through to today's behavior.
 
         Args:
             kg_ids_dict: Dictionary mapping KG IDs to supporting curies
+            kg_ids_assigned: Per-annotator {kg_id: [curies]}, used to find the RefMet node
+            category: Standardized Biolink category; source-weighting applies only to small molecules
 
         Returns:
-            KG ID with most supporting curies, or None if no candidates
+            (chosen_kg_id, review_flag) — review_flag is None unless the choice should be
+            surfaced for human review; (None, None) if there are no candidates.
         """
-        # For now, use a voting approach
-        # TODO: later use more advanced methods, like depending on source/using LLMs/other
-        if kg_ids_dict:
-            majority_kg_id = max(kg_ids_dict, key=lambda k: len(kg_ids_dict[k]))
-            return majority_kg_id
-        else:
+        if not kg_ids_dict:
+            return None, None
+
+        # Unchanged default: majority vote by number of supporting curies.
+        majority = max(kg_ids_dict, key=lambda k: len(kg_ids_dict[k]))
+
+        # Source-weighting applies ONLY to small-molecule ChEBI conflicts.
+        if not (kg_ids_assigned and category and self._is_small_molecule(category)):
+            return majority, None
+
+        # Deterministic pick. RefMet contributing >1 node is itself a signal, so the choice must not
+        # ride on dict insertion order (which follows API response order). This is a provable no-op on
+        # today's data -- no baseline row has a multi-node RefMet vote (artifact field
+        # refmet_multi_node_rate, regenerated by studies/analysis/off_category_audit.py). Note
+        # this is a *determinism* fix, not a correctness one — lexicographic order is still chemically
+        # arbitrary, so warn to surface the case if it ever appears and needs a real tiebreak rule.
+        refmet_nodes = sorted(kg_ids_assigned.get(REFMET_ANNOTATOR, {}))
+        if len(refmet_nodes) > 1:
+            logging.warning(
+                "RefMet contributed %d KG nodes (%s); picking %s lexicographically — "
+                "no chemical tiebreak rule exists for this case",
+                len(refmet_nodes),
+                refmet_nodes,
+                refmet_nodes[0],
+            )
+        # Agreement is membership, not first-element equality. When RefMet votes for several nodes and
+        # one of them IS the majority, RefMet agrees — testing only refmet_nodes[0] would miss that,
+        # override the majority with a different RefMet node, and emit a spurious 'divergent_refmet'.
+        # Unreachable on current data (see refmet_multi_node_rate), but the deterministic sort above
+        # exists precisely to make that case well-defined, so it must be correct.
+        if not refmet_nodes or majority in refmet_nodes:
+            return majority, None  # RefMet had no say, or already agrees
+
+        refmet_node = refmet_nodes[0]
+        same = self._connectivity_match(refmet_node, majority)
+        if same is True:
+            return refmet_node, None  # same molecule -> RefMet, silent
+        if same is False:
+            return refmet_node, "divergent_refmet"  # different molecule -> RefMet, FLAG
+        return majority, "conflict_no_structure"  # no InChIKey -> majority, FLAG
+
+    def is_small_molecule(self, category: str | None) -> bool:
+        """Public form of the small-molecule subtree test, for callers outside resolution.
+
+        The resolution certificate needs it to tell a metabolite row (where "the graph asserts no
+        structure" is a meaningful refusal) from a gene row (where it is a category error). Kept as
+        a thin delegate so both answers come from one definition.
+        """
+        return bool(category) and self._is_small_molecule(str(category))
+
+    def _is_small_molecule(self, category: str) -> bool:
+        """True when the category is ``biolink:SmallMolecule`` or a descendant.
+
+        Mirrors ``AnnotationEngine._is_human_applicable_category`` / ``_category_preferred_prefixes``
+        (subtree membership) — the same population that carries the ChEBI/RM canonical-namespace policy.
+        """
+        if self.biolink_client is None:
+            return False
+        return category in self.biolink_client.get_descendants("biolink:SmallMolecule")
+
+    def _connectivity_match(self, node_a: str, node_b: str) -> bool | None:
+        """Delegate the InChIKey-connectivity test to the StructureResolver (None if unavailable)."""
+        if self.structure_resolver is None:
             return None
+        return self.structure_resolver.connectivity_match(node_a, node_b)

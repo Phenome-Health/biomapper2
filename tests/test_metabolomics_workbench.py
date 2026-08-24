@@ -209,3 +209,45 @@ class TestMetabolomicsWorkbenchAnnotator:
         mw_annotations = assigned_ids["metabolomics-workbench"]
         assert "refmet_id" in mw_annotations
         assert "RM0008606" in mw_annotations["refmet_id"]
+
+
+def test_a_slash_in_the_query_name_is_percent_encoded():
+    """MW's REST is path-segment addressed, so an unescaped slash silently loses the candidate.
+
+    ``quote`` defaults to ``safe="/"``. With that default ``PC 16:0/18:1`` becomes
+    ``.../match/PC%2016%3A0/18%3A1``, which the service reads as ``name='PC 16:0'`` plus an
+    ``output_item`` -- returning NO candidate rather than an error, so nothing upstream notices.
+
+    This is the consequential site of the six: unlike the ``structure_resolver`` fallback rung
+    (which is keyed on the NODE name and feeds only the review flag), this annotator is called with
+    the QUERY name and its candidates enter the vote and the source-weighting, so the miss reaches
+    ``chosen_kg_id``. It also silently corrupts ``independent_of_selection``: with no RefMet vote,
+    ``metabolomics-workbench`` is absent from the committed node's sources, so a Tier-B-via-MW
+    verdict reports as independent on exactly the lipid population L26 exists to stratify.
+    """
+    from biomapper2.core.annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
+
+    calls = []
+
+    class _Resp:
+        status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"refmet_id": "RM0001", "name": "PC 16:0/18:1"}
+
+    class _Session:
+        def get(self, url, timeout=None):
+            calls.append(url)
+            return _Resp()
+
+    annotator = MetabolomicsWorkbenchAnnotator.__new__(MetabolomicsWorkbenchAnnotator)
+    annotator._session = _Session()  # type: ignore[assignment]  # captures the outbound URL only
+    annotator._do_refmet_request("PC 16:0/18:1")
+
+    url = calls[0]
+    assert "%2F" in url, f"the slash was not encoded: {url}"
+    base = MetabolomicsWorkbenchAnnotator.BASE_URL
+    assert url.count("/") == base.count("/") + 1, f"the name injected a path segment: {url}"

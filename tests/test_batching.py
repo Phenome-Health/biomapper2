@@ -1,12 +1,71 @@
 """Tests for Kestrel API batching functionality."""
 
 import logging
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from biomapper2.config import KESTREL_BATCH_SIZE_CANONICALIZE, KESTREL_BATCH_SIZE_SEARCH, KESTREL_BATCHING_ENABLED
-from biomapper2.utils import chunk_list, kestrel_request
+from biomapper2.utils import bulk_kestrel_request, chunk_list, kestrel_request
+
+
+def _fake_response(status: int, json_body: dict | None = None) -> MagicMock:
+    """A mock requests.Response whose raise_for_status mirrors real 4xx/5xx behavior."""
+    resp = MagicMock()
+    resp.status_code = status
+    if status >= 400:
+        err = requests.exceptions.HTTPError(f"{status} Error")
+        err.response = resp
+        resp.raise_for_status.side_effect = err
+    else:
+        resp.raise_for_status.return_value = None
+        resp.json.return_value = json_body if json_body is not None else {"ok": True}
+    return resp
+
+
+def test_bulk_kestrel_request_retries_5xx_then_succeeds():
+    """A transient 5xx is retried with backoff and the eventual 200 is returned."""
+    session = MagicMock()
+    session.request.side_effect = [_fake_response(500), _fake_response(503), _fake_response(200, {"ok": 1})]
+    with patch("biomapper2.utils.time.sleep") as sleep_mock:
+        out = bulk_kestrel_request(
+            "POST", "text-search", session=session, auth_required=False, max_retries=3, json={"search_text": ["x"]}
+        )
+    assert out == {"ok": 1}
+    assert session.request.call_count == 3  # 2 failures + 1 success
+    assert sleep_mock.call_count == 2  # backed off before each retry
+
+
+def test_bulk_kestrel_request_retries_connection_error():
+    """A transient connection error is retried, not raised on the first blip."""
+    session = MagicMock()
+    session.request.side_effect = [requests.exceptions.ConnectionError("boom"), _fake_response(200, {"ok": 2})]
+    with patch("biomapper2.utils.time.sleep"):
+        out = bulk_kestrel_request("POST", "text-search", session=session, auth_required=False, json={})
+    assert out == {"ok": 2}
+    assert session.request.call_count == 2
+
+
+def test_bulk_kestrel_request_does_not_retry_4xx():
+    """Client errors (4xx) will not self-heal, so they raise immediately without retry."""
+    session = MagicMock()
+    session.request.side_effect = [_fake_response(422)]
+    with patch("biomapper2.utils.time.sleep"):
+        with pytest.raises(requests.exceptions.HTTPError):
+            bulk_kestrel_request("POST", "text-search", session=session, auth_required=False, max_retries=3, json={})
+    assert session.request.call_count == 1  # no retry on a 4xx
+
+
+def test_bulk_kestrel_request_raises_after_exhausting_retries():
+    """A persistent 5xx raises after 1 + max_retries attempts (the overnight-outage case)."""
+    session = MagicMock()
+    session.request.side_effect = [_fake_response(500) for _ in range(4)]
+    with patch("biomapper2.utils.time.sleep"):
+        with pytest.raises(requests.exceptions.HTTPError):
+            bulk_kestrel_request("POST", "text-search", session=session, auth_required=False, max_retries=3, json={})
+    assert session.request.call_count == 4  # 1 initial + 3 retries
+
 
 pytestmark = pytest.mark.unit
 

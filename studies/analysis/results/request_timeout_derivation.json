@@ -1,0 +1,14 @@
+{
+  "n_successful_requests": 25,
+  "percentiles_s": {
+    "p50": 14.798,
+    "p90": 85.701,
+    "p95": 86.08,
+    "p99": 86.433
+  },
+  "max_s": 86.433,
+  "headroom_multiplier": 2.0,
+  "recommended_timeout_s": 173,
+  "duration_proxy": "interval between a request's announcement line and the process's next log line; overstates duration whenever downstream work follows, which is the safe direction",
+  "source_log": "/home/trentleslie/benchmark-runs/suite_20260805T033340Z.log"
+}
