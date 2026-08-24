@@ -12,9 +12,10 @@ from typing import Any
 import pandas as pd
 
 from ..biolink_client import BiolinkClient
-from ..config import CATEGORY_PREFERRED_NAMESPACES
+from ..config import CATEGORY_ACCEPTED_ROOTS, CATEGORY_PREFERRED_NAMESPACES
 from ..utils import AnnotationMode, AssignedIDsDict
 from .annotators.base import BaseAnnotator
+from .annotators.goslin_lipid import GoslinLipidAnnotator
 from .annotators.kestrel_hybrid import KestrelHybridSearchAnnotator
 from .annotators.kestrel_text import KestrelTextSearchAnnotator
 from .annotators.kestrel_vector import KestrelVectorSearchAnnotator
@@ -33,6 +34,7 @@ class AnnotationEngine:
                 KestrelTextSearchAnnotator(),
                 KestrelVectorSearchAnnotator(),
                 MetabolomicsWorkbenchAnnotator(),
+                GoslinLipidAnnotator(),
             ]
         }
         self.biolink_client = biolink_client if biolink_client else BiolinkClient()
@@ -71,6 +73,11 @@ class AnnotationEngine:
                 disease). The engine resolves the category's preferred-prefix set and passes it down;
                 gene/protein categories never receive a set (they use prefer_human).
 
+        Note: the engine also resolves an ``accepted_categories`` set from ``CATEGORY_ACCEPTED_ROOTS``
+        and passes it down. It has no request-level flag on purpose — it is a correctness guard on the
+        committed node's Biolink category, not a re-ranking preference, so it is independent of both
+        ``prefer_canonical`` and ``prefer_human``.
+
         Returns:
             AssignedIDsDict (in a named Series) for single entity, and in a single-column
             pd.DataFrame for multiple entities.
@@ -91,10 +98,16 @@ class AnnotationEngine:
             self._category_preferred_prefixes.get(category) if prefer_canonical and not effective_prefer_human else None
         )
 
+        # Category acceptance is a CORRECTNESS GUARD, not a re-ranking preference, so it is resolved
+        # independently of both prefer_canonical and prefer_human — it must not inherit the canonical
+        # policy's kill switch. None means "this category is unfiltered" (the gene path's guarantee).
+        effective_accepted_categories = self._category_accepted_categories.get(category)
+
         logging.info(
             f"Beginning annotation step.. (mode={mode}, annotators={annotators}, "
             f"prefer_human={prefer_human}, effective_prefer_human={effective_prefer_human}, "
-            f"prefer_canonical={prefer_canonical}, effective_preferred_prefixes={effective_preferred_prefixes})"
+            f"prefer_canonical={prefer_canonical}, effective_preferred_prefixes={effective_preferred_prefixes}, "
+            f"effective_accepted_categories={effective_accepted_categories})"
         )
 
         # Skip annotation if user requested it
@@ -135,6 +148,7 @@ class AnnotationEngine:
                     annotators_to_use,
                     effective_prefer_human,
                     effective_preferred_prefixes,
+                    effective_accepted_categories,
                 )
             else:
                 return self._annotate_single(
@@ -147,6 +161,7 @@ class AnnotationEngine:
                     annotators_to_use,
                     effective_prefer_human,
                     effective_preferred_prefixes,
+                    effective_accepted_categories,
                 )
         else:
             return self._get_empty_assigned_ids(item)
@@ -185,6 +200,26 @@ class AnnotationEngine:
                 resolved.setdefault(descendant, set()).update(prefixes)
         return resolved
 
+    @cached_property
+    def _category_accepted_categories(self) -> dict[str, set[str]]:
+        """Map every category in the acceptance policy (incl. Biolink descendants) to its accepted set.
+
+        Both sides of ``CATEGORY_ACCEPTED_ROOTS`` are expanded via ``get_descendants``, but for different
+        reasons: the **key** so subcategories of a configured job category inherit the policy (mirroring
+        ``_category_preferred_prefixes``), and the **value** because the acceptance root stands for its
+        whole subtree — ``biolink:ChemicalEntity`` admits all 12 chemical categories, so a legitimately
+        broader typing survives the guard. On overlap the category inherits the **union** of both roots'
+        subtrees (accept-wider), which keeps the guard failure-open in the ambiguous case.
+
+        Cached per instance: the Biolink hierarchy is static at runtime.
+        """
+        resolved: dict[str, set[str]] = {}
+        for category, root in CATEGORY_ACCEPTED_ROOTS.items():
+            accepted = self.biolink_client.get_descendants(root)
+            for descendant in self.biolink_client.get_descendants(category):
+                resolved.setdefault(descendant, set()).update(accepted)
+        return resolved
+
     def _select_annotators(self, category: str) -> list[str]:
         """Select appropriate annotators based on entity type (returns their slugs)."""
         logging.info(f"Selecting annotators for category '{category}'")
@@ -194,6 +229,7 @@ class AnnotationEngine:
         category_with_descendants = self.biolink_client.get_descendants(category)
         if category_with_descendants.intersection({"biolink:SmallMolecule"}):
             annotators.append(MetabolomicsWorkbenchAnnotator.slug)
+            annotators.append(GoslinLipidAnnotator.slug)
 
         # Always include fallback annotator (temp: orchestration will become more advanced later)
         annotators.append(KestrelHybridSearchAnnotator.slug)
@@ -211,6 +247,7 @@ class AnnotationEngine:
         annotators: list,
         prefer_human: bool = True,
         preferred_prefixes: set[str] | None = None,
+        accepted_categories: set[str] | None = None,
     ) -> pd.DataFrame:
         """Annotate an entire DataFrame. Returns a single-column DataFrame containing AssignedIDsDicts."""
         if mode == "missing":
@@ -241,6 +278,7 @@ class AnnotationEngine:
                     prefixes,
                     prefer_human=prefer_human,
                     preferred_prefixes=preferred_prefixes,
+                    accepted_categories=accepted_categories,
                 )
                 annotated_rows = pd.Series(
                     [self._merge_nested_dicts(d1, d2) for d1, d2 in zip(annotated_rows, annotations_col)],
@@ -263,6 +301,7 @@ class AnnotationEngine:
         annotators: list,
         prefer_human: bool = True,
         preferred_prefixes: set[str] | None = None,
+        accepted_categories: set[str] | None = None,
     ) -> pd.Series:
         """Annotate a single entity. Returns named series containing AssignedIDsDict."""
         # If user requested it, skip entities that have any provided IDs
@@ -283,6 +322,7 @@ class AnnotationEngine:
                 prefixes,
                 prefer_human=prefer_human,
                 preferred_prefixes=preferred_prefixes,
+                accepted_categories=accepted_categories,
             )
             assigned_ids: AssignedIDsDict = self._merge_nested_dicts(assigned_ids, entity_annotations)
 

@@ -5,7 +5,7 @@ import pandas as pd
 
 from ...config import KESTREL_BATCH_SIZE_SEARCH
 from ...utils import AssignedIDsDict, kestrel_request, text_is_not_empty
-from .base import BaseAnnotator
+from .base import BaseAnnotator, is_on_category
 
 
 class KestrelVectorSearchAnnotator(BaseAnnotator):
@@ -20,6 +20,7 @@ class KestrelVectorSearchAnnotator(BaseAnnotator):
         prefixes: list[str] | None = None,
         prefer_human: bool = True,  # accepted for interface parity; not applicable to vector search
         preferred_prefixes: set[str] | None = None,  # accepted for interface parity; not applicable
+        accepted_categories: set[str] | None = None,
         cache: dict | None = None,
     ) -> AssignedIDsDict:
         """Implements BaseAnnotator.get_annotations"""
@@ -37,10 +38,28 @@ class KestrelVectorSearchAnnotator(BaseAnnotator):
             annotations: dict[str, dict[str, dict[str, Any]]] = {}
             if term_results:
                 first_result = term_results[0]
-                node_id = first_result["id"]
-                score = first_result["score"]
-                vocab, local_id = node_id.split(":", 1)
-                annotations.setdefault(vocab, {})[local_id] = {"score": score}
+                # Same commit-point category validator as kestrel-hybrid, and for the same reason.
+                # `category_filter` is advisory: the endpoint returns rows outside the requested
+                # category, and this one commits its top row unconditionally. `annotators` is
+                # API-exposed (api/models/requests.py), so without this guard a caller could request
+                # annotators=['kestrel-vector-search'] and commit a node the default annotator set
+                # refuses — an inconsistent correctness contract. Whether an off-category row lands at
+                # rank 1 varies by query and by ranker, so the guard cannot be skipped here on the
+                # grounds that this endpoint usually ranks better. A guard a caller can step around is
+                # not a guard.
+                if is_on_category(first_result, accepted_categories):
+                    node_id = first_result["id"]
+                    score = first_result["score"]
+                    vocab, local_id = node_id.split(":", 1)
+                    annotations.setdefault(vocab, {})[local_id] = {"score": score}
+                else:
+                    logging.info(
+                        "off_category_refusal: annotator=%s term=%r node=%s categories=%s",
+                        self.slug,
+                        search_term,
+                        first_result.get("id"),
+                        first_result.get("categories"),
+                    )
 
             return {self.slug: annotations}
         else:
@@ -55,6 +74,7 @@ class KestrelVectorSearchAnnotator(BaseAnnotator):
         prefixes: list[str] | None = None,
         prefer_human: bool = True,  # accepted for interface parity; not applicable to vector search
         preferred_prefixes: set[str] | None = None,  # accepted for interface parity; not applicable
+        accepted_categories: set[str] | None = None,
     ) -> pd.Series:  # Series of AssignedIDsDicts
         """Implements BaseAnnotator.get_annotations_bulk"""
 
@@ -73,6 +93,10 @@ class KestrelVectorSearchAnnotator(BaseAnnotator):
             category=category,
             prefixes=prefixes,
             prefer_human=prefer_human,
+            # MUST be forwarded: the bulk path re-dispatches into get_annotations, so omitting this
+            # would silently drop the category guard on every dataset job while keeping it on the
+            # single-entity path.
+            accepted_categories=accepted_categories,
         )
 
         return cast(pd.Series, assigned_ids_col)

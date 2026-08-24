@@ -11,7 +11,7 @@ from ...config import (
 )
 from ...utils import AssignedIDsDict, kestrel_request, text_is_not_empty
 from ..gene_symbol_resolver import GeneSymbolResolver
-from .base import BaseAnnotator
+from .base import BaseAnnotator, is_on_category
 
 # Score assigned to a node recovered by the deterministic symbol fallback. Modest and fixed: the result
 # is a verified identity match, but it bypassed competitive search, so it must not be reported as a top
@@ -35,6 +35,7 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
         prefixes: list[str] | None = None,
         prefer_human: bool = True,
         preferred_prefixes: set[str] | None = None,
+        accepted_categories: set[str] | None = None,
         cache: dict | None = None,
     ) -> AssignedIDsDict:
         """Implements BaseAnnotator.get_annotations.
@@ -46,6 +47,10 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
           candidate that matches the query, falling back to the top-scored canonical or — on an empty
           canonical pool — the overall top-scored row (see ``_select_canonical``).
         With neither active, the legacy top-1 behavior is kept.
+
+        ``accepted_categories`` is orthogonal to both: a *validator* applied to the single node the
+        selectors committed (see ``_is_on_category``). It never touches the candidate pool, so no
+        selector's behavior changes and no vacancy is created for a runner-up to fill.
         """
 
         # Extract the value to search
@@ -82,6 +87,21 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
                     # fallback to the top-scored non-canonical row).
                     chosen = {**chosen, "resolved_via": "canonical_preference"}
 
+            # Category validation at the single commit point. Applied AFTER selection, deliberately: a
+            # pool filter would promote the runner-up into the vacancy, and that cannot recover a right
+            # answer (`_select_canonical` already preferred the canonical rows, so a promotion only
+            # happens when none were there). It only substitutes a different wrong node that now passes
+            # the type test — harder to audit than one announcing itself as not-a-molecule. Refuse
+            # instead; this can only turn wrong->refuse. See `_is_on_category`.
+            if chosen is not None and not self._is_on_category(chosen, accepted_categories):
+                logging.info(
+                    "off_category_refusal: term=%r node=%s categories=%s",
+                    search_term,
+                    chosen.get("id"),
+                    chosen.get("categories"),
+                )
+                chosen = None
+
             if chosen is not None:
                 node_id = chosen["id"]
                 score = chosen["score"]
@@ -104,6 +124,7 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
         prefixes: list[str] | None = None,
         prefer_human: bool = True,
         preferred_prefixes: set[str] | None = None,
+        accepted_categories: set[str] | None = None,
     ) -> pd.Series:  # Series of AssignedIDsDicts
         """Implements BaseAnnotator.get_annotations_bulk"""
 
@@ -117,8 +138,9 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
         results = self._kestrel_hybrid_search(search_terms, category, prefixes, limit=limit)
 
         # Annotate each entity using the results from the bulk request. The internal re-dispatch MUST
-        # forward BOTH prefer_human and preferred_prefixes, otherwise the bulk path would silently use the
-        # get_annotations defaults (a silent no-op for the canonical re-rank on dataset jobs).
+        # forward prefer_human, preferred_prefixes AND accepted_categories, otherwise the bulk path would
+        # silently use the get_annotations defaults (a silent no-op on dataset jobs — which is every
+        # benchmark run — for the canonical re-rank and for the category guard alike).
         assigned_ids_col = entities.apply(
             self.get_annotations,
             axis=1,
@@ -128,6 +150,7 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
             prefixes=prefixes,
             prefer_human=prefer_human,
             preferred_prefixes=preferred_prefixes,
+            accepted_categories=accepted_categories,
         )
 
         return cast(pd.Series, assigned_ids_col)
@@ -204,6 +227,16 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
         exact = [r for r in pool if KestrelHybridSearchAnnotator._symbol_matches(r, search_term)]
         candidates = exact if exact else pool
         return max(candidates, key=lambda r: r.get("score", 0)), True
+
+    @staticmethod
+    def _is_on_category(row: dict, accepted: set[str] | None) -> bool:
+        """Delegates to :func:`base.is_on_category`.
+
+        Kept as a name on this class because it is the annotator most reached for, but the
+        implementation is shared: kestrel-text and kestrel-vector apply the SAME predicate at
+        their own commit points, so a caller cannot bypass the guard by naming an annotator.
+        """
+        return is_on_category(row, accepted)
 
     @staticmethod
     def _symbol_matches(row: dict, search_term: str) -> bool:

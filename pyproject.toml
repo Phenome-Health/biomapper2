@@ -22,6 +22,7 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
     "python-multipart>=0.0.20",
     "adjusttext>=1.3.0",
+    "pygoslin>=2.0",
 ]
 
 [build-system]
