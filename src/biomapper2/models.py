@@ -74,6 +74,11 @@ class Entity(BaseModel):
     # Enrichment step output — equivalent IDs for the chosen KG node, grouped by prefix
     kg_equivalent_ids: dict[str, list[str]] = Field(default_factory=dict)
 
+    # Certificate step output — what the graph asserts about chosen_kg_id, and (opt-in) what an
+    # independent registry says about the query name. Held as a plain dict rather than the frozen
+    # dataclass because both emission surfaces serialize it directly; see core/certificate.py.
+    resolution_certificate: dict[str, Any] | None = None
+
     @classmethod
     def from_input(cls, item: "pd.Series | dict[str, Any]", name_field: str = "name") -> "Entity":
         """

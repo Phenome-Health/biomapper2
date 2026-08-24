@@ -1,5 +1,6 @@
 """Tests for equivalent IDs enrichment feature (issue #62)."""
 
+from functools import partial
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -155,9 +156,15 @@ class TestEquivalentIds:
         mapper.resolver.resolve.return_value = pd.Series(
             {"chosen_kg_id": "NCBIGene:84836", "chosen_kg_id_provided": None, "chosen_kg_id_assigned": None}
         )
-        mapper.linker.get_equivalent_ids.return_value = {
-            "NCBIGene:84836": {"ENSEMBL": ["ENSG00000114779"], "HGNC": ["28235"], "UniProtKB": ["Q96IU4"]}
-        }
+        mapper.linker.get_equivalent_ids_checked.return_value = (
+            {"NCBIGene:84836": {"ENSEMBL": ["ENSG00000114779"], "HGNC": ["28235"], "UniProtKB": ["Q96IU4"]}},
+            True,
+        )
+        mapper.resolver.is_small_molecule.return_value = False  # a protein
+        mapper.tier_b = None  # Tier B is opt-in; the default path must not consult it
+        # The certificate assembler is the real one: mocking it away would let this test pass while
+        # the emitted certificate was a MagicMock.
+        mapper._issue_certificate = partial(Mapper._issue_certificate, mapper)
 
         result = Mapper.map_entity_to_kg(
             mapper,
@@ -167,7 +174,7 @@ class TestEquivalentIds:
             entity_type="protein",
         )
 
-        mapper.linker.get_equivalent_ids.assert_called_once_with(["NCBIGene:84836"])
+        mapper.linker.get_equivalent_ids_checked.assert_called_once_with(["NCBIGene:84836"])
         expected = {"ENSEMBL": ["ENSG00000114779"], "HGNC": ["28235"], "UniProtKB": ["Q96IU4"]}
         assert result["kg_equivalent_ids"] == expected
 
@@ -194,12 +201,15 @@ class TestEquivalentIds:
         mapper.resolver.resolve.return_value = pd.Series(
             {"chosen_kg_id": None, "chosen_kg_id_provided": None, "chosen_kg_id_assigned": None}
         )
+        mapper.resolver.is_small_molecule.return_value = False
+        mapper.tier_b = None
+        mapper._issue_certificate = partial(Mapper._issue_certificate, mapper)
 
         result = Mapper.map_entity_to_kg(
             mapper, item={"name": "unknown"}, name_field="name", provided_id_fields=[], entity_type="protein"
         )
 
-        mapper.linker.get_equivalent_ids.assert_not_called()
+        mapper.linker.get_equivalent_ids_checked.assert_not_called()
         assert result["kg_equivalent_ids"] == {}
 
     def test_api_response_includes_equivalent_ids(self):
