@@ -123,14 +123,20 @@ class TestKestrelDiscovery:
         assert result == cached_presets
 
     @patch("biomapper2.api.kestrel_discovery.bulk_kestrel_request")
-    def test_api_key_missing_categories_returned_presets_empty(self, mock_req):
-        """GET /categories succeeds but POST /text-search fails due to missing API key."""
+    def test_unauthorized_text_search_returns_categories_with_empty_presets(self, mock_req):
+        """GET /categories succeeds but POST /text-search is rejected for want of a valid key.
+
+        Previously this simulated ``ValueError("KESTREL_API_KEY environment variable is not set")``,
+        but an unset key no longer raises anywhere — the test asserted tolerance of a failure that
+        can no longer occur. The real modern failure at this layer is a 401 from the endpoint.
+        """
 
         def side_effect(method, endpoint, auth_required=True, **kwargs):
             if endpoint == "categories":
                 return ["biolink:SmallMolecule"]
-            # text-search requires auth — simulate missing key
-            raise ValueError("KESTREL_API_KEY environment variable is not set")
+            response = requests.Response()
+            response.status_code = 401
+            raise requests.exceptions.HTTPError("401 Client Error: Unauthorized", response=response)
 
         mock_req.side_effect = side_effect
         presets, _ = derive_all_presets({"metabolite": "biolink:SmallMolecule"})

@@ -10,7 +10,7 @@ import requests
 import requests_cache
 from circuitbreaker import CircuitBreakerError, circuit
 
-from ...config import CACHE_DIR
+from ...config import CACHE_DIR, CACHE_IGNORED_PARAMETERS
 from ...utils import AssignedIDsDict
 from .base import BaseAnnotator
 
@@ -37,6 +37,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         self._session = requests_cache.CachedSession(
             CACHE_DIR / "metabolomics_workbench_http",
             expire_after=timedelta(days=7),
+            ignored_parameters=CACHE_IGNORED_PARAMETERS,
         )
 
     def get_annotations(
@@ -47,6 +48,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         prefixes: list[str] | None = None,
         prefer_human: bool = True,  # accepted for interface parity; metabolites have no HGNC analogue
         preferred_prefixes: set[str] | None = None,  # parity; MW returns raw IDs, no namespace re-rank
+        accepted_categories: set[str] | None = None,  # parity; MW returns raw IDs, no KG categories to check
         cache: dict | None = None,
     ) -> AssignedIDsDict:
         """Implements BaseAnnotator.get_annotations"""
@@ -87,6 +89,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         prefixes: list[str] | None = None,
         prefer_human: bool = True,  # accepted for interface parity; metabolites have no HGNC analogue
         preferred_prefixes: set[str] | None = None,  # parity; MW returns raw IDs, no namespace re-rank
+        accepted_categories: set[str] | None = None,  # parity; MW returns raw IDs, no KG categories to check
     ) -> pd.Series:
         """Implements BaseAnnotator.get_annotations_bulk"""
 
@@ -133,8 +136,19 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         """
         Make the actual HTTP request. Protected by circuit breaker - trips on repeated failures,
         meaning it will skip requests until a cooldown period is over (recovery_timeout).
+
+        ``safe=""`` is load-bearing, and this is the highest-consequence of the six call sites that
+        needed it. MW's REST is PATH-SEGMENT addressed, and ``quote`` defaults to ``safe="/"``, so a
+        slash in the query name splits into an extra segment: the service reads the tail as
+        ``output_item`` and returns NO CANDIDATE rather than an error. This annotator's candidates
+        enter the vote and the source-weighting, so unlike the ``structure_resolver`` fallback rung
+        this silently reached ``chosen_kg_id``. It also corrupted ``independent_of_selection``: with
+        no RefMet vote, ``metabolomics-workbench`` is absent from the committed node's sources, so a
+        Tier-B-via-MW verdict was reported independent -- true in fact, false in reason, on exactly
+        the lipid population L26 exists to stratify. Exposure per arm: artifact field
+        ``slash_bearing_name_rate``; the spuriously-independent population: ``spurious_independence``.
         """
-        url = f"{self.BASE_URL}/{quote(metabolite_name)}"
+        url = f"{self.BASE_URL}/{quote(metabolite_name, safe='')}"
 
         response = self._session.get(url, timeout=3)
         response.raise_for_status()
