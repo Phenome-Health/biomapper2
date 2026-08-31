@@ -73,6 +73,7 @@ def load_prefix_info(biolink_client: BiolinkClient) -> dict[str, dict[str, str]]
     prefix_to_iri_map["dictybase.gene"] = "http://dictybase.org/gene/"
     prefix_to_iri_map["AraPort"] = "https://www.arabidopsis.org/servlets/TairObject?accession="
     prefix_to_iri_map["CGNC"] = "https://vertebrate.genenames.org/data/gene-symbol-report/#!/cgnc_id/"
+    prefix_to_iri_map["VGNC"] = "https://vertebrate.genenames.org/data/gene-symbol-report/#!/vgnc_id/VGNC:"
     prefix_to_iri_map["ecogene"] = "https://ecocyc.org/gene?orgid=ECOLI&id="
     prefix_to_iri_map["EnsemblGenomes"] = "https://www.ensemblgenomes.org/id/"
     prefix_to_iri_map["OBA"] = "http://purl.obolibrary.org/obo/OBA_"
@@ -251,6 +252,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "uszipcode": {validator: validators.is_uszipcode_id, cleaner: cleaners.clean_zipcode},
         "vandf": {validator: validators.is_vandf_id},
         "vesiclepedia": {validator: validators.is_vesiclepedia_id},
+        "vgnc": {validator: validators.is_numeric_id},
         "wb": {validator: validators.is_wormbase_gene_id, aliases: ["wormbase"]},
         "wikipathways": {validator: validators.is_wikipathways_id, cleaner: cleaners.clean_wikipathways_id},
         "zfa": {validator: validators.is_zfa_id},
