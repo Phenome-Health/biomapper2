@@ -117,9 +117,13 @@ def is_efo_id(local_id: str) -> bool:
 
 
 def is_ensembl_gene_id(local_id: str) -> bool:
-    """Allows: ENSG followed by exactly 11 digits
-    Example: ENSG00000138675"""
-    return bool(re.match(r"^ENSG\d{11}$", local_id))
+    """Allows: ENS + optional species code + G + exactly 11 digits.
+
+    Ensembl stable IDs carry a species code for every species EXCEPT human, which omits it -- so a
+    human-only '^ENSG' pattern silently rejects every other organism's genes.
+    Examples: ENSG00000138675 (human), ENSMUSG00000000001 (mouse), ENSBTAG00070005236 (cow),
+              ENSDARG00000019949 (zebrafish)"""
+    return bool(re.match(r"^ENS[A-Z]{0,6}G\d{11}$", local_id))
 
 
 def is_envo_id(local_id: str) -> bool:
