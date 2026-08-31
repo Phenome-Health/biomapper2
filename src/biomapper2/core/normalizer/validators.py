@@ -619,6 +619,12 @@ def is_zfin_id(local_id: str) -> bool:
     return bool(re.match(r"^ZDB-[A-Z]+-\d+-\d+$", local_id))
 
 
+def is_xenbase_id(local_id: str) -> bool:
+    """Xenbase (Xenopus) IDs: XB-TYPE-digits.
+    Examples: XB-GENE-1010722, XB-GENE-865691"""
+    return bool(re.match(r"^XB-[A-Z]+-\d+$", local_id))
+
+
 def is_sgd_id(local_id: str) -> bool:
     """SGD yeast IDs: S followed by 9 digits.
     Examples: S000004291, S000004559"""

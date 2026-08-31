@@ -206,7 +206,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "oba": {validator: validators.is_oba_id},
         "obi": {validator: validators.is_seven_digit_id},
         "obo": {validator: validators.is_obo_id},
-        "omim": {validator: validators.is_omim_id},
+        "omim": {validator: validators.is_omim_id, aliases: ["mim"]},
         "omim.ps": {validator: validators.is_omim_ps_id},
         "orphanet": {validator: validators.is_numeric_id, aliases: ["orpha"]},
         "pathwhiz": {validator: validators.is_pathwhiz_id},
@@ -255,6 +255,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "vgnc": {validator: validators.is_numeric_id},
         "wb": {validator: validators.is_wormbase_gene_id, aliases: ["wormbase"]},
         "wikipathways": {validator: validators.is_wikipathways_id, cleaner: cleaners.clean_wikipathways_id},
+        "xenbase": {validator: validators.is_xenbase_id},
         "zfa": {validator: validators.is_zfa_id},
         "zfin": {validator: validators.is_zfin_id},
     }
