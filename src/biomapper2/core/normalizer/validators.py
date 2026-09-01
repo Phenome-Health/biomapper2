@@ -346,6 +346,12 @@ def is_bfo_id(local_id: str) -> bool:
     return bool(re.match(r"^\d+$", local_id))
 
 
+def is_bgd_id(local_id: str) -> bool:
+    """Bovine Genome Database gene IDs: BT followed by digits.
+    Examples: BT11878, BT10361"""
+    return bool(re.match(r"^BT\d+$", local_id))
+
+
 def is_bvbrc_id(local_id: str) -> bool:
     """Allows: digits, a period, and more digits"""
     return bool(re.match(r"^\d+\.\d+$", local_id))

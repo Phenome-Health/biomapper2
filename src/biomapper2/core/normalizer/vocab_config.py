@@ -72,6 +72,7 @@ def load_prefix_info(biolink_client: BiolinkClient) -> dict[str, dict[str, str]]
     prefix_to_iri_map["ttd.target"] = "https://db.idrblab.net/ttd/data/target/details/"
     prefix_to_iri_map["dictybase.gene"] = "http://dictybase.org/gene/"
     prefix_to_iri_map["AraPort"] = "https://www.arabidopsis.org/servlets/TairObject?accession="
+    prefix_to_iri_map["BGD"] = "https://bovinegenome.elsiklab.missouri.edu/gene/"  # Bovine Genome Database
     prefix_to_iri_map["CGNC"] = "https://vertebrate.genenames.org/data/gene-symbol-report/#!/cgnc_id/"
     prefix_to_iri_map["VGNC"] = "https://vertebrate.genenames.org/data/gene-symbol-report/#!/vgnc_id/VGNC:"
     prefix_to_iri_map["ecogene"] = "https://ecocyc.org/gene?orgid=ECOLI&id="
@@ -117,6 +118,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "bioage": {validator: validators.is_biological_measure_label},
         "biobmi": {validator: validators.is_biological_measure_label},
         "bspo": {validator: validators.is_seven_digit_id},
+        "bgd": {validator: validators.is_bgd_id},
         "bvbrc": {validator: validators.is_bvbrc_id},
         "cas": {validator: validators.is_cas_id},
         "cdcsvi": {validator: validators.is_cdcsvi_id},
