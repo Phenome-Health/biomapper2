@@ -3,7 +3,7 @@ from typing import Any, cast
 
 import pandas as pd
 
-from ...config import KESTREL_BATCH_SIZE_SEARCH
+from ...config import HYBRID_SEARCH_LIMIT, KESTREL_BATCH_SIZE_SEARCH
 from ...utils import AssignedIDsDict, kestrel_request, text_is_not_empty
 from .base import BaseAnnotator, is_on_category
 
@@ -32,34 +32,32 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
             if cache:
                 term_results = cache.get(search_term)
             else:
-                results = self._kestrel_text_search(search_term, category, prefixes, limit=1)
+                results = self._kestrel_text_search(search_term, category, prefixes, limit=HYBRID_SEARCH_LIMIT)
                 term_results = results[search_term]
 
             annotations: dict[str, dict[str, dict[str, Any]]] = {}
-            if term_results:
-                first_result = term_results[0]
-                # Same commit-point category validator as kestrel-hybrid, and for the same reason.
-                # `category_filter` is advisory: the endpoint returns rows outside the requested
-                # category, and this one commits its top row unconditionally. `annotators` is
-                # API-exposed (api/models/requests.py), so without this guard a caller could request
-                # annotators=['kestrel-text-search'] and commit a node the default annotator set
-                # refuses — an inconsistent correctness contract. Whether an off-category row lands at
-                # rank 1 varies by query and by ranker, so the guard cannot be skipped here on the
-                # grounds that this endpoint usually ranks better. A guard a caller can step around is
-                # not a guard.
-                if is_on_category(first_result, accepted_categories):
-                    node_id = first_result["id"]
-                    score = first_result["score"]
-                    vocab, local_id = node_id.split(":", 1)
-                    annotations.setdefault(vocab, {})[local_id] = {"score": score}
-                else:
-                    logging.info(
-                        "off_category_refusal: annotator=%s term=%r node=%s categories=%s",
-                        self.slug,
-                        search_term,
-                        first_result.get("id"),
-                        first_result.get("categories"),
-                    )
+            # Commit-point category validator, same as kestrel-hybrid. `category_filter` is advisory:
+            # the endpoint returns rows outside the requested category, and an off-category row can land
+            # at rank 1 (e.g. a CHV/GO/UMLS node named like the query). Scan the ranked window for the
+            # first ON-category candidate instead of committing/refusing on rank 1 alone; the guard still
+            # refuses when NOTHING in the window is on-category. `annotators` is API-exposed
+            # (api/models/requests.py), so without this guard a caller requesting
+            # annotators=['kestrel-text-search'] could commit a node the default set refuses.
+            chosen = next((r for r in (term_results or []) if is_on_category(r, accepted_categories)), None)
+            if chosen is not None:
+                node_id = chosen["id"]
+                score = chosen["score"]
+                vocab, local_id = node_id.split(":", 1)
+                annotations.setdefault(vocab, {})[local_id] = {"score": score}
+            elif term_results:
+                logging.info(
+                    "off_category_refusal: annotator=%s term=%r window=%d top=%s categories=%s",
+                    self.slug,
+                    search_term,
+                    len(term_results),
+                    term_results[0].get("id"),
+                    term_results[0].get("categories"),
+                )
 
             return {self.slug: annotations}
         else:
@@ -82,7 +80,7 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
         search_terms = [t for t in entities[name_field].tolist() if text_is_not_empty(t)]
 
         logging.info(f"Getting text search results from Kestrel API for {len(entities)} entities")
-        results = self._kestrel_text_search(search_terms, category, prefixes, limit=1)
+        results = self._kestrel_text_search(search_terms, category, prefixes, limit=HYBRID_SEARCH_LIMIT)
 
         # Annotate each entity using the results from the bulk request
         assigned_ids_col = entities.apply(
