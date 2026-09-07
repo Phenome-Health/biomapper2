@@ -165,6 +165,7 @@ class TestEquivalentIds:
         # The certificate assembler is the real one: mocking it away would let this test pass while
         # the emitted certificate was a MagicMock.
         mapper._issue_certificate = partial(Mapper._issue_certificate, mapper)
+        mapper._certify_and_reresolve = partial(Mapper._certify_and_reresolve, mapper)
 
         result = Mapper.map_entity_to_kg(
             mapper,
@@ -204,6 +205,7 @@ class TestEquivalentIds:
         mapper.resolver.is_small_molecule.return_value = False
         mapper.tier_b = None
         mapper._issue_certificate = partial(Mapper._issue_certificate, mapper)
+        mapper._certify_and_reresolve = partial(Mapper._certify_and_reresolve, mapper)
 
         result = Mapper.map_entity_to_kg(
             mapper, item={"name": "unknown"}, name_field="name", provided_id_fields=[], entity_type="protein"

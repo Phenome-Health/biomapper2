@@ -239,3 +239,71 @@ def test_structure_resolver_name_fallback_encodes_slashes() -> None:
     session.responses = {"pug/compound/name": _FakeResponse({"PropertyTable": {"Properties": [{"InChIKey": MW_KEY}]}})}
     resolver._fetch_pubchem_inchikey("PC 16:0/18:1")
     assert "%2F" in session.calls[1], f"the slash was not encoded: {session.calls[1]}"
+
+
+# --- Unit 4: the lipid independent-structure hop (MW -> PubChem -> Goslin/LIPID MAPS) ----------
+# A shared LipidStructureResolver is injected as the THIRD hop. A lipid name the exact-name registries
+# miss now resolves from the lipid source with a FULL key + source="lipidmaps"; a non-lipid is
+# unchanged.
+
+from biomapper2.core.certificate import TierBResult  # noqa: E402
+
+LIPID_FULL_KEY = "KILNVBDSWZSGLL-KXQOOQHDSA-N"
+
+
+class _FakeLipidResolver:
+    """Resolves only names starting with a lipid head group; records what it was asked."""
+
+    def __init__(self, outcome=TierBOutcome.RESOLVED, key=LIPID_FULL_KEY):
+        self._outcome = outcome
+        self._key = key
+        self.calls: list[str] = []
+
+    def resolve(self, name):
+        self.calls.append(name)
+        if name and str(name).startswith(("PC", "PE", "TG", "SM")) and self._outcome is TierBOutcome.RESOLVED:
+            return TierBResult(source="lipidmaps", inchikey_block=self._key, outcome=TierBOutcome.RESOLVED)
+        if name and str(name).startswith(("PC", "PE", "TG", "SM")):
+            return TierBResult(source=None, inchikey_block=None, outcome=self._outcome)
+        return TierBResult(source=None, inchikey_block=None, outcome=TierBOutcome.UNRESOLVABLE)
+
+
+def test_a_lipid_the_registries_miss_resolves_from_the_lipid_hop() -> None:
+    lipid = _FakeLipidResolver()
+    lookup, session = _lookup(
+        {"refmet/name": _FakeResponse({}, status=404), "pubchem": _FakeResponse({}, status=404)},
+        lipid_resolver=lipid,
+    )
+    result = lookup.lookup("PC 16:0/18:1")
+    assert result.outcome is TierBOutcome.RESOLVED
+    assert result.source == "lipidmaps"
+    assert result.inchikey_block == LIPID_FULL_KEY  # FULL key flows through unchanged
+    assert lipid.calls == ["PC 16:0/18:1"]
+
+
+def test_the_lipid_hop_is_only_tried_after_mw_and_pubchem_miss() -> None:
+    lipid = _FakeLipidResolver()
+    lookup, _ = _lookup({"refmet/name": _FakeResponse({"inchi_key": MW_KEY})}, lipid_resolver=lipid)
+    result = lookup.lookup("glucose")
+    assert result.source == "metabolomics-workbench"
+    assert lipid.calls == [], "the lipid hop must not run once an earlier hop resolves"
+
+
+def test_a_non_lipid_is_unchanged_by_the_lipid_hop() -> None:
+    lipid = _FakeLipidResolver()
+    lookup, _ = _lookup(
+        {"refmet/name": _FakeResponse({}, status=404), "pubchem": _FakeResponse({}, status=404)},
+        lipid_resolver=lipid,
+    )
+    result = lookup.lookup("X-12345")
+    assert result.outcome is TierBOutcome.UNRESOLVABLE
+
+
+def test_a_lipid_hop_lookup_failure_surfaces_as_lookup_failed() -> None:
+    lipid = _FakeLipidResolver(outcome=TierBOutcome.LOOKUP_FAILED)
+    lookup, _ = _lookup(
+        {"refmet/name": _FakeResponse({}, status=404), "pubchem": _FakeResponse({}, status=404)},
+        lipid_resolver=lipid,
+    )
+    result = lookup.lookup("PC 16:0/18:1")
+    assert result.outcome is TierBOutcome.LOOKUP_FAILED

@@ -26,13 +26,18 @@ from .linker import Linker
 class StructureResolver:
     """Adjudicates whether two KG nodes share InChIKey connectivity (2-D structure)."""
 
-    def __init__(self, linker: Linker) -> None:
+    def __init__(self, linker: Linker, lipid_resolver: Any | None = None) -> None:
         self.linker = linker
         self._session = requests_cache.CachedSession(
             str(CACHE_DIR / "structure_http"),
             ignored_parameters=CACHE_IGNORED_PARAMETERS,
         )
         self._name_cache: dict[str, str | None] = {}  # inchikey block by node name (per process)
+        self._name_full_cache: dict[str, str | None] = {}  # FULL inchikey by node name (per process)
+        # Candidate-side lipid hop (KTD6). Lipid shorthand nodes never resolve via KG/MW/PubChem by
+        # name, so a lipid candidate is un-matchable in re-resolution without this. Shared with the
+        # query-side Tier B lookup so both sides read one lipid resolver + cache. None disables it.
+        self._lipid_resolver = lipid_resolver
 
     def connectivity_match(self, node_a: str, node_b: str) -> bool | None:
         """True if the nodes share ANY InChIKey first block, False if both resolve and share none,
@@ -63,7 +68,7 @@ class StructureResolver:
         return bool(blocks_a & blocks_b)
 
     def inchikey_block(self, node_id: str, node_name: str | None, records: dict[str, Any] | None = None) -> str | None:
-        """First InChIKey block for a node: KG record -> MW by name -> PubChem by name."""
+        """First InChIKey block for a node: KG record -> MW by name -> PubChem by name -> lipid."""
         records = records if records is not None else self.linker.get_node_records([node_id])
         keys = ((records.get(node_id) or {}).get("equivalent_ids") or {}).get("INCHIKEY") or []
         if keys:
@@ -72,14 +77,78 @@ class StructureResolver:
             return None
         if node_name in self._name_cache:
             return self._name_cache[node_name]
-        try:
-            key = self._fetch_mw_inchikey(node_name) or self._fetch_pubchem_inchikey(node_name)
-            block = self._first_block(key) if key else None
-        except Exception:
-            logging.warning("Structure lookup failed for '%s'; treating as unresolvable", node_name, exc_info=True)
-            block = None
+        block = self._first_block(self._resolve_name_key(node_name))
         self._name_cache[node_name] = block
         return block
+
+    def structural_inchikey(
+        self, node_id: str, node_name: str | None, records: dict[str, Any] | None = None
+    ) -> str | None:
+        """FULL InChIKey for a node: KG record -> MW by name -> PubChem by name -> lipid.
+
+        Companion to :meth:`inchikey_block` that keeps the second (stereo) block so re-resolution can
+        compare at the structural key (block1 + block2[:8]) instead of connectivity alone. Used only
+        on the CANDIDATE nodes; the committed node's key is never read as the re-resolution anchor.
+        """
+        records = records if records is not None else self.linker.get_node_records([node_id])
+        keys = ((records.get(node_id) or {}).get("equivalent_ids") or {}).get("INCHIKEY") or []
+        if keys:
+            first = next((k for k in keys if k), None)
+            return str(first).upper() if first else None
+        if not node_name:
+            return None
+        if node_name in self._name_full_cache:
+            return self._name_full_cache[node_name]
+        key = self._resolve_name_key(node_name)
+        full = str(key).upper() if key else None
+        self._name_full_cache[node_name] = full
+        return full
+
+    def structural_inchikeys(
+        self, node_id: str, node_name: str | None, records: dict[str, Any] | None = None
+    ) -> list[str]:
+        """ALL FULL InChIKeys graph-asserted for a node, else the single name-resolved key.
+
+        A candidate node may carry SEVERAL graph-asserted InChIKeys, and the query's independent
+        structure can match any one of them. :meth:`structural_inchikey` returns only the first, so
+        re-resolution matching on it would reject a valid candidate whose match is a non-first key.
+        This companion returns the full set (order-preserving, de-duplicated, upper-cased) so the
+        caller can accept a match against ANY asserted structure. Falls back to the name-resolved key.
+        """
+        records = records if records is not None else self.linker.get_node_records([node_id])
+        keys = ((records.get(node_id) or {}).get("equivalent_ids") or {}).get("INCHIKEY") or []
+        out: list[str] = []
+        seen: set[str] = set()
+        for k in keys:
+            if k:
+                ku = str(k).upper()
+                if ku not in seen:
+                    seen.add(ku)
+                    out.append(ku)
+        if out:
+            return out
+        if not node_name:
+            return []
+        # Reuse the single-key name hop (and its cache); a name resolves to at most one structure.
+        one = self.structural_inchikey(node_id, node_name, records)
+        return [one] if one else []
+
+    def _resolve_name_key(self, node_name: str) -> str | None:
+        """Full InChIKey for a NAME via MW -> PubChem -> lipid hop. Fail-soft (``None`` on error)."""
+        try:
+            key = self._fetch_mw_inchikey(node_name) or self._fetch_pubchem_inchikey(node_name)
+        except Exception:
+            logging.warning("Structure lookup failed for '%s'; treating as unresolvable", node_name, exc_info=True)
+            return None
+        if key:
+            return key
+        if self._lipid_resolver is not None:
+            from .certificate import TierBOutcome
+
+            lipid = self._lipid_resolver.resolve(node_name)
+            if lipid.outcome is TierBOutcome.RESOLVED and lipid.inchikey_block:
+                return lipid.inchikey_block
+        return None
 
     def inchikey_blocks(self, node_id: str, node_name: str | None, records: dict[str, Any] | None = None) -> set[str]:
         """ALL KG-asserted InChIKey first-blocks for a node (the full ``equivalent_ids`` list).
