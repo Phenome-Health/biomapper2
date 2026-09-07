@@ -147,6 +147,16 @@ TIER_B_BACKOFF_BASE_S = 0.5  # first backoff; doubles per retry
 # means the verdicts were computed on a biased easy subset.
 TIER_B_MIN_RESOLUTION_RATE = 0.5
 
+# Structure-guided re-resolution of conflated KG commits (see core/resolver.py:reresolve_on_contradiction).
+#
+# OFF by default, and INERT unless TIER_B_ENABLED: re-resolution keys on a CONTRADICTED certificate,
+# which only Tier B can produce, so enabling this without Tier B does nothing. The Mapper asserts the
+# dependency and logs at build time. When on (and Tier B on), a contradiction triggers a single
+# structure-guided attempt to swap the conflated node for the correct distinct candidate; a
+# still-contradicted swap is a logged REFUSE, never a recursion. A gated production change: the
+# falsifiable benchmark that measures precision/coverage lives in the separate benchmark axis.
+RERESOLUTION_ENABLED = os.getenv("BIOMAPPER2_RERESOLUTION_ENABLED", "").strip().lower() in {"1", "true", "yes"}
+
 # Human-preference re-ranking for gene/protein resolution (see docs/plans HGNC plan).
 # When prefer_human is active, hybrid-search retrieves this many candidates (instead of 1) so the
 # human node — which often ranks below the wrong-species ortholog — is actually returned. Live spike

@@ -53,9 +53,13 @@ from typing import Any
 REFMET_ANNOTATOR = "metabolomics-workbench"
 
 # Tier B sources, and the annotator each one is NOT independent of. PubChem is independent of every
-# annotator the resolver source-weights toward; MW is the RefMet registry itself.
+# annotator the resolver source-weights toward; MW is the RefMet registry itself. LIPID MAPS binds a
+# Goslin-canonical lipid shorthand to a structure; it is KG-independent (valid for the cross-cohort
+# certificate) but CIRCULAR against the LMSD benchmark arm, so a lipidmaps-sourced structure carries
+# this tag and the benchmark axis excludes those rows from its LMSD lipid oracle.
 TIER_B_SOURCE_MW = "metabolomics-workbench"
 TIER_B_SOURCE_PUBCHEM = "pubchem"
+TIER_B_SOURCE_LIPIDMAPS = "lipidmaps"
 _SOURCE_TO_DEPENDENT_ANNOTATOR = {TIER_B_SOURCE_MW: REFMET_ANNOTATOR}
 
 # Identifier of the rule that produced the verdict (L20). Seeded to the semantics PR #47 shipped:
@@ -64,6 +68,46 @@ _SOURCE_TO_DEPENDENT_ANNOTATOR = {TIER_B_SOURCE_MW: REFMET_ANNOTATOR}
 COMPARISON_RULE_FIRST_BLOCK_SET_INTERSECTION = "inchikey_first_block_set_intersection/v1"
 
 INCHIKEY_PREFIX = "INCHIKEY"
+
+# Length of the InChIKey stereo layer prefix folded into the structural key. The second block
+# encodes stereochemistry, isotopes, protonation and charge in a fixed layout; its first 8
+# characters are the stereo/skeleton-refinement layer, and comparing only those keeps the key robust
+# to the protonation/charge suffix while still separating stereoisomers. This is the same
+# ``block1 + block2[:8]`` seam the benchmark scorers use (studies/.../necs_gold_repair.py).
+STRUCTURAL_KEY_BLOCK2_LEN = 8
+
+
+def structural_key_parts(inchikey: str | None) -> tuple[str | None, str | None]:
+    """Split an InChIKey (full OR first-block-only) into ``(block1, block2[:8] | None)``.
+
+    ``block1`` is the connectivity skeleton; ``block2`` (truncated) is the stereo layer, or ``None``
+    when the input carries only a first block (MW/PubChem emit first-block only). Upper-cased so an
+    external service's casing never decides a verdict.
+    """
+    if not inchikey or not str(inchikey).strip():
+        return None, None
+    parts = str(inchikey).strip().upper().split("-")
+    block1 = parts[0] or None
+    block2 = parts[1][:STRUCTURAL_KEY_BLOCK2_LEN] if len(parts) > 1 and parts[1] else None
+    return block1, block2
+
+
+def structural_agree(a: str | None, b: str | None) -> bool:
+    """True when two InChIKeys agree at the structural key (block1, then block2[:8] if BOTH carry it).
+
+    Connectivity is compared on block1. Stereo is compared on block2[:8] ONLY when both operands
+    carry a second block; if either side is first-block-only the agreement is connectivity-only and
+    stereo is deliberately NOT asserted (never a silent stereo pass). A missing/empty key never
+    agrees.
+    """
+    a1, a2 = structural_key_parts(a)
+    b1, b2 = structural_key_parts(b)
+    if a1 is None or b1 is None or a1 != b1:
+        return False
+    if a2 is not None and b2 is not None:
+        return a2 == b2
+    return True
+
 
 # Cache provenance. The confound that motivated recording this (a cold cache returning a wrong
 # node) lives in the KESTREL store, which expires; the structure store does not expire at all. Both
@@ -221,6 +265,21 @@ def node_blocks_from_equivalent_ids(kg_equivalent_ids: Mapping[str, Any] | None)
     return sorted(blocks)
 
 
+def node_full_inchikeys_from_equivalent_ids(kg_equivalent_ids: Mapping[str, Any] | None) -> list[str]:
+    """FULL InChIKeys the GRAPH asserts for the committed node, upper-cased. Zero I/O.
+
+    Companion to ``node_blocks_from_equivalent_ids`` (which strips to first blocks for the emitted
+    column). The full keys are kept only for the structural-key comparison, so a stereo-layer
+    difference against a full-key Tier B result is detectable instead of being flattened away.
+    """
+    if not kg_equivalent_ids:
+        return []
+    keys = kg_equivalent_ids.get(INCHIKEY_PREFIX) or []
+    if isinstance(keys, str):
+        keys = [keys]
+    return sorted({k.strip().upper() for k in keys if isinstance(k, str) and k.strip()})
+
+
 def _default_provenance(tier_b: TierBResult | None) -> dict[str, Any]:
     return {
         "tier_b_enabled": tier_b is not None and tier_b.outcome is not TierBOutcome.OFF,
@@ -311,17 +370,17 @@ def issue(
         structure_status = StructureStatus.STRUCTURE_PRESENT
         state = CertificateState.UNCORROBORATED
         if tier_b is not None and tier_b.outcome is TierBOutcome.RESOLVED and tier_b.inchikey_block:
-            # Fold BOTH operands at the comparison too, independently of the producers above, so
-            # a third producer cannot silently reopen this. A case mismatch here does not degrade
-            # gracefully: it emits ``contradicted``, the state asserting that independent evidence
-            # REFUTES the committed node, for two spellings of the same molecule. The study module
-            # folds (twice over), so its controls would score those rows as agreeing while this
-            # scored them as refuted -- an inverted Panel B with every gate satisfied.
-            state = (
-                CertificateState.CORROBORATED
-                if tier_b.inchikey_block.upper() in {b.upper() for b in blocks}
-                else CertificateState.CONTRADICTED
-            )
+            # Structural-key comparison (block1 + block2[:8]), folded over BOTH operands so a full-key
+            # Tier B result (the lipid source emits one) is not tested for membership in a set of
+            # first blocks -- which would never match and would flip every RESOLVED row to
+            # CONTRADICTED. The node side keeps its FULL keys here (the emitted column stays first
+            # blocks) so a stereoisomer difference is detectable; MW/PubChem still emit first-block
+            # only, degrading their rows to a connectivity-only agreement, never a silent stereo
+            # pass. This generalizes the old first-block set-intersection: when every operand is
+            # first-block-only the verdict is identical, so default (Tier-A) output is unchanged.
+            node_full_keys = node_full_inchikeys_from_equivalent_ids(kg_equivalent_ids)
+            agrees = any(structural_agree(tier_b.inchikey_block, nk) for nk in node_full_keys)
+            state = CertificateState.CORROBORATED if agrees else CertificateState.CONTRADICTED
 
     # Independent-evidence fields belong ONLY to rows the evidence was actually weighed on -- i.e.
     # ``structure_present``. A row that is out of scope, or that committed no node, has nothing for

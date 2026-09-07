@@ -13,11 +13,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from . import config
 from .biolink_client import BiolinkClient
-from .config import PROJECT_ROOT, TIER_B_ENABLED, get_kestrel_api_url
+from .config import PROJECT_ROOT, RERESOLUTION_ENABLED, TIER_B_ENABLED, get_kestrel_api_url
 from .core.analysis import analyze_dataset_mapping
 from .core.annotation_engine import AnnotationEngine
 from .core.certificate import (
+    CertificateState,
     ResolutionCertificate,
     derive_chosen_kg_id_review,
     issue,
@@ -60,22 +62,51 @@ class Mapper:
         self.annotation_engine = AnnotationEngine(biolink_client=self.biolink_client)
         self.normalizer = Normalizer(biolink_client=self.biolink_client)
         self.linker = Linker()
-        self.resolver = Resolver(linker=self.linker, biolink_client=self.biolink_client)
-        self.tier_b = self._build_tier_b()
+        # One lipid independent-structure resolver, shared by the query side (Tier B) and the
+        # candidate side (the resolver's StructureResolver) so both read one lookup + cache (KTD6).
+        # Constructed only when Tier B is enabled, so a default run builds no pygoslin grammar and
+        # holds no session.
+        self.lipid_resolver = self._build_lipid_resolver()
+        self.resolver = Resolver(
+            linker=self.linker, biolink_client=self.biolink_client, lipid_resolver=self.lipid_resolver
+        )
+        self.tier_b = self._build_tier_b(self.lipid_resolver)
 
     @staticmethod
-    def _build_tier_b():
+    def _build_lipid_resolver():
+        """The shared Goslin -> LIPID MAPS lipid structure resolver, or None when Tier B is off."""
+        if not TIER_B_ENABLED:
+            return None
+        from .core.lipid_structure_resolver import LipidStructureResolver
+
+        return LipidStructureResolver()
+
+    @staticmethod
+    def _build_tier_b(lipid_resolver=None):
         """The opt-in independent-structure lookup, or None.
 
         Constructed only when enabled, so a default run holds no session against Metabolomics
-        Workbench or PubChem and cannot drift into making calls.
+        Workbench or PubChem and cannot drift into making calls. The lipid resolver is threaded in as
+        the third hop (MW -> PubChem -> Goslin/LIPID MAPS).
+
+        Re-resolution is INERT without Tier B (a CONTRADICTED certificate, which it keys on, can only
+        come from Tier B), so the dependency is made explicit here: enabling re-resolution without
+        Tier B is a configuration error, surfaced loudly rather than as a silent no-op.
         """
         if not TIER_B_ENABLED:
+            if RERESOLUTION_ENABLED:
+                raise ValueError(
+                    "RERESOLUTION_ENABLED requires TIER_B_ENABLED: re-resolution triggers on a "
+                    "CONTRADICTED certificate, which only Tier B can produce. Enable Tier B or "
+                    "disable re-resolution."
+                )
             return None
         from .core.tier_b import IndependentStructureLookup
 
         logging.info("Tier B independent structure evidence is ENABLED for this run")
-        return IndependentStructureLookup()
+        if RERESOLUTION_ENABLED:
+            logging.info("Structure-guided re-resolution is ENABLED for this run (requires Tier B)")
+        return IndependentStructureLookup(lipid_resolver=lipid_resolver)
 
     def _issue_certificate(
         self,
@@ -87,6 +118,7 @@ class Mapper:
         equivalent_ids_lookup_ok: bool,
         selection_conflict: str | None,
         kg_ids_assigned: dict[str, dict[str, list[str]]] | None,
+        refusal_reason: str | None = None,
     ) -> ResolutionCertificate:
         """Assemble one certificate. Shared by both emission paths so they cannot drift apart.
 
@@ -135,7 +167,111 @@ class Mapper:
             selection_conflict=selection_conflict,
             tier_b=tier_b_result,
             committed_node_sources=committed_sources,
+            refusal_reason=refusal_reason,
         )
+
+    def _enrich_equivalent_ids(self, chosen_kg_id: str | None) -> tuple[dict[str, list[str]], bool]:
+        """Step 5 for one node: the graph's equivalent ids, and whether the lookup succeeded.
+
+        Factored out so re-resolution can re-run enrichment on a swapped node without duplicating the
+        /get-nodes call shape the two mapping paths use.
+        """
+        if chosen_kg_id is None:
+            return {}, True
+        equiv_ids, ok = self.linker.get_equivalent_ids_checked([chosen_kg_id])
+        return equiv_ids.get(chosen_kg_id, {}), ok
+
+    def _certify_and_reresolve(
+        self,
+        *,
+        query_name: str | None,
+        category: str | None,
+        chosen_kg_id: str | None,
+        kg_equivalent_ids: dict[str, list[str]] | None,
+        equivalent_ids_lookup_ok: bool,
+        selection_conflict: str | None,
+        kg_ids: dict[str, list[str]] | None,
+        kg_ids_assigned: dict[str, dict[str, list[str]]] | None,
+    ) -> tuple[ResolutionCertificate, str | None, dict[str, list[str]]]:
+        """Step 6 (+ optional Step 6.5): issue the certificate and, on a contradiction, re-resolve.
+
+        Returns ``(certificate, chosen_kg_id, kg_equivalent_ids)`` -- the last two are swapped only
+        when re-resolution commits a distinct candidate. When the flag is off, or the certificate is
+        not CONTRADICTED, this is exactly today's behavior: a single ``_issue_certificate`` call.
+
+        On a CONTRADICTED certificate with the flag on, the resolver picks the distinct candidate
+        whose own structure matches the query's INDEPENDENT structure (never the committed node's key,
+        KTD5). A commit re-runs enrichment + the certificate on the swapped node under a SINGLE-ATTEMPT
+        guard: a swap that still contradicts is a logged REFUSE, not a recursion. A refusal keeps the
+        committed node and records the reason on the certificate.
+        """
+        kg_equivalent_ids = kg_equivalent_ids or {}
+        certificate = self._issue_certificate(
+            query_name=query_name,
+            category=category,
+            chosen_kg_id=chosen_kg_id,
+            kg_equivalent_ids=kg_equivalent_ids,
+            equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
+            selection_conflict=selection_conflict,
+            kg_ids_assigned=kg_ids_assigned,
+        )
+        if not (config.RERESOLUTION_ENABLED and certificate.state is CertificateState.CONTRADICTED):
+            return certificate, chosen_kg_id, kg_equivalent_ids
+
+        new_id, reason = self.resolver.reresolve_on_contradiction(
+            candidates=list(kg_ids or {}),
+            query_independent_inchikey=certificate.independent_inchikey_block,
+            committed_kg_id=chosen_kg_id,
+        )
+        if reason != "reresolved" or new_id == chosen_kg_id:
+            # No distinct match (within-node conflation, or ambiguous): keep the committed node and
+            # its contradicted certificate, but record WHY re-resolution declined (L2: never guess).
+            refused = self._issue_certificate(
+                query_name=query_name,
+                category=category,
+                chosen_kg_id=chosen_kg_id,
+                kg_equivalent_ids=kg_equivalent_ids,
+                equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
+                selection_conflict=selection_conflict,
+                kg_ids_assigned=kg_ids_assigned,
+                refusal_reason=reason,
+            )
+            return refused, chosen_kg_id, kg_equivalent_ids
+
+        # Commit the swap: re-run Step 5 enrichment + Step 6 certificate on the NEW node. This
+        # re-certify must NOT re-trigger re-resolution (single attempt).
+        new_equiv, new_ok = self._enrich_equivalent_ids(new_id)
+        swapped = self._issue_certificate(
+            query_name=query_name,
+            category=category,
+            chosen_kg_id=new_id,
+            kg_equivalent_ids=new_equiv,
+            equivalent_ids_lookup_ok=new_ok,
+            selection_conflict=selection_conflict,
+            kg_ids_assigned=kg_ids_assigned,
+        )
+        if swapped.state is CertificateState.CONTRADICTED:
+            # The swapped node still contradicts the independent structure. Refuse rather than recurse
+            # or commit a second wrong node; keep the original committed node and log it.
+            logging.info(
+                "Re-resolution swapped %s -> %s but the new node still contradicts; refusing",
+                chosen_kg_id,
+                new_id,
+            )
+            refused = self._issue_certificate(
+                query_name=query_name,
+                category=category,
+                chosen_kg_id=chosen_kg_id,
+                kg_equivalent_ids=kg_equivalent_ids,
+                equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
+                selection_conflict=selection_conflict,
+                kg_ids_assigned=kg_ids_assigned,
+                refusal_reason="reresolution_still_contradicted",
+            )
+            return refused, chosen_kg_id, kg_equivalent_ids
+
+        logging.info("Re-resolution swapped conflated node %s -> %s (structure-guided)", chosen_kg_id, new_id)
+        return swapped, new_id, new_equiv
 
     def map_entity_to_kg(
         self,
@@ -223,18 +359,21 @@ class Mapper:
             kg_equivalent_ids = equiv_ids.get(entity.chosen_kg_id, {})
             entity = entity.update_from(pd.Series({"kg_equivalent_ids": kg_equivalent_ids}))
 
-        # Do Step 6: issue the resolution certificate.
+        # Do Step 6 (+ optional Step 6.5 re-resolution): issue the resolution certificate.
         #
         # Deliberately OUTSIDE the null guard above: the rows the certificate most needs to describe
         # are the ones with no committed node, and building it inside would leave that population
-        # undescribed here while the dataset path described it.
-        certificate = self._issue_certificate(
+        # undescribed here while the dataset path described it. When re-resolution is enabled and the
+        # certificate contradicts, the committed node and its equivalent ids may be swapped for the
+        # correct distinct candidate (default-off; today's behavior otherwise).
+        certificate, chosen_kg_id, kg_equivalent_ids = self._certify_and_reresolve(
             query_name=entity.name,
             category=entity_type,
             chosen_kg_id=entity.chosen_kg_id,
             kg_equivalent_ids=kg_equivalent_ids,
             equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
             selection_conflict=entity.chosen_kg_id_review,
+            kg_ids=entity.kg_ids,
             kg_ids_assigned=entity.kg_ids_assigned,
         )
         # Emitted as a plain dict, not the dataclass: pydantic rejects a raw dataclass at the
@@ -242,6 +381,8 @@ class Mapper:
         entity = entity.update_from(
             pd.Series(
                 {
+                    "chosen_kg_id": chosen_kg_id,
+                    "kg_equivalent_ids": kg_equivalent_ids or {},
                     "resolution_certificate": certificate.to_api_dict(),
                     "chosen_kg_id_review": derive_chosen_kg_id_review(certificate),
                 }
@@ -385,18 +526,31 @@ class Mapper:
         # Flat scalar columns, assembled as plain dicts: an object column surviving to df.to_csv
         # would write `ResolutionCertificate(state=...)` and reintroduce exactly the
         # ast.literal_eval-only column the certificate exists to replace.
-        certificate_rows = [
-            self._issue_certificate(
+        certificate_rows = []
+        reresolved_ids: list[str | None] = []
+        reresolved_equiv: list[dict[str, list[str]]] = []
+        for _, row in df.iterrows():
+            committed = _scalar_or_none(row.get("chosen_kg_id"))
+            equiv = row.get("kg_equivalent_ids") or {}
+            certificate, new_id, new_equiv = self._certify_and_reresolve(
                 query_name=_scalar_or_none(row.get(name_column)),
                 category=entity_type,
-                chosen_kg_id=_scalar_or_none(row.get("chosen_kg_id")),
-                kg_equivalent_ids=row.get("kg_equivalent_ids") or {},
+                chosen_kg_id=committed,
+                kg_equivalent_ids=equiv,
                 equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
                 selection_conflict=_scalar_or_none(row.get("chosen_kg_id_review")),
+                kg_ids=row.get("kg_ids") or {},
                 kg_ids_assigned=row.get("kg_ids_assigned") or {},
             )
-            for _, row in df.iterrows()
-        ]
+            certificate_rows.append(certificate)
+            reresolved_ids.append(new_id)
+            reresolved_equiv.append(new_equiv or {})
+        # Re-resolution may have swapped the committed node; reflect the correction in the emitted
+        # chosen_kg_id / kg_equivalent_ids columns. Guarded by the flag so a default run's columns
+        # (and their dtypes) are byte-for-byte unchanged.
+        if config.RERESOLUTION_ENABLED:
+            df["chosen_kg_id"] = pd.Series(reresolved_ids, index=df.index, dtype=object)
+            df["kg_equivalent_ids"] = pd.Series(reresolved_equiv, index=df.index, dtype=object)
         df = df.join(pd.DataFrame([c.to_flat_columns() for c in certificate_rows], index=df.index))
         # The legacy flag is now DERIVED from the certificate (C4/L20) rather than passed through,
         # so the two can never disagree. Identical for one release; deprecation is a follow-up.
