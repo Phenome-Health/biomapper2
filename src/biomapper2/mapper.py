@@ -331,6 +331,7 @@ class Mapper:
         annotators: list[str] | None = None,
         prefer_human: bool = True,
         prefer_canonical: bool = True,
+        candidate_limit: int | None = None,
     ) -> pd.Series | dict[str, Any]:
         """
         Map a single entity to knowledge graph nodes.
@@ -372,6 +373,7 @@ class Mapper:
             annotators=annotators,
             prefer_human=prefer_human,
             prefer_canonical=prefer_canonical,
+            candidate_limit=candidate_limit,
         )
         assert isinstance(annotation_result, pd.Series)
         entity = entity.update_from(annotation_result)
@@ -468,6 +470,7 @@ class Mapper:
         annotators: list[str] | None = None,
         prefer_human: bool = True,
         prefer_canonical: bool = True,
+        candidate_limit: int | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """
         Map all entities in a dataset to knowledge graph nodes.
@@ -549,6 +552,7 @@ class Mapper:
             annotators=annotators,
             prefer_human=prefer_human,
             prefer_canonical=prefer_canonical,
+            candidate_limit=candidate_limit,
         )
         df = df.join(annotation_df)
         logging.info(f"After step 1 (annotation), df is: \n{df}")

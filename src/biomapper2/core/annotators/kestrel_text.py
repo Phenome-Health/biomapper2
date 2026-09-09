@@ -21,6 +21,7 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
         prefer_human: bool = True,  # accepted for interface parity; not applicable to text search
         preferred_prefixes: set[str] | None = None,  # accepted for interface parity; not applicable
         accepted_categories: set[str] | None = None,
+        candidate_limit: int | None = None,
         cache: dict | None = None,
     ) -> AssignedIDsDict:
         """Implements BaseAnnotator.get_annotations"""
@@ -28,11 +29,12 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
         # Extract the value to search
         search_term = entity.get(name_field)
         if text_is_not_empty(search_term):
-            # Use cache if available, otherwise make API call
+            # Use cache if available, otherwise make API call. An explicit candidate_limit always wins.
             if cache:
                 term_results = cache.get(search_term)
             else:
-                results = self._kestrel_text_search(search_term, category, prefixes, limit=HYBRID_SEARCH_LIMIT)
+                limit = candidate_limit if candidate_limit is not None else HYBRID_SEARCH_LIMIT
+                results = self._kestrel_text_search(search_term, category, prefixes, limit=limit)
                 term_results = results[search_term]
 
             # Deterministic candidate order before the first-on-category scan: an exact score tie must
@@ -77,6 +79,7 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
         prefer_human: bool = True,  # accepted for interface parity; not applicable to text search
         preferred_prefixes: set[str] | None = None,  # accepted for interface parity; not applicable
         accepted_categories: set[str] | None = None,
+        candidate_limit: int | None = None,
     ) -> pd.Series:  # Series of AssignedIDsDicts
         """Implements BaseAnnotator.get_annotations_bulk"""
 
@@ -84,7 +87,9 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
         search_terms = [t for t in entities[name_field].tolist() if text_is_not_empty(t)]
 
         logging.info(f"Getting text search results from Kestrel API for {len(entities)} entities")
-        results = self._kestrel_text_search(search_terms, category, prefixes, limit=HYBRID_SEARCH_LIMIT)
+        # An explicit candidate_limit always wins over the default window.
+        limit = candidate_limit if candidate_limit is not None else HYBRID_SEARCH_LIMIT
+        results = self._kestrel_text_search(search_terms, category, prefixes, limit=limit)
 
         # Annotate each entity using the results from the bulk request
         assigned_ids_col = entities.apply(
@@ -95,10 +100,11 @@ class KestrelTextSearchAnnotator(BaseAnnotator):
             category=category,
             prefixes=prefixes,
             prefer_human=prefer_human,
-            # MUST be forwarded: the bulk path re-dispatches into get_annotations, so omitting this
-            # would silently drop the category guard on every dataset job while keeping it on the
-            # single-entity path.
+            # MUST be forwarded: the bulk path re-dispatches into get_annotations, so omitting these
+            # would silently drop the category guard (and the candidate window) on every dataset job
+            # while keeping them on the single-entity path.
             accepted_categories=accepted_categories,
+            candidate_limit=candidate_limit,
         )
 
         return cast(pd.Series, assigned_ids_col)

@@ -154,6 +154,18 @@ def get_refmet_snapshot_path() -> Path | None:
     return p if p.is_absolute() else (PROJECT_ROOT / p)
 
 
+def get_refmet_live_api_fallback() -> bool:
+    """Whether a freeze MISS falls through to the live ``/match`` endpoint (reads os.environ per call).
+
+    Default False: with a freeze present, a name not in it resolves deterministically to NO_MATCH
+    (``source=not_in_snapshot``) with no network call. Set ``REFMET_LIVE_API_FALLBACK`` truthy to let a
+    miss fall through to live ``/match`` (+breaker) so novel names still resolve on a deployment that
+    pins a corpus-bound freeze (the frozen names stay deterministic; only misses touch the network).
+    No effect when no freeze is present -- the live path is already the default there.
+    """
+    return os.environ.get("REFMET_LIVE_API_FALLBACK", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def derive_refmet_snapshot_version(path: Path | None) -> str | None:
     """Derive the freeze version from a sidecar or the filename. No file read of the TSV itself.
 

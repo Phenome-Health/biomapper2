@@ -51,6 +51,7 @@ class GoslinLipidAnnotator(BaseAnnotator):
         prefer_human: bool = True,
         preferred_prefixes: set[str] | None = None,
         accepted_categories: set[str] | None = None,
+        candidate_limit: int | None = None,
         cache: dict | None = None,
     ) -> AssignedIDsDict:
         """Implements BaseAnnotator.get_annotations. Returns ``{}`` for non-lipids (fail-soft)."""
@@ -73,6 +74,9 @@ class GoslinLipidAnnotator(BaseAnnotator):
             prefer_human=prefer_human,
             preferred_prefixes=preferred_prefixes,
             accepted_categories=accepted_categories,
+            # Forwarded so a Kestrel-backed binder honors the candidate window on a lipid search
+            # (the default RefMet binder accepts and ignores it).
+            candidate_limit=candidate_limit,
         )
         inner: dict[str, dict[str, dict[str, Any]]] = dict(bound.get(self._binder.slug, {}))
 
@@ -101,6 +105,7 @@ class GoslinLipidAnnotator(BaseAnnotator):
         prefer_human: bool = True,
         preferred_prefixes: set[str] | None = None,
         accepted_categories: set[str] | None = None,
+        candidate_limit: int | None = None,
     ) -> pd.Series:
         """Implements BaseAnnotator.get_annotations_bulk (rowwise; the binder handles its own cache)."""
         col = entities.apply(
@@ -112,6 +117,9 @@ class GoslinLipidAnnotator(BaseAnnotator):
             prefer_human=prefer_human,
             preferred_prefixes=preferred_prefixes,
             accepted_categories=accepted_categories,
+            # Re-dispatches into get_annotations, which forwards it to the binder — omitting it would
+            # drop the candidate window on every lipid dataset job.
+            candidate_limit=candidate_limit,
         )
         return cast(pd.Series, col)
 

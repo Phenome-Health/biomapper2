@@ -46,6 +46,7 @@ class _StatusAnnotator(BaseAnnotator):
         prefer_human=True,
         preferred_prefixes=None,
         accepted_categories=None,
+        candidate_limit=None,
         cache=None,
     ):
         return {self.slug: {}}
@@ -59,6 +60,7 @@ class _StatusAnnotator(BaseAnnotator):
         prefer_human=True,
         preferred_prefixes=None,
         accepted_categories=None,
+        candidate_limit=None,
         cache=None,
     ):
         return pd.Series([{self.slug: {}} for _ in range(len(entities))], index=entities.index)

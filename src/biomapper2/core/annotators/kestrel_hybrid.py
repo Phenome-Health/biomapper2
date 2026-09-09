@@ -36,6 +36,7 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
         prefer_human: bool = True,
         preferred_prefixes: set[str] | None = None,
         accepted_categories: set[str] | None = None,
+        candidate_limit: int | None = None,
         cache: dict | None = None,
     ) -> AssignedIDsDict:
         """Implements BaseAnnotator.get_annotations.
@@ -61,7 +62,12 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
             if cache:
                 term_results = cache.get(search_term)
             else:
-                limit = HYBRID_SEARCH_LIMIT if (prefer_human or preferred_prefixes) else 1
+                # An explicit candidate_limit always wins, overriding both the 20 and the "else 1".
+                limit = (
+                    candidate_limit
+                    if candidate_limit is not None
+                    else (HYBRID_SEARCH_LIMIT if (prefer_human or preferred_prefixes) else 1)
+                )
                 results = self._kestrel_hybrid_search(search_term, category, prefixes, limit=limit)
                 term_results = results[search_term]
 
@@ -131,6 +137,7 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
         prefer_human: bool = True,
         preferred_prefixes: set[str] | None = None,
         accepted_categories: set[str] | None = None,
+        candidate_limit: int | None = None,
     ) -> pd.Series:  # Series of AssignedIDsDicts
         """Implements BaseAnnotator.get_annotations_bulk"""
 
@@ -138,15 +145,20 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
         search_terms = [t for t in entities[name_field].tolist() if text_is_not_empty(t)]
 
         logging.info(f"Getting hybrid search results from Kestrel API for {len(entities)} entities")
-        # Enlarge the candidate window when either re-ranking policy is active (keeps payloads small for
-        # bulk jobs where no re-ranking applies).
-        limit = HYBRID_SEARCH_LIMIT if (prefer_human or preferred_prefixes) else 1
+        # An explicit candidate_limit always wins; otherwise enlarge the candidate window when either
+        # re-ranking policy is active (keeps payloads small for bulk jobs where no re-ranking applies).
+        limit = (
+            candidate_limit
+            if candidate_limit is not None
+            else (HYBRID_SEARCH_LIMIT if (prefer_human or preferred_prefixes) else 1)
+        )
         results = self._kestrel_hybrid_search(search_terms, category, prefixes, limit=limit)
 
         # Annotate each entity using the results from the bulk request. The internal re-dispatch MUST
-        # forward prefer_human, preferred_prefixes AND accepted_categories, otherwise the bulk path would
-        # silently use the get_annotations defaults (a silent no-op on dataset jobs — which is every
-        # benchmark run — for the canonical re-rank and for the category guard alike).
+        # forward prefer_human, preferred_prefixes, accepted_categories AND candidate_limit, otherwise
+        # the bulk path would silently use the get_annotations defaults (a silent no-op on dataset jobs —
+        # which is every benchmark run — for the canonical re-rank, the category guard, and the
+        # candidate window alike).
         assigned_ids_col = entities.apply(
             self.get_annotations,
             axis=1,
@@ -157,6 +169,7 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
             prefer_human=prefer_human,
             preferred_prefixes=preferred_prefixes,
             accepted_categories=accepted_categories,
+            candidate_limit=candidate_limit,
         )
 
         return cast(pd.Series, assigned_ids_col)
