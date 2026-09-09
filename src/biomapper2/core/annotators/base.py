@@ -175,6 +175,7 @@ class BaseAnnotator(ABC):  # Inherit from ABC
         prefer_human: bool = True,
         preferred_prefixes: set[str] | None = None,
         accepted_categories: set[str] | None = None,
+        candidate_limit: int | None = None,
         cache: dict | None = None,
     ) -> AssignedIDsDict:
         """
@@ -196,6 +197,10 @@ class BaseAnnotator(ABC):  # Inherit from ABC
                 the annotator refuses rather than committing an off-category node. A correctness guard,
                 not a preference: it is independent of prefer_canonical/prefer_human, and None means
                 unfiltered. Honored only by annotators that filter candidates; others accept and ignore it.
+            candidate_limit: When set, the search ``limit`` each Kestrel annotator uses directly,
+                overriding the adaptive default (20 with a re-ranking policy, else 1 for hybrid). None
+                means "use the adaptive default". Honored only by the Kestrel search annotators; others
+                accept and ignore it.
             cache: Optional pre-fetched results from bulk API call
 
         Returns:
@@ -213,6 +218,7 @@ class BaseAnnotator(ABC):  # Inherit from ABC
         prefer_human: bool = True,
         preferred_prefixes: set[str] | None = None,
         accepted_categories: set[str] | None = None,
+        candidate_limit: int | None = None,
     ) -> pd.Series:  # Series of AssignedIdsDicts
         """
         Get annotations for multiple entities with bulk API call.
@@ -225,6 +231,7 @@ class BaseAnnotator(ABC):  # Inherit from ABC
             prefer_human: See get_annotations. Accepted by all annotators; honored where applicable.
             preferred_prefixes: See get_annotations. Accepted by all annotators; honored where applicable.
             accepted_categories: See get_annotations. Accepted by all annotators; honored where applicable.
+            candidate_limit: See get_annotations. Accepted by all annotators; honored where applicable.
 
         Returns:
             Column (Series) of annotation results (same index as input)
