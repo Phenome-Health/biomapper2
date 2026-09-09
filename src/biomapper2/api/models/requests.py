@@ -42,6 +42,17 @@ class MappingOptions(BaseModel):
             "prefer_human)."
         ),
     )
+    candidate_limit: int | None = Field(
+        default=None,
+        ge=1,
+        le=100,
+        description=(
+            "Number of candidate nodes each Kestrel search annotator retrieves (the search 'limit'). "
+            "When set, this value is used directly, overriding the adaptive default (20 when a "
+            "re-ranking policy is active, else 1 for hybrid). When None (default), behavior is "
+            "unchanged. Bounded to 1..100; out-of-range values are rejected with a 422."
+        ),
+    )
 
     # Ignore unknown fields so a newer client sending extra options to an older server does not 422.
     # (Pydantic v2 already defaults to ignore; set explicitly as documentation of the contract.)
