@@ -12,10 +12,6 @@ wrong. A node the graph asserts no structure for can never be ``contradicted``, 
 nothing to contradict it with. ``test_structure_absent_is_never_contradicted`` is that guard (G3).
 """
 
-# State machine exercised as a table: each row is a dict of issue() kwargs spread into the call,
-# so pyright widens the value type to the column union. Runtime values are each the declared type.
-# pyright: reportArgumentType=false
-
 from __future__ import annotations
 
 import dataclasses
@@ -53,7 +49,7 @@ def _issue(**overrides):
         selection_conflict=None,
     )
     kwargs.update(overrides)
-    return issue(**kwargs)
+    return issue(**kwargs)  # pyright: ignore[reportArgumentType]
 
 
 # --------------------------------------------------------------------------------------------

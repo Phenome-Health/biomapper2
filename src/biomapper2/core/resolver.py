@@ -15,12 +15,26 @@ from typing import Any
 
 import pandas as pd
 
+from ..config import CATEGORY_PREFERRED_NAMESPACES
 from .certificate import structural_agree
 from .structure_resolver import StructureResolver
 
 # The annotator whose vote is authoritative for small-molecule ChEBI conflicts: it queries the
 # RefMet /match endpoint by name and emits the RefMet-anchored node.
 REFMET_ANNOTATOR = "metabolomics-workbench"
+
+
+def _curie_sort_key(curie: str) -> tuple[int, int, str]:
+    """Total order over CURIEs preferring a lower NUMERIC local id, without implying canonicality.
+
+    String sort is not numeric (``CHEBI:983`` > ``CHEBI:12777`` lexically); this orders numeric locals by
+    value and falls back to the full CURIE for non-numeric locals. Determinism only — the winner on a
+    genuine tie is arbitrary and is logged as a WARNING by the caller.
+    """
+    local = curie.rsplit(":", 1)[-1]
+    if local.isdigit():
+        return (0, int(local), curie)
+    return (1, 0, curie)
 
 
 class Resolver:
@@ -97,6 +111,38 @@ class Resolver:
             }
         )
 
+    def _stable_majority(self, kg_ids_dict: dict[str, list[str]], category: str | None) -> str:
+        """Majority vote by supporting-curie count with a DETERMINISTIC tie-break.
+
+        A strict count winner is returned unchanged (byte-identical to the old
+        ``max(kg_ids_dict, key=len)``). On a genuine 2+ count tie the pick is (1) a category-preferred
+        namespace when one is configured, then (2) ``_curie_sort_key`` as a total-order fallback, and a
+        WARNING is logged so a coin-flip resolution stays visible in run logs instead of riding silently on
+        API-response order. Determinism, not chemical correctness. (A structured downstream tie flag is a
+        deliberate follow-up: the certificate ``selection_conflict`` channel is a closed, small-molecule-only
+        whitelist, so surfacing ties to the benchmark is a certificate-contract change gated on the Unit 0
+        tie-frequency scan, not part of this resolver fix.)
+        """
+        max_count = max(len(curies) for curies in kg_ids_dict.values())
+        tied = [kg_id for kg_id, curies in kg_ids_dict.items() if len(curies) == max_count]
+        if len(tied) == 1:
+            return tied[0]
+        # Prefer a canonical namespace for the row's category when configured, inheriting a configured
+        # ancestor's policy through the Biolink hierarchy (so e.g. biolink:Drug inherits SmallMolecule's
+        # CHEBI/HMDB/RM), matching the annotation path. The numeric fallback keeps ties deterministic when
+        # no policy applies.
+        preferred = self._preferred_prefixes(category)
+        pool = [kg_id for kg_id in tied if kg_id.split(":", 1)[0] in preferred] if preferred else []
+        chosen = min(pool or tied, key=_curie_sort_key)
+        logging.warning(
+            "majority tie among %s (category=%s); picked %s by deterministic tie-break — arbitrary, no "
+            "chemical preference",
+            sorted(tied),
+            category,
+            chosen,
+        )
+        return chosen
+
     def _choose_best_kg_id(
         self,
         kg_ids_dict: dict[str, list[str]],
@@ -126,8 +172,8 @@ class Resolver:
         if not kg_ids_dict:
             return None, None
 
-        # Unchanged default: majority vote by number of supporting curies.
-        majority = max(kg_ids_dict, key=lambda k: len(kg_ids_dict[k]))
+        # Deterministic majority vote (stable tie-break on count ties; warning logged on a genuine tie).
+        majority = self._stable_majority(kg_ids_dict, category)
 
         # Source-weighting applies ONLY to small-molecule ChEBI conflicts.
         if not (kg_ids_assigned and category and self._is_small_molecule(category)):
@@ -182,6 +228,22 @@ class Resolver:
         if self.biolink_client is None:
             return False
         return category in self.biolink_client.get_descendants("biolink:SmallMolecule")
+
+    def _preferred_prefixes(self, category: str | None) -> set[str]:
+        """Preferred namespaces for a category, inheriting configured Biolink ancestors' policy.
+
+        Mirrors ``AnnotationEngine._category_preferred_prefixes``: each configured key in
+        ``CATEGORY_PREFERRED_NAMESPACES`` applies to all its Biolink descendants, so a descendant category
+        (e.g. ``biolink:Drug``) inherits ``biolink:SmallMolecule``'s prefixes. Returns the union on overlap;
+        empty set when no policy applies or ``biolink_client`` is unavailable. Called only on a genuine tie.
+        """
+        if not category or self.biolink_client is None:
+            return set()
+        preferred: set[str] = set()
+        for configured, prefixes in CATEGORY_PREFERRED_NAMESPACES.items():
+            if category in self.biolink_client.get_descendants(configured):
+                preferred |= prefixes
+        return preferred
 
     def _connectivity_match(self, node_a: str, node_b: str) -> bool | None:
         """Delegate the InChIKey-connectivity test to the StructureResolver (None if unavailable)."""

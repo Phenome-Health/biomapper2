@@ -120,7 +120,7 @@ def sample_prefixes_for_category(
                 json={
                     "search_text": [term],
                     "limit": limit,
-                    "category_filter": category,
+                    "category": category,
                 },
                 timeout=PER_REQUEST_TIMEOUT,
             )

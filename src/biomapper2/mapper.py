@@ -18,7 +18,14 @@ from .biolink_client import BiolinkClient
 from .config import PROJECT_ROOT, RERESOLUTION_ENABLED, TIER_B_ENABLED, get_kestrel_api_url
 from .core.analysis import analyze_dataset_mapping
 from .core.annotation_engine import AnnotationEngine
+from .core.annotators import refmet_snapshot
+from .core.annotators.base import (
+    REFMET_SOURCE_LOCAL,
+    REFMET_SOURCE_NOT_IN_SNAPSHOT,
+    REFMET_SOURCE_NOT_QUERIED,
+)
 from .core.certificate import (
+    REFMET_ANNOTATOR,
     CertificateState,
     ResolutionCertificate,
     derive_chosen_kg_id_review,
@@ -43,6 +50,23 @@ def _scalar_or_none(value: Any) -> Any:
     NaN, which is the quiet version of the bug the certificate exists to remove.
     """
     return None if value is None or (isinstance(value, float) and value != value) or value is pd.NA else value
+
+
+# RefMet sources that are attributable to the pinned freeze. The snapshot version pins WHICH freeze
+# produced a deterministic vote; a live_api / unavailable / not_queried row is not attributable to
+# it, so its ``refmet_snapshot_version`` stays None even when a freeze is loaded.
+_SNAPSHOT_ATTRIBUTABLE_SOURCES = frozenset({REFMET_SOURCE_LOCAL, REFMET_SOURCE_NOT_IN_SNAPSHOT})
+
+
+def _refmet_snapshot_version_for(refmet_source: str) -> str | None:
+    """The freeze version to stamp for a row, given which source served it.
+
+    Set only when the row was served by (or checked against) the pinned freeze; read once from the
+    loader, which caches. None otherwise, so a live/absent row never carries a spurious version.
+    """
+    if refmet_source in _SNAPSHOT_ATTRIBUTABLE_SOURCES:
+        return refmet_snapshot.version()
+    return None
 
 
 class Mapper:
@@ -119,6 +143,9 @@ class Mapper:
         selection_conflict: str | None,
         kg_ids_assigned: dict[str, dict[str, list[str]]] | None,
         refusal_reason: str | None = None,
+        refmet_availability: str = "not_queried",
+        refmet_source: str = REFMET_SOURCE_NOT_QUERIED,
+        refmet_snapshot_version: str | None = None,
     ) -> ResolutionCertificate:
         """Assemble one certificate. Shared by both emission paths so they cannot drift apart.
 
@@ -168,6 +195,9 @@ class Mapper:
             tier_b=tier_b_result,
             committed_node_sources=committed_sources,
             refusal_reason=refusal_reason,
+            refmet_availability=refmet_availability,
+            refmet_source=refmet_source,
+            refmet_snapshot_version=refmet_snapshot_version,
         )
 
     def _enrich_equivalent_ids(self, chosen_kg_id: str | None) -> tuple[dict[str, list[str]], bool]:
@@ -192,6 +222,9 @@ class Mapper:
         selection_conflict: str | None,
         kg_ids: dict[str, list[str]] | None,
         kg_ids_assigned: dict[str, dict[str, list[str]]] | None,
+        refmet_availability: str = "not_queried",
+        refmet_source: str = REFMET_SOURCE_NOT_QUERIED,
+        refmet_snapshot_version: str | None = None,
     ) -> tuple[ResolutionCertificate, str | None, dict[str, list[str]]]:
         """Step 6 (+ optional Step 6.5): issue the certificate and, on a contradiction, re-resolve.
 
@@ -214,6 +247,9 @@ class Mapper:
             equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
             selection_conflict=selection_conflict,
             kg_ids_assigned=kg_ids_assigned,
+            refmet_availability=refmet_availability,
+            refmet_source=refmet_source,
+            refmet_snapshot_version=refmet_snapshot_version,
         )
         if not (config.RERESOLUTION_ENABLED and certificate.state is CertificateState.CONTRADICTED):
             return certificate, chosen_kg_id, kg_equivalent_ids
@@ -235,6 +271,9 @@ class Mapper:
                 selection_conflict=selection_conflict,
                 kg_ids_assigned=kg_ids_assigned,
                 refusal_reason=reason,
+                refmet_availability=refmet_availability,
+                refmet_source=refmet_source,
+                refmet_snapshot_version=refmet_snapshot_version,
             )
             return refused, chosen_kg_id, kg_equivalent_ids
 
@@ -249,6 +288,9 @@ class Mapper:
             equivalent_ids_lookup_ok=new_ok,
             selection_conflict=selection_conflict,
             kg_ids_assigned=kg_ids_assigned,
+            refmet_availability=refmet_availability,
+            refmet_source=refmet_source,
+            refmet_snapshot_version=refmet_snapshot_version,
         )
         if swapped.state is CertificateState.CONTRADICTED:
             # The swapped node still contradicts the independent structure. Refuse rather than recurse
@@ -267,6 +309,9 @@ class Mapper:
                 selection_conflict=selection_conflict,
                 kg_ids_assigned=kg_ids_assigned,
                 refusal_reason="reresolution_still_contradicted",
+                refmet_availability=refmet_availability,
+                refmet_source=refmet_source,
+                refmet_snapshot_version=refmet_snapshot_version,
             )
             return refused, chosen_kg_id, kg_equivalent_ids
 
@@ -330,6 +375,15 @@ class Mapper:
         )
         assert isinstance(annotation_result, pd.Series)
         entity = entity.update_from(annotation_result)
+        # RefMet availability for the row, read from the engine's TOTAL availability map (present on
+        # every path, including skips). Threaded into the certificate and mirrored on the output.
+        annotator_availability = annotation_result.get("annotator_availability") or {}
+        refmet_availability = annotator_availability.get(REFMET_ANNOTATOR, "not_queried")
+        # WHICH RefMet source served the row, from the engine's TOTAL source map (parallel provenance
+        # channel). The snapshot version is derived from the source so it pins only freeze-served rows.
+        annotator_source = annotation_result.get("annotator_source") or {}
+        refmet_source = annotator_source.get(REFMET_ANNOTATOR, REFMET_SOURCE_NOT_QUERIED)
+        refmet_snapshot_version = _refmet_snapshot_version_for(refmet_source)
 
         # Do Step 2: normalize vocab IDs to form proper curies
         normalization_result = self.normalizer.normalize(
@@ -375,9 +429,13 @@ class Mapper:
             selection_conflict=entity.chosen_kg_id_review,
             kg_ids=entity.kg_ids,
             kg_ids_assigned=entity.kg_ids_assigned,
+            refmet_availability=refmet_availability,
+            refmet_source=refmet_source,
+            refmet_snapshot_version=refmet_snapshot_version,
         )
         # Emitted as a plain dict, not the dataclass: pydantic rejects a raw dataclass at the
         # response model, and the NDJSON endpoint json.dumps's this value outside its try/except.
+        # ``refmet_availability`` is mirrored on the row (per R2) as well as on the certificate.
         entity = entity.update_from(
             pd.Series(
                 {
@@ -385,6 +443,9 @@ class Mapper:
                     "kg_equivalent_ids": kg_equivalent_ids or {},
                     "resolution_certificate": certificate.to_api_dict(),
                     "chosen_kg_id_review": derive_chosen_kg_id_review(certificate),
+                    "refmet_availability": refmet_availability,
+                    "refmet_source": refmet_source,
+                    "refmet_snapshot_version": refmet_snapshot_version,
                 }
             )
         )
@@ -532,6 +593,9 @@ class Mapper:
         for _, row in df.iterrows():
             committed = _scalar_or_none(row.get("chosen_kg_id"))
             equiv = row.get("kg_equivalent_ids") or {}
+            row_availability = row.get("annotator_availability") or {}
+            row_source = row.get("annotator_source") or {}
+            refmet_source = row_source.get(REFMET_ANNOTATOR, REFMET_SOURCE_NOT_QUERIED)
             certificate, new_id, new_equiv = self._certify_and_reresolve(
                 query_name=_scalar_or_none(row.get(name_column)),
                 category=entity_type,
@@ -541,6 +605,9 @@ class Mapper:
                 selection_conflict=_scalar_or_none(row.get("chosen_kg_id_review")),
                 kg_ids=row.get("kg_ids") or {},
                 kg_ids_assigned=row.get("kg_ids_assigned") or {},
+                refmet_availability=row_availability.get(REFMET_ANNOTATOR, "not_queried"),
+                refmet_source=refmet_source,
+                refmet_snapshot_version=_refmet_snapshot_version_for(refmet_source),
             )
             certificate_rows.append(certificate)
             reresolved_ids.append(new_id)
@@ -570,6 +637,23 @@ class Mapper:
                 f"rows. Row count should not change."
             )
 
+        # Count RefMet-unavailable rows before the availability helper column is dropped. This is a
+        # cold-run metric only: the RefMet HTTP cache serves successes, so a warm rerun understates
+        # unavailability. Any gating use must be attributed to a cold cache.
+        refmet_unavailable_rows = sum(1 for c in certificate_rows if c.refmet_availability == "unavailable")
+
+        # Run-level RefMet SOURCE breakdown (parallel to the unavailable count): how many rows each
+        # source served. With a pinned freeze present this is dominated by local_snapshot /
+        # not_in_snapshot (the breaker is out of the path); without one it is live_api / unavailable.
+        refmet_source_counts: dict[str, int] = {}
+        for c in certificate_rows:
+            refmet_source_counts[c.refmet_source] = refmet_source_counts.get(c.refmet_source, 0) + 1
+
+        # Drop the availability + source helper columns: their per-row values are already emitted as
+        # the flat ``certificate_refmet_availability`` / ``certificate_refmet_source`` columns, so the
+        # TSV keeps no repr'd dict for either.
+        df = df.drop(columns=["annotator_availability", "annotator_source"], errors="ignore")
+
         # Dump the final dataframe to a TSV
 
         logging.info(f"Dumping output TSV to {output_tsv_path}")
@@ -584,5 +668,15 @@ class Mapper:
         stats_summary = analyze_dataset_mapping(
             output_tsv_path, self.linker, annotation_mode, run_provenance=run_provenance.model_dump()
         )
+        # Run-level RefMet availability metric (D5). Cold-run-attributable only (see the count above).
+        stats_summary["refmet_unavailable_rows"] = refmet_unavailable_rows
+        stats_summary["refmet_total_rows"] = len(certificate_rows)
+        # Run-level RefMet source provenance (counts by source) + which freeze served the run. Stamp the
+        # freeze version ONLY when the run actually used/consulted the snapshot (a snapshot-attributable
+        # source has a nonzero count); otherwise a non-small-molecule or live-fallback run would name a
+        # freeze that served no row, contradicting refmet_source_counts.
+        stats_summary["refmet_source_counts"] = refmet_source_counts
+        snapshot_used = any(refmet_source_counts.get(s, 0) for s in _SNAPSHOT_ATTRIBUTABLE_SOURCES)
+        stats_summary["refmet_snapshot_version"] = refmet_snapshot.version() if snapshot_used else None
 
         return str(output_tsv_path), stats_summary

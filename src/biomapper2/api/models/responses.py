@@ -67,6 +67,27 @@ class ResolutionCertificateModel(BaseModel):
         description="Reserved. Until the refusal-reason change ships, an off-category refusal and a "
         "no-match are not distinguishable in this response.",
     )
+    refmet_availability: str = Field(
+        default="not_queried",
+        description="Whether the RefMet source (Metabolomics Workbench) answered for this row: "
+        "'voted' | 'no_match' | 'unavailable' | 'not_queried'. A runtime availability signal like "
+        "'equivalent_ids_lookup_ok', NOT a verdict — 'unavailable' means the service did not answer, "
+        "distinct from 'no_match' (it answered, no such metabolite). 'not_queried' when RefMet was "
+        "not selected for the row.",
+    )
+    refmet_source: str = Field(
+        default="not_queried",
+        description="WHICH RefMet source served the row, on a parallel axis to 'refmet_availability': "
+        "'local_snapshot' (the pinned freeze answered) | 'not_in_snapshot' (freeze loaded, name absent, "
+        "deterministic no-match, no network) | 'live_api' (live /match answered) | 'unavailable' (live "
+        "service did not answer) | 'not_queried'. With a freeze present the circuit breaker is out of "
+        "the default path.",
+    )
+    refmet_snapshot_version: str | None = Field(
+        default=None,
+        description="Version of the pinned freeze that served (or was consulted for) the row, else "
+        "None. Set only when 'refmet_source' is 'local_snapshot' or 'not_in_snapshot'.",
+    )
     provenance: dict[str, Any] = Field(default_factory=dict, description="Tier B state, cache stores and expiry policy")
 
 
@@ -86,6 +107,22 @@ class EntityMappingResult(BaseModel):
         default=None,
         description="Structural certificate for chosen_kg_id (and only chosen_kg_id — "
         "chosen_kg_id_provided and chosen_kg_id_assigned carry none). Null when mapping failed.",
+    )
+    refmet_availability: str = Field(
+        default="not_queried",
+        description="Per-row RefMet (Metabolomics Workbench) availability, mirrored from the "
+        "certificate so a consumer can flag/exclude rows a degraded RefMet service left uncovered: "
+        "'voted' | 'no_match' | 'unavailable' | 'not_queried'. Always present (never None).",
+    )
+    refmet_source: str = Field(
+        default="not_queried",
+        description="Per-row RefMet source, mirrored from the certificate: 'local_snapshot' | "
+        "'not_in_snapshot' | 'live_api' | 'unavailable' | 'not_queried'. Always present (never None).",
+    )
+    refmet_snapshot_version: str | None = Field(
+        default=None,
+        description="Version of the pinned freeze that served the row, mirrored from the certificate; "
+        "None when the row was not served by (or consulted against) a freeze.",
     )
     kg_equivalent_ids: dict[str, list[str]] = Field(
         default_factory=dict,
@@ -114,9 +151,10 @@ class BatchMappingResponse(BaseModel):
 
     results: list[EntityMappingResult]
     metadata: RequestMetadata
-    summary: dict[str, int] = Field(
+    summary: dict[str, int | dict[str, int]] = Field(
         default_factory=dict,
-        description="Summary statistics (total, successful, failed)",
+        description="Summary statistics (total, successful, failed, refmet_unavailable) plus "
+        "'refmet_source_counts', a per-source tally of which RefMet source served each row.",
     )
 
 
