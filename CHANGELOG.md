@@ -5,6 +5,11 @@
 
 ### Features
 
+* **refmet:** write-through `live_backup` mode — live-first with freeze-backup on outage + write-back (fork #73) ([927ef03](https://github.com/Phenome-Health/biomapper2/commit/927ef03))
+* **api:** `REFMET_LIVE_API_FALLBACK` toggle + optional per-request `candidate_limit` Kestrel search window (fork #71, #72) ([70ce825](https://github.com/Phenome-Health/biomapper2/commit/70ce825))
+* **resolver/refmet:** deterministic resolution — majority tie-break, stable Kestrel candidate ordering, RefMet availability surfacing, pinned `/match` freeze + source provenance, category/prefix search filter (fork #64, #67, #68, #69, #70) ([6507da7](https://github.com/Phenome-Health/biomapper2/commit/6507da7))
+* **engine:** Kestrel 5xx retry, Entity NaN coercion, structure-resolver InChIKey blocks ([a1348f2](https://github.com/Phenome-Health/biomapper2/commit/a1348f2))
+
 * add annotation engine with modular annotator architecture [#6](https://github.com/Phenome-Health/biomapper2/issues/6) ([b4e93cb](https://github.com/Phenome-Health/biomapper2/commit/b4e93cb4810cc5f0bbc4ed1d84d9df3ac7c13ce4))
 * add batching for Kestrel API requests ([#44](https://github.com/Phenome-Health/biomapper2/issues/44)) ([9a0782a](https://github.com/Phenome-Health/biomapper2/commit/9a0782adc88896ed4ecc6a036c844469d9dbe5b4))
 * add batching for Kestrel API requests ([#44](https://github.com/Phenome-Health/biomapper2/issues/44)) ([d02f51b](https://github.com/Phenome-Health/biomapper2/commit/d02f51b4c9ec38a0dfcf2c071452a7b8e43db9b1))
@@ -94,6 +99,8 @@
 
 
 ### Bug Fixes
+
+* **security:** withhold the Kestrel key from the public host, redact the request cache ([51ad1b2](https://github.com/Phenome-Health/biomapper2/commit/51ad1b2))
 
 * add missing dev uv install for black ([a92a132](https://github.com/Phenome-Health/biomapper2/commit/a92a13247dfdf5425ed1975ce6b6bf721bce1bcd))
 * add proxy-compatible route aliases for biomapper-ui ([bc32352](https://github.com/Phenome-Health/biomapper2/commit/bc32352aa2891c4e15983b24e5e3f612420b6d59))
