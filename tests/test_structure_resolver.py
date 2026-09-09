@@ -201,3 +201,77 @@ def test_conflated_list_can_produce_a_false_agreement():
         )
     )
     assert sr.connectivity_match("CHEBI:1", "CHEBI:2") is True
+
+
+# --- Unit 5: candidate-side lipid hop (KG -> MW -> PubChem -> Goslin/LIPID MAPS) ----------------
+# StructureResolver resolves a NODE's structure. Lipid candidate nodes (the dominant refused class)
+# never resolve via KG/MW/PubChem by name, so re-resolution could never match them. A shared LipidStructureResolver
+# is added as the final name-fallback hop, and `structural_inchikey` exposes the FULL key so
+# re-resolution can compare stereo when both sides carry it.
+
+from biomapper2.core.certificate import TierBOutcome, TierBResult  # noqa: E402
+
+LIPID_FULL = "KILNVBDSWZSGLL-KXQOOQHDSA-N"
+
+
+class _FakeLipidResolver:
+    def __init__(self, key=LIPID_FULL, outcome=TierBOutcome.RESOLVED):
+        self._key = key
+        self._outcome = outcome
+        self.calls = []
+
+    def resolve(self, name):
+        self.calls.append(name)
+        if name and str(name).startswith(("PC", "PE", "TG", "SM")):
+            return TierBResult(source="lipidmaps", inchikey_block=self._key, outcome=self._outcome)
+        return TierBResult(source=None, inchikey_block=None, outcome=TierBOutcome.UNRESOLVABLE)
+
+
+def test_lipid_candidate_node_resolves_via_the_lipid_hop(monkeypatch):
+    sr = StructureResolver(
+        _linker({"CHEBI:1": {"name": "PC 16:0/18:1", "equivalent_ids": {}}}),  # no KG inchikey
+        lipid_resolver=_FakeLipidResolver(),
+    )
+    monkeypatch.setattr(sr, "_fetch_mw_inchikey", lambda name: None)
+    monkeypatch.setattr(sr, "_fetch_pubchem_inchikey", lambda name: None)
+    assert sr.inchikey_block("CHEBI:1", "PC 16:0/18:1") == "KILNVBDSWZSGLL"  # first block from lipid hop
+
+
+def test_lipid_hop_only_runs_after_mw_and_pubchem_miss(monkeypatch):
+    lipid = _FakeLipidResolver()
+    sr = StructureResolver(
+        _linker({"CHEBI:1": {"name": "PC 16:0/18:1", "equivalent_ids": {}}}),
+        lipid_resolver=lipid,
+    )
+    monkeypatch.setattr(sr, "_fetch_mw_inchikey", lambda name: "AAAAAAAAAAAAAA-BB-N")
+    monkeypatch.setattr(sr, "_fetch_pubchem_inchikey", lambda name: pytest.fail("pubchem must not run"))
+    assert sr.inchikey_block("CHEBI:1", "PC 16:0/18:1") == "AAAAAAAAAAAAAA"
+    assert lipid.calls == [], "the lipid hop must not run once MW resolves"
+
+
+def test_non_lipid_name_path_is_unchanged_when_a_lipid_resolver_is_present(monkeypatch):
+    lipid = _FakeLipidResolver()
+    sr = StructureResolver(
+        _linker({"CHEBI:1": {"name": "glucose", "equivalent_ids": {}}}),
+        lipid_resolver=lipid,
+    )
+    monkeypatch.setattr(sr, "_fetch_mw_inchikey", lambda name: None)
+    monkeypatch.setattr(sr, "_fetch_pubchem_inchikey", lambda name: None)
+    assert sr.inchikey_block("CHEBI:1", "glucose") is None  # lipid resolver returns UNRESOLVABLE
+
+
+def test_structural_inchikey_returns_the_full_key_for_a_lipid_candidate(monkeypatch):
+    sr = StructureResolver(
+        _linker({"CHEBI:1": {"name": "PC 16:0/18:1", "equivalent_ids": {}}}),
+        lipid_resolver=_FakeLipidResolver(),
+    )
+    monkeypatch.setattr(sr, "_fetch_mw_inchikey", lambda name: None)
+    monkeypatch.setattr(sr, "_fetch_pubchem_inchikey", lambda name: None)
+    assert sr.structural_inchikey("CHEBI:1", "PC 16:0/18:1") == LIPID_FULL  # FULL key, not stripped
+
+
+def test_structural_inchikey_prefers_the_full_kg_key():
+    sr = StructureResolver(
+        _linker({"CHEBI:1": {"name": "x", "equivalent_ids": {"INCHIKEY": ["AAAAAAAAAAAAAA-BBBBBBBBBB-N"]}}})
+    )
+    assert sr.structural_inchikey("CHEBI:1", "x") == "AAAAAAAAAAAAAA-BBBBBBBBBB-N"

@@ -87,6 +87,7 @@ class IndependentStructureLookup:
         min_interval_s: float = TIER_B_MIN_INTERVAL_S,
         max_attempts: int = TIER_B_MAX_ATTEMPTS,
         backoff_base_s: float = TIER_B_BACKOFF_BASE_S,
+        lipid_resolver: Any | None = None,
     ) -> None:
         self._session = (
             session if session is not None else requests_cache.CachedSession(str(CACHE_DIR / STRUCTURE_CACHE_STORE))
@@ -96,6 +97,10 @@ class IndependentStructureLookup:
         self._min_interval_s = min_interval_s
         self._max_attempts = max_attempts
         self._backoff_base_s = backoff_base_s
+        # The THIRD hop: Goslin -> LIPID MAPS, resolving lipid shorthand the exact-name registries
+        # miss (the dominant REFUSED class). None keeps the tier at MW -> PubChem. Shared with the
+        # candidate-side StructureResolver so query and candidate structures come from one lookup.
+        self._lipid_resolver = lipid_resolver
         self._last_call_at: float | None = None
         self._memo: dict[str, TierBResult] = {}
         # Unique names attempted, and those whose LAST attempt failed. Tracked separately from the
@@ -163,11 +168,21 @@ class IndependentStructureLookup:
                     source=source,
                     # Upper-cased here as well as at the comparison: the value goes straight
                     # into the emitted certificate column, and an external service's casing must
-                    # not become part of the published artifact.
+                    # not become part of the published artifact. MW/PubChem emit FIRST-BLOCK only.
                     inchikey_block=key.split("-")[0].upper(),
                     outcome=TierBOutcome.RESOLVED,
                     cache_state=cache_state,
                 )
+        # Third hop: the lipid independent-structure source. Only reached once MW and PubChem have
+        # both missed, so it costs nothing on the common path. It returns a fully-formed TierBResult
+        # (a FULL key + source="lipidmaps" on a hit); a hit flows through unchanged, a lookup failure
+        # folds into the tier's own lookup_failed accounting.
+        if self._lipid_resolver is not None:
+            lipid = self._lipid_resolver.resolve(name)
+            if lipid.outcome is TierBOutcome.RESOLVED:
+                return lipid
+            if lipid.outcome is TierBOutcome.LOOKUP_FAILED:
+                any_failure = True
         if any_failure:
             # At least one hop went wrong rather than answering "unknown". Reporting this as
             # ``unresolvable`` would silently fold a service outage into the name-difficulty

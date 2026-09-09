@@ -10,10 +10,12 @@ for review rather than committed silently.
 
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
 from typing import Any
 
 import pandas as pd
 
+from .certificate import structural_agree
 from .structure_resolver import StructureResolver
 
 # The annotator whose vote is authoritative for small-molecule ChEBI conflicts: it queries the
@@ -24,16 +26,21 @@ REFMET_ANNOTATOR = "metabolomics-workbench"
 class Resolver:
     """Resolves one-to-many KG mappings to single chosen nodes."""
 
-    def __init__(self, linker: Any = None, biolink_client: Any = None) -> None:
+    def __init__(self, linker: Any = None, biolink_client: Any = None, lipid_resolver: Any = None) -> None:
         """
         Args:
             linker: Linker used by the connectivity test (get-nodes InChIKey enrichment). When
                 None, source-weighting is inactive and resolution is the plain majority vote.
             biolink_client: Used to test small-molecule category membership.
+            lipid_resolver: Shared LipidStructureResolver so a lipid CANDIDATE node resolves to a
+                structural key during re-resolution (KTD6). When None, the candidate side has no
+                lipid hop. The same instance also feeds the query-side Tier B lookup.
         """
         self.linker = linker
         self.biolink_client = biolink_client
-        self.structure_resolver = StructureResolver(linker) if linker is not None else None
+        self.structure_resolver = (
+            StructureResolver(linker, lipid_resolver=lipid_resolver) if linker is not None else None
+        )
 
     def resolve(
         self, item: pd.Series | dict[str, Any] | pd.DataFrame, category: str | None = None
@@ -181,3 +188,62 @@ class Resolver:
         if self.structure_resolver is None:
             return None
         return self.structure_resolver.connectivity_match(node_a, node_b)
+
+    def reresolve_on_contradiction(
+        self,
+        *,
+        candidates: Iterable[str],
+        query_independent_inchikey: str | None,
+        committed_kg_id: str | None,
+    ) -> tuple[str | None, str]:
+        """Pick the distinct candidate whose structure matches the query's independent structure.
+
+        This is the structure-guided correction: when a certificate is CONTRADICTED, the conflated
+        vote committed a node whose structure disagrees with the query's INDEPENDENT structure. Among
+        the one-to-many candidates (the vote's losers), find the unique DISTINCT candidate whose own
+        structure matches that independent anchor and switch to it.
+
+        KTD5 — the anchor is ALWAYS ``query_independent_inchikey`` (the query's independent
+        structure), never the committed node's own InChIKey. The committed node is excluded from the
+        match search, so its structure is never even consulted here.
+
+        Two topologies (design fact): across-node conflation has a distinct matching candidate to
+        switch to; within-node conflation does not, and this refuses rather than fabricates (L2).
+
+        Returns ``(chosen_kg_id, reason)``:
+          * ``(candidate, "reresolved")`` — a unique distinct candidate matched.
+          * ``(committed, "reresolution_ambiguous")`` — several distinct candidates matched.
+          * ``(committed, "reresolution_refused_no_match")`` — none matched / no anchor / disabled deps.
+          * ``(committed, "reresolution_disabled")`` — the flag is off (defensive; the Mapper gates too).
+        """
+        import biomapper2.config as config
+
+        if not config.RERESOLUTION_ENABLED:
+            return committed_kg_id, "reresolution_disabled"
+        anchor = query_independent_inchikey
+        if not anchor or self.structure_resolver is None:
+            return committed_kg_id, "reresolution_refused_no_match"
+
+        # Never the committed node: KTD5 forbids reading its key as the anchor, and there is no point
+        # matching it to itself. Only the DISTINCT other candidates are considered.
+        others = [c for c in dict.fromkeys(candidates) if c and c != committed_kg_id]
+        if not others:
+            return committed_kg_id, "reresolution_refused_no_match"
+
+        records = self.linker.get_node_records(others) if self.linker is not None else {}
+        matches: set[str] = set()
+        for candidate in others:
+            name = (records.get(candidate) or {}).get("name")
+            # A candidate may carry several graph-asserted InChIKeys; accept a match against ANY of
+            # them, so the correct candidate is not missed when its match is a non-first key.
+            candidate_keys = self.structure_resolver.structural_inchikeys(candidate, name, records)
+            if any(structural_agree(anchor, ck) for ck in candidate_keys):
+                matches.add(candidate)
+
+        if len(matches) == 1:
+            return matches.pop(), "reresolved"
+        if len(matches) > 1:
+            # Two distinct candidates both match the independent structure: the KG is conflated on
+            # the other side too. Refuse rather than pick arbitrarily (L2).
+            return committed_kg_id, "reresolution_ambiguous"
+        return committed_kg_id, "reresolution_refused_no_match"
