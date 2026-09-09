@@ -13,10 +13,6 @@ the certificate most needs to describe -- the ones with no committed node -- wou
 certificate at all, and the two surfaces would disagree precisely there.
 """
 
-# Tests inject stub collaborators onto a real Mapper (mapper.linker = _StubLinker(), etc.).
-# Building the real ones would hit Kestrel; the stubs implement only the surface each path calls.
-# pyright: reportAttributeAccessIssue=false
-
 from __future__ import annotations
 
 import json
@@ -77,8 +73,10 @@ def _stub_mapper(
     model; this suite must stay offline.
     """
     mapper = Mapper.__new__(Mapper)
-    mapper.biolink_client = _StubBiolink()
-    mapper.linker = _StubLinker(equiv if equiv is not None else {}, lookup_ok)
+    mapper.biolink_client = _StubBiolink()  # pyright: ignore[reportAttributeAccessIssue]
+    mapper.linker = _StubLinker(  # pyright: ignore[reportAttributeAccessIssue]
+        equiv if equiv is not None else {}, lookup_ok
+    )
     mapper.tier_b = tier_b
 
     resolved = {
@@ -115,9 +113,9 @@ def _stub_mapper(
                 return pd.DataFrame([fields] * len(item), index=item.index)
             return pd.Series(fields)
 
-    mapper.resolver = _StubResolver()
-    mapper.annotation_engine = _StubAnnotation()
-    mapper.normalizer = _StubNormalizer()
+    mapper.resolver = _StubResolver()  # pyright: ignore[reportAttributeAccessIssue]
+    mapper.annotation_engine = _StubAnnotation()  # pyright: ignore[reportAttributeAccessIssue]
+    mapper.normalizer = _StubNormalizer()  # pyright: ignore[reportAttributeAccessIssue]
     # kg_ids_assigned is threaded through the linker stub's output for the dataset path.
     mapper.linker.link = _patched_link(assigned)  # type: ignore[method-assign]
     return mapper

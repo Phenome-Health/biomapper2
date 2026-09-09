@@ -125,6 +125,53 @@ KESTREL_BATCHING_ENABLED = True  # Set to False to disable batching (for perform
 KESTREL_BATCH_SIZE_SEARCH = 1000  # For text-search, vector-search, hybrid-search
 KESTREL_BATCH_SIZE_CANONICALIZE = 2000  # For canonicalize endpoint
 
+# Pinned local RefMet freeze (deterministic resolution). Path to a frozen ``/match`` corpus TSV
+# (see core/annotators/refmet_snapshot.py for the format). When set to a loadable file the RefMet
+# annotator consults the freeze FIRST and the live-endpoint circuit breaker leaves the default
+# resolution path entirely; unset (None) or absent -> the loader reports NOT present and the
+# annotator behaves exactly as before (live /match + breaker). Override via REFMET_SNAPSHOT_PATH in
+# the environment; a relative value is resolved against PROJECT_ROOT so a repo-relative default and
+# an absolute deployment path both work.
+_refmet_snapshot_env = os.getenv("REFMET_SNAPSHOT_PATH", "").strip()
+if _refmet_snapshot_env:
+    _snap = Path(_refmet_snapshot_env)
+    REFMET_SNAPSHOT_PATH: Path | None = _snap if _snap.is_absolute() else (PROJECT_ROOT / _snap)
+else:
+    REFMET_SNAPSHOT_PATH = None
+
+
+def get_refmet_snapshot_path() -> Path | None:
+    """Return the configured freeze path, reading os.environ on every call.
+
+    Mirrors ``get_kestrel_api_url``: the module-level constant is captured at import time, this
+    function reflects an override applied after import (a test setting REFMET_SNAPSHOT_PATH). A
+    relative value resolves against PROJECT_ROOT; empty/unset -> None (loader NOT present).
+    """
+    raw = os.environ.get("REFMET_SNAPSHOT_PATH", "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_absolute() else (PROJECT_ROOT / p)
+
+
+def derive_refmet_snapshot_version(path: Path | None) -> str | None:
+    """Derive the freeze version from a sidecar or the filename. No file read of the TSV itself.
+
+    Precedence: a ``<path>.version`` sidecar file (first non-empty line) wins so a freeze can be
+    versioned independently of its filename; otherwise the version is the TSV filename stem. None
+    when no path is configured. Kept pure/­filesystem-only so the loader and any caller derive the
+    same value.
+    """
+    if path is None:
+        return None
+    sidecar = path.with_suffix(path.suffix + ".version")
+    with contextlib.suppress(OSError):
+        for line in sidecar.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                return line.strip()
+    return path.stem
+
+
 # Structure (InChIKey) fallback services for the resolver's connectivity test. Used only on the
 # small-molecule ChEBI conflict path when a node carries no KG InChIKey (see StructureResolver).
 MW_INCHIKEY_URL = "https://www.metabolomicsworkbench.org/rest/refmet/name"  # /{name}/inchi_key
