@@ -178,7 +178,12 @@ class TestPipelinePerformance:
 
     @pytest.mark.slow
     def test_step_timings_olink_proteins(self, request: pytest.FixtureRequest, shared_mapper: Mapper) -> None:
-        """Profile each pipeline step for the OLink protein dataset (~2900 items)."""
+        """Profile each pipeline step for the OLink protein dataset.
+
+        Row count deliberately not restated here: it is a property of the TSV read on the next
+        line, and the prose-figure guard (tests/test_no_measured_figures_in_prose.py) refuses
+        numbers in prose that nothing keeps in sync.
+        """
         tsv_path = DATA_DIR / "olink_protein_metadata.tsv"
         if not tsv_path.exists():
             pytest.skip(f"Dataset not found: {tsv_path}")

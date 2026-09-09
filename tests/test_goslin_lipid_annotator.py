@@ -1,8 +1,3 @@
-# _FakeBinder is a duck-typed stand-in for the RefMet/MW name binder — it implements only
-# get_annotations, the one method GoslinLipidAnnotator calls. Subclassing BaseAnnotator to satisfy
-# the checker would drag in its constructor and abstract surface for no test value. Scoped to this
-# file and to the argument-type rule alone.
-# pyright: reportArgumentType=false
 import pandas as pd
 
 from biomapper2.core.annotators.goslin_lipid import GoslinLipidAnnotator
@@ -28,7 +23,7 @@ class _FakeBinder:
 def test_lipid_shorthand_binds_via_canonicalized_query():
     # Binder only "knows" the CANONICAL name; raw "PC 34:1" would have missed.
     binder = _FakeBinder(result_ids={"PC 34:1": {"refmet_id": ["REFMET:RM0001"]}})
-    ann = GoslinLipidAnnotator(binder=binder)
+    ann = GoslinLipidAnnotator(binder=binder)  # pyright: ignore[reportArgumentType]
     entity = {"name": "PC 34:1"}
     out = ann.get_annotations(entity, name_field="name", category="biolink:SmallMolecule")
     # bound under the goslin-lipid slug
@@ -41,14 +36,14 @@ def test_lipid_shorthand_binds_via_canonicalized_query():
 
 def test_non_lipid_returns_empty_and_never_queries_binder():
     binder = _FakeBinder()
-    ann = GoslinLipidAnnotator(binder=binder)
+    ann = GoslinLipidAnnotator(binder=binder)  # pyright: ignore[reportArgumentType]
     out = ann.get_annotations({"name": "caffeine"}, name_field="name", category="biolink:SmallMolecule")
     assert out == {}
     assert binder.seen_names == []  # fail-soft: non-lipid short-circuits before binding
 
 
 def test_blank_name_returns_empty():
-    ann = GoslinLipidAnnotator(binder=_FakeBinder())
+    ann = GoslinLipidAnnotator(binder=_FakeBinder())  # pyright: ignore[reportArgumentType]
     assert ann.get_annotations({"name": None}, name_field="name", category="biolink:SmallMolecule") == {}
 
 
@@ -57,7 +52,8 @@ def test_enrichment_off_by_default_is_never_called():
         def enrich(self, canonical_name):
             raise AssertionError("enrichment must be OFF by default")
 
-    ann = GoslinLipidAnnotator(binder=_FakeBinder(result_ids={"FA 16:0": {"refmet_id": ["REFMET:RM9"]}}))
+    fake = _FakeBinder(result_ids={"FA 16:0": {"refmet_id": ["REFMET:RM9"]}})
+    ann = GoslinLipidAnnotator(binder=fake)  # pyright: ignore[reportArgumentType]
     assert ann._enrichment is None  # default off
     # a run with default construction never touches enrichment
     out = ann.get_annotations({"name": "FA 16:0"}, name_field="name", category="biolink:SmallMolecule")
@@ -70,14 +66,14 @@ def test_enrichment_when_injected_adds_lipidmaps_ids_and_flags_fired():
             return {"LIPIDMAPS": "LMGP01010001", "INCHIKEY": "KILNVBDSWZSGLL-KXQOOQHDSA-N"}
 
     binder = _FakeBinder(result_ids={"PC 34:1": {"refmet_id": ["REFMET:RM0001"]}})
-    ann = GoslinLipidAnnotator(binder=binder, enrichment=_FakeEnricher())
+    ann = GoslinLipidAnnotator(binder=binder, enrichment=_FakeEnricher())  # pyright: ignore[reportArgumentType]
     out = ann.get_annotations({"name": "PC 34:1"}, name_field="name", category="biolink:SmallMolecule")
     assert "LMGP01010001" in out["goslin-lipid"]["LIPIDMAPS"]
 
 
 def test_bulk_matches_rowwise_single_calls():
     binder = _FakeBinder(result_ids={"FA 16:0": {"refmet_id": ["REFMET:RM9"]}})
-    ann = GoslinLipidAnnotator(binder=binder)
+    ann = GoslinLipidAnnotator(binder=binder)  # pyright: ignore[reportArgumentType]
     df = pd.DataFrame({"name": ["FA 16:0", "caffeine"]})
     col = ann.get_annotations_bulk(df, name_field="name", category="biolink:SmallMolecule")
     assert "goslin-lipid" in col.iloc[0]

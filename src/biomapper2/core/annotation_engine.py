@@ -14,7 +14,7 @@ import pandas as pd
 from ..biolink_client import BiolinkClient
 from ..config import CATEGORY_ACCEPTED_ROOTS, CATEGORY_PREFERRED_NAMESPACES
 from ..utils import AnnotationMode, AssignedIDsDict
-from .annotators.base import BaseAnnotator
+from .annotators.base import AVAILABILITY_NOT_QUERIED, REFMET_SOURCE_NOT_QUERIED, BaseAnnotator
 from .annotators.goslin_lipid import GoslinLipidAnnotator
 from .annotators.kestrel_hybrid import KestrelHybridSearchAnnotator
 from .annotators.kestrel_text import KestrelTextSearchAnnotator
@@ -262,33 +262,76 @@ class AnnotationEngine:
             items_to_annotate = df
             needs_annotation_mask = pd.Series([True] * len(df), index=df.index)
 
-        # Initialize results column with empty dicts for all rows
+        # Initialize results columns for all rows. Availability is TOTAL from the start (every row,
+        # every registered annotator -> not_queried), so a skipped/provided-id row still reads a
+        # complete map rather than None. Annotated rows overwrite their annotators' real statuses.
         assigned_ids_col = pd.Series([{} for _ in range(len(df))], index=df.index)
+        availability_col = pd.Series([self._empty_availability() for _ in range(len(df))], index=df.index)
+        # Source is a TOTAL per-row map on the SAME footing as availability (parallel provenance
+        # channel): every registered annotator -> not_queried until one overwrites its own slug.
+        source_col = pd.Series([self._empty_source() for _ in range(len(df))], index=df.index)
 
         # Only annotate rows that need it
         if not items_to_annotate.empty:
             annotated_rows = pd.Series([{} for _ in range(len(items_to_annotate))], index=items_to_annotate.index)
+            availability_rows = pd.Series(
+                [self._empty_availability() for _ in range(len(items_to_annotate))], index=items_to_annotate.index
+            )
+            source_rows = pd.Series(
+                [self._empty_source() for _ in range(len(items_to_annotate))], index=items_to_annotate.index
+            )
 
             for annotator in annotators:
                 prepared_df = annotator.prepare(items_to_annotate, provided_id_fields)
+                # One fetch per annotator: the RefMet cache feeds BOTH the vote and the availability
+                # signal, so a degraded row is never fetched (or breaker-counted) twice.
+                availability_cache = annotator.build_availability_cache(prepared_df, name_field)
+                bulk_kwargs: dict[str, Any] = dict(
+                    prefer_human=prefer_human,
+                    preferred_prefixes=preferred_prefixes,
+                    accepted_categories=accepted_categories,
+                )
+                # Only the RefMet annotator returns a cache and accepts the kwarg; others build none.
+                if availability_cache is not None:
+                    bulk_kwargs["cache"] = availability_cache
                 annotations_col = annotator.get_annotations_bulk(
                     prepared_df,
                     name_field,
                     category,
                     prefixes,
-                    prefer_human=prefer_human,
-                    preferred_prefixes=preferred_prefixes,
-                    accepted_categories=accepted_categories,
+                    **bulk_kwargs,
                 )
                 annotated_rows = pd.Series(
                     [self._merge_nested_dicts(d1, d2) for d1, d2 in zip(annotated_rows, annotations_col)],
                     index=annotated_rows.index,
                 )
+                availability_rows = pd.Series(
+                    [
+                        {**existing, **annotator.get_availability(row, name_field, cache=availability_cache)}
+                        for existing, (_, row) in zip(availability_rows, prepared_df.iterrows())
+                    ],
+                    index=availability_rows.index,
+                )
+                source_rows = pd.Series(
+                    [
+                        {**existing, **annotator.get_source(row, name_field, cache=availability_cache)}
+                        for existing, (_, row) in zip(source_rows, prepared_df.iterrows())
+                    ],
+                    index=source_rows.index,
+                )
 
             # Merge partial results back into full results
             assigned_ids_col[needs_annotation_mask] = annotated_rows
+            availability_col[needs_annotation_mask] = availability_rows
+            source_col[needs_annotation_mask] = source_rows
 
-        return pd.DataFrame({"assigned_ids": assigned_ids_col})
+        return pd.DataFrame(
+            {
+                "assigned_ids": assigned_ids_col,
+                "annotator_availability": availability_col,
+                "annotator_source": source_col,
+            }
+        )
 
     def _annotate_single(
         self,
@@ -313,8 +356,12 @@ class AnnotationEngine:
 
         # Otherwise get assigned IDs for the entity
         assigned_ids = dict()  # All annotations will be merged into this
+        availability = self._empty_availability()  # TOTAL map; annotators overwrite their own slug
+        source = self._empty_source()  # TOTAL parallel provenance map; same overwrite discipline
         for annotator in annotators:
             prepared_entity = annotator.prepare(item, provided_id_fields)
+            # One fetch: the RefMet cache feeds both the vote and the availability signal below.
+            availability_cache = annotator.build_availability_cache(prepared_entity, name_field)
             entity_annotations = annotator.get_annotations(
                 prepared_entity,
                 name_field,
@@ -323,10 +370,16 @@ class AnnotationEngine:
                 prefer_human=prefer_human,
                 preferred_prefixes=preferred_prefixes,
                 accepted_categories=accepted_categories,
+                cache=availability_cache,
             )
             assigned_ids: AssignedIDsDict = self._merge_nested_dicts(assigned_ids, entity_annotations)
+            availability.update(annotator.get_availability(prepared_entity, name_field, cache=availability_cache))
+            source.update(annotator.get_source(prepared_entity, name_field, cache=availability_cache))
 
-        return pd.Series({"assigned_ids": assigned_ids})  # Named Series
+        # Named Series
+        return pd.Series(
+            {"assigned_ids": assigned_ids, "annotator_availability": availability, "annotator_source": source}
+        )
 
     @staticmethod
     def _merge_nested_dicts(d1: AssignedIDsDict, d2: AssignedIDsDict) -> AssignedIDsDict:
@@ -360,6 +413,22 @@ class AnnotationEngine:
 
         return result
 
+    def _empty_availability(self) -> dict[str, str]:
+        """A TOTAL availability map: every registered annotator -> not_queried.
+
+        Total by construction so a consumer (certificate, run metric) never reads None or hits a
+        missing key, whether or not the row was annotated.
+        """
+        return {slug: AVAILABILITY_NOT_QUERIED for slug in self.annotator_registry}
+
+    def _empty_source(self) -> dict[str, str]:
+        """A TOTAL source map: every registered annotator -> not_queried.
+
+        Parallel to ``_empty_availability`` — total by construction so the certificate and the run
+        metric never read None or hit a missing key, whether or not the row was annotated.
+        """
+        return {slug: REFMET_SOURCE_NOT_QUERIED for slug in self.annotator_registry}
+
     def _get_empty_assigned_ids(self, item: pd.Series | dict[str, Any] | pd.DataFrame) -> pd.DataFrame | pd.Series:
         """Return empty assigned_ids in appropriate format."""
         if isinstance(item, pd.DataFrame):
@@ -367,13 +436,25 @@ class AnnotationEngine:
         else:
             return self._get_empty_assigned_ids_for_entity(item)
 
-    @staticmethod
-    def _get_empty_assigned_ids_for_dataset(item: pd.DataFrame) -> pd.DataFrame:
-        # Return single-column DataFrame with empty dicts
+    def _get_empty_assigned_ids_for_dataset(self, item: pd.DataFrame) -> pd.DataFrame:
+        # Return DataFrame with empty dicts plus TOTAL not_queried availability + source maps per row
         empty_col = pd.Series([{} for _ in range(len(item))], index=item.index)
-        return pd.DataFrame({"assigned_ids": empty_col})
+        availability_col = pd.Series([self._empty_availability() for _ in range(len(item))], index=item.index)
+        source_col = pd.Series([self._empty_source() for _ in range(len(item))], index=item.index)
+        return pd.DataFrame(
+            {
+                "assigned_ids": empty_col,
+                "annotator_availability": availability_col,
+                "annotator_source": source_col,
+            }
+        )
 
-    @staticmethod
-    def _get_empty_assigned_ids_for_entity(item: pd.Series | dict[str, Any]) -> pd.Series:
-        # Return named Series with empty dict
-        return pd.Series({"assigned_ids": {}})
+    def _get_empty_assigned_ids_for_entity(self, item: pd.Series | dict[str, Any]) -> pd.Series:
+        # Return named Series with empty dict plus TOTAL not_queried availability + source maps
+        return pd.Series(
+            {
+                "assigned_ids": {},
+                "annotator_availability": self._empty_availability(),
+                "annotator_source": self._empty_source(),
+            }
+        )
