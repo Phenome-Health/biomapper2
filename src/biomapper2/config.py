@@ -5,12 +5,15 @@ Customize these values to change API endpoints, model versions, and logging beha
 """
 
 import contextlib
+import logging
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()  # Load environmental variables (secrets)
+
+logger = logging.getLogger(__name__)
 
 
 # Set up our general cache directory (e.g., for requests cache, biolink)
@@ -164,6 +167,52 @@ def get_refmet_live_api_fallback() -> bool:
     No effect when no freeze is present -- the live path is already the default there.
     """
     return os.environ.get("REFMET_LIVE_API_FALLBACK", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+# The three RefMet freeze modes (D5). ``off`` = live ``/match`` only (no freeze); ``frozen`` =
+# deterministic freeze-first via the immutable TSV (benchmark reproducibility); ``live_backup`` =
+# live-first + write-through SQLite store served as backup when live is down (prod). An unknown value
+# (or unset) resolves to the BACKWARD-COMPAT default rather than raising: ``frozen`` when a
+# REFMET_SNAPSHOT_PATH is configured, else ``off`` (see get_refmet_freeze_mode) — so a typo degrades
+# to whatever the box was already doing, never hard-failing startup or silently dropping a freeze.
+REFMET_FREEZE_MODES = frozenset({"off", "frozen", "live_backup"})
+
+
+def get_refmet_freeze_mode() -> str:
+    """RefMet freeze mode from ``REFMET_FREEZE_MODE`` (reads os.environ per call).
+
+    One of ``off`` | ``frozen`` | ``live_backup``. An unrecognized value is treated as the unset case
+    with a logged warning (a typo must not silently enable — or hard-fail — a resolution path).
+
+    BACKWARD-COMPAT default: when the mode is unset/blank, infer ``frozen`` iff a ``REFMET_SNAPSHOT_PATH``
+    is configured, else ``off``. This preserves every existing deployment — a box that set only
+    ``REFMET_SNAPSHOT_PATH`` (freeze-first, pre-mode) keeps freeze behavior instead of silently reverting
+    to live-only. Set the mode explicitly to opt into ``live_backup`` (or force ``off``).
+    """
+
+    def _unset_default() -> str:
+        return "frozen" if get_refmet_snapshot_path() is not None else "off"
+
+    raw = os.environ.get("REFMET_FREEZE_MODE", "").strip().lower()
+    if not raw:
+        return _unset_default()
+    if raw not in REFMET_FREEZE_MODES:
+        logger.warning("Unknown REFMET_FREEZE_MODE %r; using the unset default (valid: off|frozen|live_backup)", raw)
+        return _unset_default()
+    return raw
+
+
+def get_refmet_store_path() -> Path | None:
+    """Return the configured write-through store path, reading os.environ on every call.
+
+    Mirrors ``get_refmet_snapshot_path``: the mutable SQLite store used by mode ``live_backup``.
+    A relative value resolves against PROJECT_ROOT; empty/unset -> None (store NOT configured).
+    """
+    raw = os.environ.get("REFMET_STORE_PATH", "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_absolute() else (PROJECT_ROOT / p)
 
 
 def derive_refmet_snapshot_version(path: Path | None) -> str | None:
