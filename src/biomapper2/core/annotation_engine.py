@@ -12,7 +12,12 @@ from typing import Any
 import pandas as pd
 
 from ..biolink_client import BiolinkClient
-from ..config import CATEGORY_ACCEPTED_ROOTS, CATEGORY_PREFERRED_NAMESPACES, get_refmet_live_api_fallback
+from ..config import (
+    CATEGORY_ACCEPTED_ROOTS,
+    CATEGORY_PREFERRED_NAMESPACES,
+    get_refmet_freeze_mode,
+    get_refmet_live_api_fallback,
+)
 from ..utils import AnnotationMode, AssignedIDsDict
 from .annotators.base import AVAILABILITY_NOT_QUERIED, REFMET_SOURCE_NOT_QUERIED, BaseAnnotator
 from .annotators.goslin_lipid import GoslinLipidAnnotator
@@ -32,14 +37,22 @@ class AnnotationEngine:
         # per-batch deadline state is not shared) — otherwise lipids resolved via Goslin would silently
         # ignore the toggle.
         refmet_fallback = get_refmet_live_api_fallback()
+        # Freeze mode (D5) is resolved once and passed to BOTH RefMet annotators (registered + Goslin
+        # binder), same rationale as the fallback flag: the two are separate instances, so an unpassed
+        # mode would leave lipids resolved via Goslin on a different resolution path.
+        refmet_freeze_mode = get_refmet_freeze_mode()
         self.annotator_registry: dict[str, BaseAnnotator] = {
             annotator.slug: annotator
             for annotator in [
                 KestrelHybridSearchAnnotator(),
                 KestrelTextSearchAnnotator(),
                 KestrelVectorSearchAnnotator(),
-                MetabolomicsWorkbenchAnnotator(live_api_fallback=refmet_fallback),
-                GoslinLipidAnnotator(binder=MetabolomicsWorkbenchAnnotator(live_api_fallback=refmet_fallback)),
+                MetabolomicsWorkbenchAnnotator(live_api_fallback=refmet_fallback, freeze_mode=refmet_freeze_mode),
+                GoslinLipidAnnotator(
+                    binder=MetabolomicsWorkbenchAnnotator(
+                        live_api_fallback=refmet_fallback, freeze_mode=refmet_freeze_mode
+                    )
+                ),
             ]
         }
         self.biolink_client = biolink_client if biolink_client else BiolinkClient()

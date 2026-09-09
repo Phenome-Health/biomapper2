@@ -25,11 +25,14 @@ AVAILABILITY_NOT_QUERIED = "not_queried"
 #                     default deterministic outcome (NO_MATCH) without a network call.
 #   live_api        : the live Metabolomics Workbench /match endpoint served the row (no snapshot,
 #                     or a snapshot miss with live_api_fallback enabled) and answered.
+#   freeze_backup   : mode ``live_backup`` only — live was DOWN and the write-through store served a
+#                     last-known-good value (D3: served regardless of age, age via updated_at).
 #   unavailable     : the live service did not answer (breaker open / transport error / timeout).
 #   not_queried     : RefMet was not selected for the row.
 REFMET_SOURCE_LOCAL = "local_snapshot"
 REFMET_SOURCE_NOT_IN_SNAPSHOT = "not_in_snapshot"
 REFMET_SOURCE_LIVE = "live_api"
+REFMET_SOURCE_FREEZE_BACKUP = "freeze_backup"
 REFMET_SOURCE_UNAVAILABLE = "unavailable"
 REFMET_SOURCE_NOT_QUERIED = "not_queried"
 
