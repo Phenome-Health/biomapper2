@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/Phenome-Health/biomapper2/compare/v1.0.0...v1.0.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **structure:** serve candidate node-name InChIKey from the pinned freeze (Axis 4 determinism) ([349a2ff](https://github.com/Phenome-Health/biomapper2/commit/349a2ff4d693d64a70cd2309afd7280550c33add))
+
 ## [1.0.0](https://github.com/Phenome-Health/biomapper2/compare/v0.1.0...v1.0.0) (2026-09-09)
 
 
