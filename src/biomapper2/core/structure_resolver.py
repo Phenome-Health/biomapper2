@@ -20,6 +20,7 @@ from ..config import (
     PUBCHEM_INCHIKEY_URL,
     STRUCTURE_LOOKUP_TIMEOUT_S,
 )
+from .annotators import refmet_snapshot
 from .linker import Linker
 
 
@@ -133,8 +134,38 @@ class StructureResolver:
         one = self.structural_inchikey(node_id, node_name, records)
         return [one] if one else []
 
+    @staticmethod
+    def _frozen_inchikey(node_name: str) -> str | None:
+        """Full InChIKey pinned in the RefMet freeze for this name, else None. Deterministic, no network.
+
+        Axis 4: a node with no KG-asserted InChIKey (e.g. a RefMet ``RM:`` node) otherwise resolves its
+        structure via a LIVE MW/PubChem name lookup, which is fail-soft ``None`` on a transient error.
+        A ``None`` flips ``connectivity_match`` (same-molecule test) to "unresolvable", which flips the
+        committed node between the RefMet node and the majority run-to-run. Serving the InChIKey from the
+        pinned freeze when present makes that structure deterministic; absent/blank falls to live.
+        """
+        if not node_name:
+            return None
+        try:
+            hit = refmet_snapshot.lookup(node_name)
+        except Exception:  # noqa: BLE001 - broken snapshot -> live hop, never aborts
+            logging.warning(
+                "Frozen structure lookup failed for '%s'; falling through to live", node_name, exc_info=True
+            )
+            return None
+        if hit is None:
+            return None
+        key = (hit.extra or {}).get("inchi_key")
+        # Treat the upstream "-" missing-value sentinel (and blanks) as NO structure, matching the live
+        # MW lookup's own "-" filter — a sentinel must never be accepted as a real InChIKey.
+        return key.upper() if key and key != "-" else None
+
     def _resolve_name_key(self, node_name: str) -> str | None:
-        """Full InChIKey for a NAME via MW -> PubChem -> lipid hop. Fail-soft (``None`` on error)."""
+        """Full InChIKey for a NAME via pinned freeze -> MW -> PubChem -> lipid hop. Fail-soft (``None``)."""
+        # Prefer a pinned freeze structure (deterministic, no network) over the live MW/PubChem hop.
+        frozen = self._frozen_inchikey(node_name)
+        if frozen:
+            return frozen
         try:
             key = self._fetch_mw_inchikey(node_name) or self._fetch_pubchem_inchikey(node_name)
         except Exception:
