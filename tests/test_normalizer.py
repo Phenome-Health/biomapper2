@@ -242,3 +242,66 @@ class TestCleanId:
         # ...while a float-typed whole number is still cleaned up.
         curies, _, _ = normalizer.get_curies({"icd9": 250.0}, log_warnings=False, fuzzy_match_vocab=False)
         assert "ICD9:250" in curies
+
+
+class TestVariantVocabs:
+    """CAID and HGVS -- the vocabularies aggregators record as the original endpoints of variant edges."""
+
+    @pytest.fixture
+    def normalizer(self):
+        return Normalizer()
+
+    def test_caid_ids(self, normalizer):
+        curies, _, unrecognized = normalizer.get_curies(
+            {"caid": ["CA15984545", "CA321211"]}, log_warnings=False, fuzzy_match_vocab=False
+        )
+        assert not unrecognized
+        assert set(curies) == {"CAID:CA15984545", "CAID:CA321211"}
+
+    def test_caid_is_upper_cased(self, normalizer):
+        curies, _, _ = normalizer.get_curies({"caid": "ca15984545"}, log_warnings=False, fuzzy_match_vocab=False)
+        assert "CAID:CA15984545" in curies
+
+    def test_caid_rejects_non_ids(self, normalizer):
+        curies, invalid, _ = normalizer.get_curies({"caid": "notanid"}, log_warnings=False, fuzzy_match_vocab=False)
+        assert not curies
+        assert invalid["caid"] == ["notanid"]
+
+    @pytest.mark.parametrize(
+        "local_id",
+        [
+            "NC_000001.11:g.109175441A>G",  # substitution
+            "NC_000001.11:g.1398673_1398677del",  # deletion
+            "NM_000546.5:c.215C>G",  # coding
+            "NP_000537.3:p.Pro72Arg",  # protein
+        ],
+    )
+    def test_hgvs_expressions_keep_their_internal_colon(self, normalizer, local_id):
+        """An HGVS local id contains a colon; the reference sequence must not be stripped as a prefix."""
+        curies, invalid, unrecognized = normalizer.get_curies(
+            {"hgvs": local_id}, log_warnings=False, fuzzy_match_vocab=False
+        )
+        assert not unrecognized and not invalid
+        assert f"HGVS:{local_id}" in curies
+
+    def test_hgvs_full_curie_strips_only_the_real_prefix(self, normalizer):
+        curies, _, _ = normalizer.get_curies(
+            {"hgvs": "HGVS:NC_000021.9:g.25840043C>G"}, log_warnings=False, fuzzy_match_vocab=False
+        )
+        assert "HGVS:NC_000021.9:g.25840043C>G" in curies
+
+    def test_hgvs_rejects_non_expressions(self, normalizer):
+        curies, invalid, _ = normalizer.get_curies({"hgvs": "garbage"}, log_warnings=False, fuzzy_match_vocab=False)
+        assert not curies
+        assert invalid["hgvs"] == ["garbage"]
+
+    def test_ordinary_prefix_stripping_is_unaffected(self, normalizer):
+        """The colon-aware strip must still remove a genuine leading prefix, and still leave an
+        un-split compound intact so it fails validation rather than resolving to one of its parts."""
+        curies, _, _ = normalizer.get_curies({"ncit": "NCIT:C34831"}, log_warnings=False, fuzzy_match_vocab=False)
+        assert "NCIT:C34831" in curies
+        curies, invalid, _ = normalizer.get_curies(
+            {"ncit": "C34831:C34915:C34916"}, log_warnings=False, fuzzy_match_vocab=False
+        )
+        assert not curies
+        assert invalid["ncit"] == ["C34831:C34915:C34916"]

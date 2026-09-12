@@ -79,6 +79,11 @@ def load_prefix_info(biolink_client: BiolinkClient) -> dict[str, dict[str, str]]
     prefix_to_iri_map["EnsemblGenomes"] = "https://www.ensemblgenomes.org/id/"
     prefix_to_iri_map["OBA"] = "http://purl.obolibrary.org/obo/OBA_"
     prefix_to_iri_map["OBO"] = "http://purl.obolibrary.org/obo/"
+    # HGVS sequence-variant expressions (ROBOKOP records these as the original endpoints of its
+    # variant edges). Not in the Biolink prefix map, so the prefix is minted here; an HGVS
+    # expression names a change rather than a registered record, so there is no IRI to resolve to.
+    # (CAID, the ClinGen Allele Registry, IS in Biolink's map already -- it only needed a validator.)
+    prefix_to_iri_map["HGVS"] = ""
 
     # KRAKEN source-ingest prefixes (minted for sources without a registered infores)
     prefix_to_iri_map["PGS"] = "https://www.pgscatalog.org/score/PGS"  # PGS:000027 -> .../score/PGS000027
@@ -120,6 +125,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "bspo": {validator: validators.is_seven_digit_id},
         "bgd": {validator: validators.is_bgd_id},
         "bvbrc": {validator: validators.is_bvbrc_id},
+        "caid": {validator: validators.is_caid_id, cleaner: lambda x: x.upper(), aliases: ["clingenallele"]},
         "cas": {validator: validators.is_cas_id},
         "cdcsvi": {validator: validators.is_cdcsvi_id},
         "cde": {validator: validators.is_cde_id},
@@ -164,6 +170,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "gtopdb": {validator: validators.is_gtopdb_id},
         "hcpcs": {validator: validators.is_hcpcs_id},
         "hgnc": {validator: validators.is_numeric_id},
+        "hgvs": {validator: validators.is_hgvs_id},
         "hmdb": {validator: validators.is_hmdb_id, cleaner: cleaners.clean_hmdb_id},
         "hp": {validator: validators.is_seven_digit_id, aliases: ["hpo"]},
         "hps": {validator: validators.is_hps_id},

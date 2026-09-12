@@ -88,9 +88,32 @@ def is_uberon_id(local_id: str) -> bool:
     return bool(re.match(r"^[0-9]+$", local_id))
 
 
+def is_caid_id(local_id: str) -> bool:
+    """ClinGen Allele Registry IDs: 'CA' followed by digits.
+    Examples: CA15984545, CA321211"""
+    return bool(re.match(r"^CA\d+$", local_id))
+
+
 def is_dbsnp_id(local_id: str) -> bool:
     """Allows: rs followed by digits, with an optional version suffix (e.g., .1)"""
     return bool(re.match(r"^rs[0-9]+(\.\d+)?$", local_id))
+
+
+def is_hgvs_id(local_id: str) -> bool:
+    """HGVS sequence-variant expressions: '<reference sequence>:<type>.<change>', where type is one
+    of g/o/m/c/n/r/p (genomic, circular, mitochondrial, coding, non-coding, RNA, protein).
+    Examples: NC_000001.11:g.109175441A>G, NC_000001.11:g.1398673_1398677del,
+    NM_000546.5:c.215C>G, NP_000537.3:p.Pro72Arg
+
+    NOTE these local ids CONTAIN a colon, unlike every other vocabulary here. _construct_curie
+    therefore strips a leading prefix only when it names a known vocabulary, so a reference sequence
+    ('NC_000001.11') is never mistaken for one and chopped off.
+
+    The change portion is deliberately not parsed -- HGVS grammar covers substitutions, indels,
+    duplications, inversions, repeats and more, and this is an id validator, not an HGVS parser. We
+    check the shape that identifies the expression and let the rest through.
+    """
+    return bool(re.match(r"^[A-Za-z][A-Za-z0-9_.]*:[gomcnrp]\.\S+$", local_id))
 
 
 def is_ec_id(local_id: str) -> bool:

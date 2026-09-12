@@ -346,20 +346,17 @@ class Normalizer:
         Returns:
             Tuple of (curie, iri) - empty strings if validation fails
         """
-        # If a full curie was passed (e.g. "NCIT:C123"), strip the single leading prefix to get the
-        # bare local id. A local id with MULTIPLE colons is treated as malformed (e.g. an un-split
-        # compound like "C1:C2:C3") -- left intact so it fails validation below rather than silently
-        # resolving to one of its parts. Genuine compounds should be split via get_curies'
-        # array_delimiters, which runs before this and removes the colons, so ':' as a delimiter and
-        # ':' as a prefix separator never collide here.
-        if not local_id.startswith("http") and local_id.count(":") == 1:
-            local_id = local_id.split(":", 1)[1]
         # Construct a standardized curie for the given local ID and vocab (or list of vocabs; first valid kept)
         prefixes_lowercase = [vocab_name_cleaned] if isinstance(vocab_name_cleaned, str) else vocab_name_cleaned
+        candidate_local_ids = self._candidate_local_ids(local_id)
         curie = ""
         iri = ""
         for prefix_lowercase in prefixes_lowercase:
-            is_valid_id, cleaned_local_id = self.is_valid_id(local_id, prefix_lowercase)
+            is_valid_id, cleaned_local_id = False, local_id
+            for candidate in candidate_local_ids:
+                is_valid_id, cleaned_local_id = self.is_valid_id(candidate, prefix_lowercase)
+                if is_valid_id:
+                    break
             if is_valid_id:
                 # Return the standardized curie and its corresponding IRI
                 prefix_normalized = self.vocab_info_map[prefix_lowercase]["prefix"]
@@ -379,6 +376,32 @@ class Normalizer:
                 logging.warning(f"Local id '{local_id}' is invalid for {vocab_name_cleaned}. Skipping.")
 
         return curie, iri
+
+    def _candidate_local_ids(self, local_id: str) -> list[str]:
+        """The forms of ``local_id`` to try validating, most literal first.
+
+        Most vocabularies' ids carry no colon, so a leading "PREFIX:" on one is a full curie whose
+        prefix should come off -- and it comes off whether or not we recognize the prefix, since
+        sources use nonstandard and aliased ones ("foo:C34831" is still NCIT's C34831).
+
+        But a few vocabularies' ids DO contain a colon -- an HGVS expression is
+        "NC_000001.11:g.109175441A>G", where "NC_000001.11" is a reference sequence, not a prefix.
+        Blind stripping would leave a meaningless fragment, so the id AS GIVEN is always tried
+        first: if it validates for the target vocabulary, that is what it is.
+
+        An un-split compound ("C1:C2:C3") yields no valid candidate and so fails validation rather
+        than resolving to one of its parts -- unless its leading segment names a known vocabulary,
+        which makes it a full curie wrapping a colon-bearing local id
+        ("HGVS:NC_000021.9:g.25840043C>G"). Genuine compounds should be split via get_curies'
+        array_delimiters, which runs before this.
+        """
+        candidates = [local_id]
+        if local_id.startswith("http") or ":" not in local_id:
+            return candidates
+        prefix, remainder = local_id.split(":", 1)
+        if local_id.count(":") == 1 or cleaners.clean_vocab_prefix(prefix) in self.vocab_validator_map:
+            candidates.append(remainder)
+        return candidates
 
     @staticmethod
     def _parse_delimited_string(value: Any, array_delimiters: list[str]) -> Any:
