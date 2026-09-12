@@ -139,14 +139,26 @@ def is_efo_id(local_id: str) -> bool:
     return bool(re.match(r"^[0-9]{7}$", local_id))
 
 
-def is_ensembl_gene_id(local_id: str) -> bool:
-    """Allows: ENS + optional species code + G + exactly 11 digits.
+def is_ensembl_id(local_id: str) -> bool:
+    """Allows: ENS + optional species code + feature type + exactly 11 digits + optional version.
 
-    Ensembl stable IDs carry a species code for every species EXCEPT human, which omits it -- so a
-    human-only '^ENSG' pattern silently rejects every other organism's genes.
-    Examples: ENSG00000138675 (human), ENSMUSG00000000001 (mouse), ENSBTAG00070005236 (cow),
-              ENSDARG00000019949 (zebrafish)"""
-    return bool(re.match(r"^ENS[A-Z]{0,6}G\d{11}$", local_id))
+    Ensembl stable IDs name any of several feature types, not just genes -- E(xon), FM (protein
+    family), G(ene), GT (gene tree), P(rotein), R(egulatory feature), T(ranscript) -- and a gene-only
+    pattern silently rejects the rest. Proteins in particular are a large share of what sources
+    carry, and usually versioned.
+
+    They also carry a species code for every species EXCEPT human, which omits it, so a human-only
+    '^ENSG' pattern silently rejects every other organism.
+
+    Examples: ENSG00000138675 (human gene), ENSMUSG00000000001 (mouse gene),
+              ENSBTAG00070005236 (cow gene), ENSP00000252486.3 (human protein, versioned),
+              ENST00000379044 (transcript), ENSE00001234567 (exon)
+
+    Ids from other resources that sources sometimes file under the Ensembl prefix (FlyBase FBgn...,
+    Locus Reference Genomic LRG_...) are deliberately NOT accepted -- they are not Ensembl ids, and
+    treating them as such would bless the mislabeling instead of surfacing it.
+    """
+    return bool(re.match(r"^ENS[A-Z]{0,6}?(FM|GT|[EGPRT])\d{11}(\.\d+)?$", local_id))
 
 
 def is_envo_id(local_id: str) -> bool:
@@ -455,6 +467,24 @@ def is_numeric_id(local_id: str) -> bool:
     """Generic validator for pure numeric identifiers (positive integers).
     Used by: HGNC, MGI, RGD, RxNorm, RXCUI, DrugCentral, RHEA, orphanet, FMA, etc."""
     return local_id.isdigit() and int(local_id) > 0
+
+
+def is_panther_family_id(local_id: str) -> bool:
+    """PANTHER protein families, and their subfamilies: 'PTHR' + digits, optionally followed by
+    ':SF' + digits for a subfamily.
+    Examples: PTHR22884, PTHR22884:SF473, PTHR10110:SF59
+
+    NOTE a subfamily id CONTAINS a colon (like HGVS), so _construct_curie validates the id as given
+    before trying it with a leading prefix removed -- otherwise 'PTHR22884' would be mistaken for a
+    prefix and only ':SF473' would survive.
+    """
+    return bool(re.match(r"^PTHR\d+(:SF\d+)?$", local_id))
+
+
+def is_panther_pathway_id(local_id: str) -> bool:
+    """PANTHER pathways: 'P' followed by digits.
+    Examples: P00013, P06664"""
+    return bool(re.match(r"^P\d+$", local_id))
 
 
 def is_seven_digit_id(local_id: str) -> bool:
