@@ -403,6 +403,13 @@ class Normalizer:
         Blind stripping would leave a meaningless fragment, so the id AS GIVEN is always tried
         first: if it validates for the target vocabulary, that is what it is.
 
+        A REPEATED colon ("DOID::12386") is a typo rather than structure, so a colon-collapsed form
+        is offered too. It is an extra candidate, not a rewrite, so an id that legitimately contains
+        a colon is still tried untouched first. (Note the obvious one-line fix for this -- taking the
+        LAST colon-separated segment -- would quietly destroy those ids: HGVS's
+        "NC_000001.11:g.109175441A>G" would become "g.109175441A>G", and PANTHER's "PTHR22884:SF473"
+        would become "SF473".)
+
         An un-split compound ("C1:C2:C3") yields no valid candidate and so fails validation rather
         than resolving to one of its parts -- unless its leading segment names a known vocabulary,
         which makes it a full curie wrapping a colon-bearing local id
@@ -412,9 +419,17 @@ class Normalizer:
         candidates = [local_id]
         if local_id.startswith("http") or ":" not in local_id:
             return candidates
-        prefix, remainder = local_id.split(":", 1)
-        if local_id.count(":") == 1 or cleaners.clean_vocab_prefix(prefix) in self.vocab_validator_map:
-            candidates.append(remainder)
+        collapsed = re.sub(r":{2,}", ":", local_id)
+        if collapsed != local_id:
+            candidates.append(collapsed)
+        # Then, for each form, the same id with a leading prefix removed.
+        for candidate in list(candidates):
+            if ":" not in candidate:
+                continue
+            prefix, remainder = candidate.split(":", 1)
+            known_prefix = cleaners.clean_vocab_prefix(prefix) in self.vocab_validator_map
+            if remainder and remainder not in candidates and (candidate.count(":") == 1 or known_prefix):
+                candidates.append(remainder)
         return candidates
 
     @staticmethod
