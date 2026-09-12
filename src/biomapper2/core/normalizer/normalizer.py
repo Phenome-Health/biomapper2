@@ -23,6 +23,14 @@ from ...utils import (
 from . import cleaners
 from .vocab_config import load_prefix_info, load_validator_map
 
+# Shortest vocabulary name that may be matched as a BARE SUBSTRING of a field name (the last, fuzziest
+# tier of determine_vocab -- how "labcorploincid" finds "loinc"). A third of our vocab names are two or
+# three characters ('mi', 'go', 'so', 'pr', 'cl', 'ec', 'chr', 'cas', ...), and as bare substrings those
+# match almost any English word -- 'mi' is inside "family", 'so' inside "sodium", 'pr' inside "protein".
+# One such match silently resolves an id to a completely unrelated vocabulary, so short names are
+# matchable only by the exact and alias tiers above, never by substring.
+MIN_SUBSTRING_MATCH_LENGTH = 4
+
 
 class Normalizer:
     """
@@ -249,9 +257,15 @@ class Normalizer:
         if field_name_cleaned in self.vocab_validator_map:
             # We have an exact match, so we return it
             return {field_name_cleaned}
-        elif field_name_cleaned in self.field_name_to_vocab_name_cache:
+        # The cache is keyed by the fuzzy flag as well as the field name: a substring match is only
+        # valid for a CALLER THAT ASKED FOR ONE, and serving it to a caller that passed
+        # do_fuzzy_matching=False would make the answer depend on what happened to be looked up
+        # earlier in the process. (That silently turned 'hgnc.family:1561' into 'MI:1561' whenever
+        # any fuzzy lookup ran first.)
+        cache_key = (field_name_cleaned, do_fuzzy_matching)
+        if cache_key in self.field_name_to_vocab_name_cache:
             # We've already processed this field name before, so we return the cached mapping
-            return self.field_name_to_vocab_name_cache[field_name_cleaned]
+            return self.field_name_to_vocab_name_cache[cache_key]
         else:
             # Check explicit and implicit aliases
             matches_on_alias = set()
@@ -267,7 +281,7 @@ class Normalizer:
                     matches_on_alias.add(vocab)
 
             if matches_on_alias:
-                self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_alias
+                self.field_name_to_vocab_name_cache[cache_key] = matches_on_alias
                 return matches_on_alias
 
             if do_fuzzy_matching:
@@ -277,12 +291,12 @@ class Normalizer:
                 for vocab in self.vocab_validator_map:
                     # Use the root vocab name for substring matching
                     vocab_root = vocab.split(".")[0] if "." in vocab else vocab
-                    if vocab_root in field_name_cleaned:
+                    if len(vocab_root) >= MIN_SUBSTRING_MATCH_LENGTH and vocab_root in field_name_cleaned:
                         matches_on_substring.add(vocab)
 
                 if matches_on_substring:
                     logging.debug(f"Found substring match(es) for '{id_field_name}': {matches_on_substring}")
-                    self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_substring
+                    self.field_name_to_vocab_name_cache[cache_key] = matches_on_substring
                     return matches_on_substring
 
             return None

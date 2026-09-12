@@ -305,3 +305,38 @@ class TestVariantVocabs:
         )
         assert not curies
         assert invalid["ncit"] == ["C34831:C34915:C34916"]
+
+
+class TestVocabMatchingSafety:
+    """determine_vocab's fuzzy tier, and the cache in front of it."""
+
+    @pytest.fixture
+    def normalizer(self):
+        return Normalizer()
+
+    def test_fuzzy_result_never_leaks_into_a_non_fuzzy_call(self):
+        """The cache is keyed by the fuzzy flag, so the answer can't depend on lookup order.
+
+        Regression: a fuzzy lookup of 'hgnc.family' cached a substring match on 'mi' (inside
+        "hgncfaMIly"), and a later non-fuzzy call read that cache and resolved 1561 to MI:1561.
+        """
+        n = Normalizer()
+        n.determine_vocab("some_unknown_family_field")  # fuzzy (the default), populates the cache
+        assert n.determine_vocab("some_unknown_family_field", do_fuzzy_matching=False) is None
+
+    def test_short_vocab_names_are_not_matched_as_substrings(self, normalizer):
+        """'mi', 'go', 'so', 'pr' etc. are inside ordinary English words; matching them as bare
+        substrings silently resolves ids to unrelated vocabularies."""
+        matches = normalizer.determine_vocab("some_unknown_family_field") or set()
+        assert "mi" not in matches  # "mi" is inside "faMIly"
+        matches = normalizer.determine_vocab("sodium_measurement") or set()
+        assert "so" not in matches  # "so" is inside "SOdium"
+
+    def test_long_vocab_names_still_match_as_substrings(self, normalizer):
+        """The documented purpose of the fuzzy tier must survive the length guard."""
+        assert normalizer.determine_vocab("labcorploincid") == {"loinc"}
+
+    def test_exact_match_wins_over_any_fuzzy_guess(self, normalizer):
+        """Now that hgnc.family has its own entry, it resolves to itself rather than to hgnc/mi."""
+        assert normalizer.determine_vocab("hgnc.family") == {"hgnc.family"}
+
