@@ -400,13 +400,20 @@ class Normalizer:
             return value
 
     def clean_id(self, local_id: str | float | int) -> str:
-        """Convert numeric IDs to strings, strip whitespace, removing trailing .0 for whole numbers..."""
+        """Convert numeric IDs to strings, strip whitespace, removing the trailing '.0' a whole
+        number picks up when it arrives as a float.
+
+        The '.0' is stripped ONLY for an actual float input, never for a string. A float is the
+        spreadsheet artifact we mean to undo (pandas types an integer column containing blanks as
+        float64, so the code 12345 arrives as 12345.0), whereas in a string the '.0' is part of the
+        identifier -- ICD9 '250.0' (diabetes with coma) is a DIFFERENT code from '250' (diabetes
+        mellitus), so stripping it silently changes the entity being referenced. Anything that can
+        reach us as text (an ICD/OMOP/HCPCS-style dotted code) is therefore left intact.
+        """
+        # NaN is never a whole number (and int(nan) raises), so screen it out before the int compare.
+        if isinstance(local_id, float) and local_id == local_id and local_id == int(local_id):
+            return str(int(local_id))
         local_id = str(local_id).strip()
-        try:
-            if local_id.endswith(".0") and float(local_id) == int(float(local_id)):
-                return local_id.removesuffix(".0")
-        except (ValueError, TypeError):
-            pass
         if local_id in self.dashes:
             return ""
         else:

@@ -202,3 +202,43 @@ class TestGetCuries:
         )
         assert not curies
         assert invalid_ids["ncit"] == ["C34831:C34915:C34916"]
+
+
+class TestCleanId:
+    """Tests for Normalizer.clean_id -- in particular that a dotted code keeps its '.0'."""
+
+    @pytest.fixture
+    def normalizer(self):
+        return Normalizer()
+
+    def test_float_whole_number_loses_its_dot_zero(self, normalizer):
+        """The artifact we DO mean to undo: pandas types an int column with blanks as float64."""
+        assert normalizer.clean_id(12345.0) == "12345"
+        assert normalizer.clean_id(250.0) == "250"
+
+    def test_string_keeps_its_dot_zero(self, normalizer):
+        """A '.0' inside a STRING is part of the identifier, not a float artifact.
+
+        ICD9 '250.0' (diabetes with coma) is a different code from '250' (diabetes mellitus),
+        so stripping it would silently change which entity is referenced.
+        """
+        assert normalizer.clean_id("250.0") == "250.0"
+        assert normalizer.clean_id("12345.0") == "12345.0"
+        assert normalizer.clean_id(" 250.0 ") == "250.0"
+
+    def test_non_whole_float_and_nan_are_unharmed(self, normalizer):
+        assert normalizer.clean_id(1.5) == "1.5"
+        assert normalizer.clean_id(float("nan")) == "nan"
+
+    def test_plain_values_and_dashes(self, normalizer):
+        assert normalizer.clean_id("250") == "250"
+        assert normalizer.clean_id(12345) == "12345"
+        assert normalizer.clean_id("-") == ""
+
+    def test_dotted_code_survives_curie_construction(self, normalizer):
+        """End to end: the ICD9 code keeps its '.0' all the way to the curie."""
+        curies, _, _ = normalizer.get_curies({"icd9": "250.0"}, log_warnings=False, fuzzy_match_vocab=False)
+        assert "ICD9:250.0" in curies
+        # ...while a float-typed whole number is still cleaned up.
+        curies, _, _ = normalizer.get_curies({"icd9": 250.0}, log_warnings=False, fuzzy_match_vocab=False)
+        assert "ICD9:250" in curies
