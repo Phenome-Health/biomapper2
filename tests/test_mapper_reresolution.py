@@ -200,11 +200,13 @@ def test_reresolution_default_is_off_in_config():
 
 
 def test_reresolution_without_tier_b_is_a_loud_configuration_error(monkeypatch):
-    """RERESOLUTION_ENABLED requires TIER_B_ENABLED (a CONTRADICTED certificate only comes from Tier
+    """RERESOLUTION_ENABLED requires an ACTIVE Tier B (a CONTRADICTED certificate only comes from Tier
     B). The dependency is surfaced at build time, not as a silent no-op."""
     import biomapper2.mapper as mapper_mod
 
-    monkeypatch.setattr(mapper_mod, "TIER_B_ENABLED", False)
+    # Explicitly disable Tier B (and ensure no freeze), so it is not active for this run.
+    monkeypatch.setenv("BIOMAPPER2_TIER_B_ENABLED", "false")
+    monkeypatch.delenv("BIOMAPPER2_TIER_B_SNAPSHOT_PATH", raising=False)
     monkeypatch.setattr(mapper_mod, "RERESOLUTION_ENABLED", True)
-    with pytest.raises(ValueError, match="requires TIER_B_ENABLED"):
+    with pytest.raises(ValueError, match="requires an ACTIVE Tier B"):
         mapper_mod.Mapper._build_tier_b(None)

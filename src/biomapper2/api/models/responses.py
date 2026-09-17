@@ -97,6 +97,12 @@ class ResolutionCertificateModel(BaseModel):
         description="Version of the pinned freeze that served (or was consulted for) the row, else "
         "None. Set only when 'refmet_source' is 'local_snapshot' or 'not_in_snapshot'.",
     )
+    tier_b_snapshot_version: str | None = Field(
+        default=None,
+        description="Version of the Tier B freeze that produced a frozen independent result, else "
+        "None for a live result. A first-class field mirroring 'refmet_snapshot_version' so frozen "
+        "Tier B evidence is auditable.",
+    )
     provenance: dict[str, Any] = Field(default_factory=dict, description="Tier B state, cache stores and expiry policy")
 
 
@@ -205,6 +211,11 @@ class EntityMappingResult(BaseModel):
         default=None,
         description="Version of the pinned freeze that served the row, mirrored from the certificate; "
         "None when the row was not served by (or consulted against) a freeze.",
+    )
+    tier_b_snapshot_version: str | None = Field(
+        default=None,
+        description="Version of the Tier B freeze that produced a frozen independent result for the "
+        "row, mirrored from the certificate; None for a live (non-frozen) result.",
     )
     kg_equivalent_ids: dict[str, list[str]] = Field(
         default_factory=dict,
