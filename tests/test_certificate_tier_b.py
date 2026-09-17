@@ -281,6 +281,18 @@ def test_a_lipid_the_registries_miss_resolves_from_the_lipid_hop() -> None:
     assert lipid.calls == ["PC 16:0/18:1"]
 
 
+def test_an_ambiguous_lipid_outcome_propagates_through_the_lookup() -> None:
+    # AMBIGUOUS is a real verdict from the lipid hop; the lookup must forward it, not let it fall
+    # through to unresolvable (which would drop the outcome and the candidate set).
+    lipid = _FakeLipidResolver(outcome=TierBOutcome.AMBIGUOUS)
+    lookup, _ = _lookup(
+        {"refmet/name": _FakeResponse({}, status=404), "pubchem": _FakeResponse({}, status=404)},
+        lipid_resolver=lipid,
+    )
+    result = lookup.lookup("PC 16:0/18:1")
+    assert result.outcome is TierBOutcome.AMBIGUOUS
+
+
 def test_the_lipid_hop_is_only_tried_after_mw_and_pubchem_miss() -> None:
     lipid = _FakeLipidResolver()
     lookup, _ = _lookup({"refmet/name": _FakeResponse({"inchi_key": MW_KEY})}, lipid_resolver=lipid)

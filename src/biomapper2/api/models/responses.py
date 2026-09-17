@@ -59,8 +59,17 @@ class ResolutionCertificateModel(BaseModel):
     )
     tier_b_outcome: str = Field(
         default="off",
-        description="'off' | 'resolved' | 'unresolvable' | 'lookup_failed'. A failed lookup is kept "
-        "distinct from an unresolvable name so a throttled service is never read as name difficulty.",
+        description="'off' | 'resolved' | 'unresolvable' | 'lookup_failed' | 'ambiguous' | "
+        "'out_of_scope'. A failed lookup is kept distinct from an unresolvable name so a throttled "
+        "service is never read as name difficulty. 'off' means Tier B was disabled for the run; "
+        "'out_of_scope' means it was enabled but this row is not one an independent lookup can "
+        "adjudicate, so the two are never conflated.",
+    )
+    lipid_resolution_level: str = Field(
+        default="unavailable",
+        description="Graded agreement of a STRUCTURE-FREE lipid check ('lipid_species' | 'contradicted' "
+        "| 'unavailable'), on an axis PARALLEL to the InChIKey-block 'resolution_level'. Set only for a "
+        "committed lipid node the graph lists no InChIKey for; 'unavailable' on every other row.",
     )
     refusal_reason: str | None = Field(
         default=None,
@@ -91,6 +100,66 @@ class ResolutionCertificateModel(BaseModel):
     provenance: dict[str, Any] = Field(default_factory=dict, description="Tier B state, cache stores and expiry policy")
 
 
+class LipidResolution(BaseModel):
+    """Lipid hierarchy-aware resolution detail for a committed node. Null for non-lipid rows.
+
+    Additive (R10): assembled from metadata the lipid units already produce (goslin parse + the
+    committed node's matched level). ``mapping_relation`` is the canonical successor of the flat
+    ``chosen_kg_id_lipid_hint`` field: ``mapping_relation == 'broad'`` is exactly the
+    ``lipid_generalized`` case that hint marks.
+    """
+
+    query_lipid_level_asserted: str | None = Field(
+        default=None, description="The input's real lipid level (goslin LipidLevel, lowercased), before trust policy"
+    )
+    query_lipid_level_effective: str | None = Field(
+        default=None,
+        description="The level actually queried after the sn-position trust policy (Decision 1): equals "
+        "'query_lipid_level_asserted' unless a trust-off downgrade capped a slash-bearing input to a coarser level",
+    )
+    matched_lipid_level: str | None = Field(
+        default=None,
+        description="The level at which the committed node matched, joined to the goslin votes by the same "
+        "raw-id vs curie reconciliation the resolver tie-break uses; None when no goslin vote backs the node",
+    )
+    mapping_relation: str = Field(
+        default="unknown",
+        description="Relation of the committed node's matched level to the effective query level: "
+        "'exact' | 'broad' | 'narrow' | 'unknown'. 'broad' means the committed node is coarser than the "
+        "query asked for (a generalization); 'narrow' should not occur under Decision 2 but is represented "
+        "honestly if seen; 'unknown' when a level is missing",
+    )
+    mapping_predicate: str | None = Field(
+        default=None,
+        description="SKOS predicate for 'mapping_relation': 'skos:exactMatch' | 'skos:broadMatch' | "
+        "'skos:narrowMatch'; None when the relation is 'unknown'",
+    )
+    query_transformed: str | None = Field(
+        default=None,
+        description="How the query name was transformed before lookup: 'slash_to_underscore' when a "
+        "trust-off downgrade rewrote a slash-bearing input, else 'goslin_species_canonical'",
+    )
+    ambiguous: bool = Field(
+        default=False,
+        description="Whether the committed node came from a structurally ambiguous candidate set. Defaults "
+        "to false: the LIPID MAPS / Tier B ambiguity signal is not yet threaded to this surface, so no "
+        "ambiguity is asserted rather than fabricated",
+    )
+    candidate_structure_count: int | None = Field(
+        default=None,
+        description="Number of distinct structures in the candidate set when an ambiguity signal is present; "
+        "None when that signal does not reach this row",
+    )
+    ambiguity_basis: str | None = Field(
+        default=None,
+        description="What the ambiguity is grounded in (e.g. 'lipidmaps_abbrev_chains') when 'ambiguous' is "
+        "true; None otherwise",
+    )
+    goslin_dialect: str | None = Field(default=None, description="Goslin grammar dialect that parsed the input name")
+    goslin_formula: str | None = Field(default=None, description="Sum formula from the goslin parse")
+    goslin_mass: float | None = Field(default=None, description="Monoisotopic mass from the goslin parse")
+
+
 class EntityMappingResult(BaseModel):
     """Result of mapping a single entity to knowledge graph nodes."""
 
@@ -107,6 +176,19 @@ class EntityMappingResult(BaseModel):
         default=None,
         description="Structural certificate for chosen_kg_id (and only chosen_kg_id — "
         "chosen_kg_id_provided and chosen_kg_id_assigned carry none). Null when mapping failed.",
+    )
+    chosen_kg_id_lipid_hint: str | None = Field(
+        default=None,
+        description="Additive lipid review hint for chosen_kg_id, on its own axis from the closed "
+        "selection_conflict whitelist: 'lipid_generalized' when the committed lipid node is BROADER "
+        "than the effective lipid query level (a generalization the resolver could not avoid); None "
+        "otherwise and for non-lipid rows. Now folded into lipid_resolution.mapping_relation "
+        "('broad' == this hint's 'lipid_generalized'); kept for one release for backward compatibility.",
+    )
+    lipid_resolution: LipidResolution | None = Field(
+        default=None,
+        description="Lipid hierarchy-aware resolution detail for chosen_kg_id; null for non-lipid rows. "
+        "Additive object assembled from the goslin parse and the committed node's matched level.",
     )
     refmet_availability: str = Field(
         default="not_queried",

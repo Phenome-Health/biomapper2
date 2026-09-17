@@ -51,7 +51,12 @@ class AnnotationEngine:
                 GoslinLipidAnnotator(
                     binder=MetabolomicsWorkbenchAnnotator(
                         live_api_fallback=refmet_fallback, freeze_mode=refmet_freeze_mode
-                    )
+                    ),
+                    # D3: the level cascade queries Kestrel hybrid search with each level-specific name,
+                    # but only for levels no other source already hit. A private instance (separate from
+                    # the registered kestrel-hybrid-search, which searches the raw name) so the two do
+                    # not share state; both keep the same adaptive candidate window.
+                    kestrel=KestrelHybridSearchAnnotator(),
                 ),
             ]
         }
@@ -447,6 +452,16 @@ class AnnotationEngine:
 
         Total by construction so a consumer (certificate, run metric) never reads None or hits a
         missing key, whether or not the row was annotated.
+
+        Availability tracks whether a source answered for the row (live / snapshot / unavailable /
+        no_match). Only the RefMet annotator (Metabolomics Workbench) is INSTRUMENTED for it: it alone
+        overrides the base ``not_queried`` (F8). Every other annotator inherits ``not_queried`` here BY
+        DESIGN even when it voted, regardless of whether it hits an external service. That covers both a
+        purely local parser like ``goslin-lipid`` (no external call to instrument) and
+        ``kestrel-hybrid-search``, which DOES call an external Kestrel API and can fail when that service
+        is unavailable but whose availability is simply not instrumented in this map. A voting
+        annotator's contribution is recorded in ``assigned_ids``, not here. The certificate consumes only
+        the RefMet slug, surfaced as ``refmet_availability``.
         """
         return {slug: AVAILABILITY_NOT_QUERIED for slug in self.annotator_registry}
 

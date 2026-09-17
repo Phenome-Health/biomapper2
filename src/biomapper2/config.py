@@ -233,6 +233,14 @@ def derive_refmet_snapshot_version(path: Path | None) -> str | None:
     return path.stem
 
 
+# Lipid sn-position trust policy (D1 of the lipid-hierarchy plan). Shorthand notation writes a proven
+# sn-position with "/" (e.g. "PC 16:0/18:1") and an unknown one with "_" ("PC 16:0_18:1"), but vendors
+# frequently emit "/" loosely for data that only supports the molecular-species level. Default OFF: an
+# input asserted at sn-position is DOWNGRADED to molecular-species for querying (its EFFECTIVE level),
+# so a match is never over-claimed as sn-proven. Set truthy only when the input source is trusted to use
+# "/" strictly. Read by GoslinLipidAnnotator's level cascade.
+LIPID_TRUST_SN_POSITION = os.getenv("BIOMAPPER2_LIPID_TRUST_SN_POSITION", "").strip().lower() in {"1", "true", "yes"}
+
 # Structure (InChIKey) fallback services for the resolver's connectivity test. Used only on the
 # small-molecule ChEBI conflict path when a node carries no KG InChIKey (see StructureResolver).
 MW_INCHIKEY_URL = "https://www.metabolomicsworkbench.org/rest/refmet/name"  # /{name}/inchi_key

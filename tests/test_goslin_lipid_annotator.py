@@ -65,6 +65,17 @@ def test_enrichment_when_injected_adds_lipidmaps_ids_and_flags_fired():
         def enrich(self, canonical_name):
             return {"LIPIDMAPS": "LMGP01010001", "INCHIKEY": "KILNVBDSWZSGLL-KXQOOQHDSA-N"}
 
+        def candidates_checked(self, canonical_name):
+            # The cascade reads the candidate set (Unit 1 contract); one row here.
+            row = {
+                "lm_id": "LMGP01010001",
+                "inchi_key": "KILNVBDSWZSGLL-KXQOOQHDSA-N",
+                "name": "",
+                "abbrev": "",
+                "abbrev_chains": "",
+            }
+            return [row], True
+
     binder = _FakeBinder(result_ids={"PC 34:1": {"refmet_id": ["REFMET:RM0001"]}})
     ann = GoslinLipidAnnotator(binder=binder, enrichment=_FakeEnricher())  # pyright: ignore[reportArgumentType]
     out = ann.get_annotations({"name": "PC 34:1"}, name_field="name", category="biolink:SmallMolecule")
