@@ -48,6 +48,7 @@ import requests_cache
 
 from ..config import (
     CACHE_DIR,
+    CACHE_IGNORED_PARAMETERS,
     MW_INCHIKEY_URL,
     PUBCHEM_INCHIKEY_URL,
     STRUCTURE_LOOKUP_TIMEOUT_S,
@@ -90,7 +91,13 @@ class IndependentStructureLookup:
         lipid_resolver: Any | None = None,
     ) -> None:
         self._session = (
-            session if session is not None else requests_cache.CachedSession(str(CACHE_DIR / STRUCTURE_CACHE_STORE))
+            session
+            if session is not None
+            else requests_cache.CachedSession(
+                str(CACHE_DIR / STRUCTURE_CACHE_STORE),
+                ignored_parameters=CACHE_IGNORED_PARAMETERS,
+                allowable_methods=["GET"],
+            )
         )
         self._sleep = sleep
         self._clock = clock

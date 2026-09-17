@@ -20,9 +20,11 @@ import pytest
 
 from biomapper2.core.certificate import (
     COMPARISON_RULE_FIRST_BLOCK_SET_INTERSECTION,
+    COMPARISON_RULE_INCHIKEY_LADDER,
     SELECTION_CONFLICT_VALUES,
     CertificateState,
     ResolutionCertificate,
+    ResolutionLevel,
     StructureStatus,
     TierBOutcome,
     TierBResult,
@@ -467,3 +469,50 @@ def test_the_emitted_blocks_are_canonical_regardless_of_input_casing():
     """Folded at the PRODUCER too, so the published column is canonical and not merely compared as if."""
     certificate = _issue_case(_KEY.lower(), "bsynrymutxbxsq")
     assert certificate.node_inchikey_blocks == ["BSYNRYMUTXBXSQ"]
+
+
+# --------------------------------------------------------------------------------------------
+# Graded resolution level -- surfaced from the SAME comparison as the state, so the two agree
+# --------------------------------------------------------------------------------------------
+
+
+def test_level_is_unavailable_when_no_independent_comparison_ran() -> None:
+    cert = _issue()
+    assert cert.state is CertificateState.UNCORROBORATED
+    assert cert.resolution_level is ResolutionLevel.UNAVAILABLE
+    assert cert.resolution_level_worst is ResolutionLevel.UNAVAILABLE
+
+
+def test_exact_full_key_match_grades_exact_and_records_the_rule() -> None:
+    # A full independent key equal to the node's first key; the node's second key (same block1 and
+    # block2, different final char) is structural, so worst is structural.
+    cert = _issue(tier_b=_tier_b(TierBOutcome.RESOLVED, "BSYNRYMUTXBXSQ-UHFFFAOYSA-N", "lipidmaps"))
+    assert cert.state is CertificateState.CORROBORATED
+    assert cert.resolution_level is ResolutionLevel.EXACT_INCHIKEY
+    assert cert.resolution_level_worst is ResolutionLevel.STRUCTURAL
+    assert cert.provenance.get("resolution_level_rule") == COMPARISON_RULE_INCHIKEY_LADDER
+
+
+def test_first_block_only_independent_grades_connectivity() -> None:
+    # MW and PubChem emit first-block only: agreement is connectivity, never a silent stereo pass.
+    cert = _issue(tier_b=_tier_b(TierBOutcome.RESOLVED, "BSYNRYMUTXBXSQ", "pubchem"))
+    assert cert.state is CertificateState.CORROBORATED
+    assert cert.resolution_level is ResolutionLevel.CONNECTIVITY
+    assert cert.resolution_level_worst is ResolutionLevel.CONNECTIVITY
+
+
+def test_block1_disagreement_grades_contradicted_consistently_with_state() -> None:
+    cert = _issue(tier_b=_tier_b(TierBOutcome.RESOLVED, OTHER_BLOCK, "pubchem"))
+    assert cert.state is CertificateState.CONTRADICTED
+    assert cert.resolution_level is ResolutionLevel.CONTRADICTED
+
+
+def test_serializers_surface_the_level_fields() -> None:
+    cert = _issue(tier_b=_tier_b(TierBOutcome.RESOLVED, "BSYNRYMUTXBXSQ", "pubchem"))
+    api = cert.to_api_dict()
+    assert api["resolution_level"] == "connectivity"
+    assert api["resolution_level_worst"] == "connectivity"
+    flat = cert.to_flat_columns()
+    assert flat["certificate_resolution_level"] == "connectivity"
+    assert flat["certificate_resolution_level_worst"] == "connectivity"
+    assert flat["certificate_provenance_resolution_level_rule"] == COMPARISON_RULE_INCHIKEY_LADDER

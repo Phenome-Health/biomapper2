@@ -67,6 +67,11 @@ _SOURCE_TO_DEPENDENT_ANNOTATOR = {TIER_B_SOURCE_MW: REFMET_ANNOTATOR}
 # lands, introduces a second value here rather than silently changing what this one means.
 COMPARISON_RULE_FIRST_BLOCK_SET_INTERSECTION = "inchikey_first_block_set_intersection/v1"
 
+# The rule that produces the graded ``resolution_level``. It refines the state's agreement into
+# exact/structural/connectivity using the SAME operand and block1/block2 comparison, so it never
+# disagrees with the state; recorded in provenance when a level was computed.
+COMPARISON_RULE_INCHIKEY_LADDER = "inchikey_ladder/v2"
+
 INCHIKEY_PREFIX = "INCHIKEY"
 
 # Length of the InChIKey stereo layer prefix folded into the structural key. The second block
@@ -107,6 +112,69 @@ def structural_agree(a: str | None, b: str | None) -> bool:
     if a2 is not None and b2 is not None:
         return a2 == b2
     return True
+
+
+class ResolutionLevel(str, Enum):
+    """How deeply the committed node and the independent lookup agree, refining the binary
+    corroborated/contradicted state. Derived from the SAME block1/block2 comparison as
+    ``structural_agree``; a block-1 disagreement is ``contradicted`` here, and the structure
+    escalation (a later unit) can reclaim some of those to a same-molecule level.
+    """
+
+    EXACT_INCHIKEY = "exact_inchikey"  # full keys identical
+    STRUCTURAL = "structural"  # block1 and block2[:8] agree (both operands carry a stereo layer)
+    CONNECTIVITY = "connectivity"  # block1 agrees; stereo not compared (a side is first-block-only)
+    CONTRADICTED = "contradicted"  # block1 disagrees, or block1 agrees but block2[:8] differs
+    UNAVAILABLE = "unavailable"  # no comparison was possible
+
+
+_LEVEL_RANK = {
+    ResolutionLevel.EXACT_INCHIKEY: 4,
+    ResolutionLevel.STRUCTURAL: 3,
+    ResolutionLevel.CONNECTIVITY: 2,
+    ResolutionLevel.CONTRADICTED: 1,
+    ResolutionLevel.UNAVAILABLE: 0,
+}
+
+
+def _pair_level(node_key: str | None, independent_key: str | None) -> ResolutionLevel:
+    """The level of one node key against one independent key, consistent with ``structural_agree``.
+
+    A block-1 match with a differing block2[:8] is ``contradicted`` (never a silent stereo pass), the
+    same way ``structural_agree`` returns False for that case.
+    """
+    n1, n2 = structural_key_parts(node_key)
+    i1, i2 = structural_key_parts(independent_key)
+    if n1 is None or i1 is None:
+        return ResolutionLevel.UNAVAILABLE
+    if n1 != i1:
+        return ResolutionLevel.CONTRADICTED
+    if n2 is None or i2 is None:
+        # At least one side is first-block-only (MW/PubChem, or a graph key with no stereo layer):
+        # only connectivity was compared. Two identical truncated strings are NOT exact -- no full
+        # key or stereo layer was ever seen -- so never grant exact/structural here.
+        return ResolutionLevel.CONNECTIVITY
+    if str(node_key).strip().upper() == str(independent_key).strip().upper():
+        return ResolutionLevel.EXACT_INCHIKEY
+    return ResolutionLevel.STRUCTURAL if n2 == i2 else ResolutionLevel.CONTRADICTED
+
+
+def resolve_level(
+    node_keys: Iterable[str | None] | None, independent_key: str | None
+) -> tuple[ResolutionLevel, ResolutionLevel]:
+    """Best and worst resolution level of ``independent_key`` against the node's key list.
+
+    Set-based over the full multi-valued node keys (never index 0). ``best`` is the strongest
+    agreement any node key reaches; ``worst`` surfaces an internally inconsistent node (one key
+    matching exactly while another contradicts) so it cannot silently grade ``exact_inchikey``.
+    """
+    keys = [k for k in (node_keys or []) if k and str(k).strip()]
+    if not keys or not independent_key or not str(independent_key).strip():
+        return ResolutionLevel.UNAVAILABLE, ResolutionLevel.UNAVAILABLE
+    levels = [_pair_level(k, independent_key) for k in keys]
+    best = max(levels, key=lambda lv: _LEVEL_RANK[lv])
+    worst = min(levels, key=lambda lv: _LEVEL_RANK[lv])
+    return best, worst
 
 
 # Cache provenance. The confound that motivated recording this (a cold cache returning a wrong
@@ -197,6 +265,14 @@ class ResolutionCertificate:
     # snapshot-served vote (set only when the freeze served or was consulted for the row), else None.
     refmet_source: str = "not_queried"
     refmet_snapshot_version: str | None = None
+    # Graded structural agreement between the committed node and the independent lookup, refining the
+    # binary state. Derived from the SAME operand and block1/block2 comparison the state uses, so the
+    # two never disagree: a corroborated row is exact/structural/connectivity, a contradicted row is
+    # contradicted, and a row with no independent comparison is unavailable. ``_worst`` surfaces an
+    # internally inconsistent multi-key node. Appended after the existing defaulted fields so the
+    # dataclass shape stays additive.
+    resolution_level: ResolutionLevel = ResolutionLevel.UNAVAILABLE
+    resolution_level_worst: ResolutionLevel = ResolutionLevel.UNAVAILABLE
     provenance: dict[str, Any] = field(default_factory=dict)
 
     def to_api_dict(self) -> dict[str, Any]:
@@ -211,6 +287,8 @@ class ResolutionCertificate:
             "structure_status": self.structure_status.value,
             "node_inchikey_blocks": list(self.node_inchikey_blocks),
             "comparison_rule": self.comparison_rule,
+            "resolution_level": self.resolution_level.value,
+            "resolution_level_worst": self.resolution_level_worst.value,
             "equivalent_ids_lookup_ok": self.equivalent_ids_lookup_ok,
             "selection_conflict": self.selection_conflict,
             "independent_source": self.independent_source,
@@ -237,6 +315,8 @@ class ResolutionCertificate:
             "certificate_structure_status": self.structure_status.value,
             "certificate_node_inchikey_blocks": "|".join(self.node_inchikey_blocks),
             "certificate_comparison_rule": self.comparison_rule,
+            "certificate_resolution_level": self.resolution_level.value,
+            "certificate_resolution_level_worst": self.resolution_level_worst.value,
             "certificate_equivalent_ids_lookup_ok": self.equivalent_ids_lookup_ok,
             "certificate_selection_conflict": self.selection_conflict,
             "certificate_independent_source": self.independent_source,
@@ -376,6 +456,9 @@ def issue(
 
     blocks = node_blocks_from_equivalent_ids(kg_equivalent_ids)
     tier_b_outcome = tier_b.outcome if tier_b else TierBOutcome.OFF
+    resolution_level = ResolutionLevel.UNAVAILABLE
+    resolution_level_worst = ResolutionLevel.UNAVAILABLE
+    resolution_level_rule: str | None = None
 
     if not is_small_molecule:
         # Not defensive padding. ``unavailable`` means "we looked for a structure and the graph has
@@ -412,6 +495,10 @@ def issue(
             node_full_keys = node_full_inchikeys_from_equivalent_ids(kg_equivalent_ids)
             agrees = any(structural_agree(tier_b.inchikey_block, nk) for nk in node_full_keys)
             state = CertificateState.CORROBORATED if agrees else CertificateState.CONTRADICTED
+            # Same operand and comparison as the state above, graded rather than binary, so the level
+            # never disagrees with the state.
+            resolution_level, resolution_level_worst = resolve_level(node_full_keys, tier_b.inchikey_block)
+            resolution_level_rule = COMPARISON_RULE_INCHIKEY_LADDER
 
     # Independent-evidence fields belong ONLY to rows the evidence was actually weighed on -- i.e.
     # ``structure_present``. A row that is out of scope, or that committed no node, has nothing for
@@ -437,11 +524,17 @@ def issue(
         independent_block = tier_b.inchikey_block
         independence = _independent_of_selection(tier_b, committed_node_sources)
 
+    _prov = dict(provenance) if provenance is not None else _default_provenance(tier_b)
+    if resolution_level_rule is not None:
+        _prov["resolution_level_rule"] = resolution_level_rule
+
     certificate = ResolutionCertificate(
         state=state,
         structure_status=structure_status,
         node_inchikey_blocks=blocks,
         comparison_rule=comparison_rule,
+        resolution_level=resolution_level,
+        resolution_level_worst=resolution_level_worst,
         equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
         selection_conflict=selection_conflict,
         independent_source=independent_source,
@@ -452,7 +545,7 @@ def issue(
         refmet_availability=refmet_availability,
         refmet_source=refmet_source,
         refmet_snapshot_version=refmet_snapshot_version,
-        provenance=dict(provenance) if provenance is not None else _default_provenance(tier_b),
+        provenance=_prov,
     )
 
     # G3, asserted at the point of construction as well as in the suite. ``contradicted`` is
