@@ -74,6 +74,7 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
         refmet_availability=mapped_item.get("refmet_availability") or "not_queried",
         refmet_source=mapped_item.get("refmet_source") or "not_queried",
         refmet_snapshot_version=mapped_item.get("refmet_snapshot_version"),
+        tier_b_snapshot_version=mapped_item.get("tier_b_snapshot_version"),
         kg_equivalent_ids=mapped_item.get("kg_equivalent_ids", {}) or {},
         kg_ids=mapped_item.get("kg_ids", {}) or {},
         assigned_ids=mapped_item.get("assigned_ids", {}) or {},

@@ -15,7 +15,7 @@ import pandas as pd
 
 from . import config
 from .biolink_client import BiolinkClient
-from .config import PROJECT_ROOT, RERESOLUTION_ENABLED, TIER_B_ENABLED, get_kestrel_api_url
+from .config import PROJECT_ROOT, RERESOLUTION_ENABLED, get_kestrel_api_url
 from .core.analysis import analyze_dataset_mapping
 from .core.annotation_engine import AnnotationEngine
 from .core.annotators import refmet_snapshot
@@ -94,8 +94,8 @@ class Mapper:
         self.linker = Linker()
         # One lipid independent-structure resolver, shared by the query side (Tier B) and the
         # candidate side (the resolver's StructureResolver) so both read one lookup + cache (KTD6).
-        # Constructed only when Tier B is enabled, so a default run builds no pygoslin grammar and
-        # holds no session.
+        # Constructed only when Tier B is active for this run (see _tier_b_active), so an inert or
+        # disabled run builds no pygoslin grammar and holds no session.
         self.lipid_resolver = self._build_lipid_resolver()
         self.resolver = Resolver(
             linker=self.linker, biolink_client=self.biolink_client, lipid_resolver=self.lipid_resolver
@@ -103,9 +103,22 @@ class Mapper:
         self.tier_b = self._build_tier_b(self.lipid_resolver)
 
     @staticmethod
+    def _tier_b_active() -> bool:
+        """Whether Tier B is ACTIVE (a lookup is built) for this run, coupling to freeze presence.
+
+        Resolves the three-state posture (see config.resolve_tier_b_state) against the RUNTIME
+        freeze presence: a loadable freeze, or an explicit truthy override, makes it active; the
+        unset default with no freeze is INERT (behaves disabled) and a falsy override disables it.
+        """
+        from .core import tier_b_snapshot
+
+        state = config.resolve_tier_b_state(tier_b_snapshot.is_present())
+        return state in (config.TIER_B_STATE_ENABLED_FREEZE, config.TIER_B_STATE_ENABLED_LIVE)
+
+    @staticmethod
     def _build_lipid_resolver():
-        """The shared Goslin -> LIPID MAPS lipid structure resolver, or None when Tier B is off."""
-        if not TIER_B_ENABLED:
+        """The shared Goslin -> LIPID MAPS lipid structure resolver, or None when Tier B is inactive."""
+        if not Mapper._tier_b_active():
             return None
         from .core.lipid_structure_resolver import LipidStructureResolver
 
@@ -113,27 +126,53 @@ class Mapper:
 
     @staticmethod
     def _build_tier_b(lipid_resolver=None):
-        """The opt-in independent-structure lookup, or None.
+        """The independent-structure lookup, or None when Tier B is not active for this run.
 
-        Constructed only when enabled, so a default run holds no session against Metabolomics
-        Workbench or PubChem and cannot drift into making calls. The lipid resolver is threaded in as
-        the third hop (MW -> PubChem -> Goslin/LIPID MAPS).
+        Enablement is THREE-STATE and, in the default posture, COUPLED to freeze presence (a runtime
+        fact), so the decision is made here rather than from an import-time boolean:
+          - ``enabled_freeze`` (a loadable freeze present) -> built; the hot path is served from the
+            freeze with no live call.
+          - ``enabled_live`` (explicit truthy, no freeze) -> built, with a loud warning that it is
+            doing LIVE lookups without a freeze (the supervised-sweep path that builds the corpus).
+          - ``inert`` (the default with no freeze) -> None, with one prominent warning telling the
+            operator to configure a freeze, so a fresh deploy never silently reaches live services.
+          - ``disabled`` (explicit falsy) -> None, silent.
+        The lipid resolver is threaded in as the third hop (MW -> PubChem -> Goslin/LIPID MAPS).
 
-        Re-resolution is INERT without Tier B (a CONTRADICTED certificate, which it keys on, can only
-        come from Tier B), so the dependency is made explicit here: enabling re-resolution without
-        Tier B is a configuration error, surfaced loudly rather than as a silent no-op.
+        Re-resolution is INERT without an active Tier B (a CONTRADICTED certificate, which it keys on,
+        can only come from Tier B), so the dependency is made explicit here: enabling re-resolution
+        without an active Tier B is a configuration error, surfaced loudly rather than as a silent
+        no-op.
         """
-        if not TIER_B_ENABLED:
+        from .core import tier_b_snapshot
+
+        state = config.resolve_tier_b_state(tier_b_snapshot.is_present())
+        if state not in (config.TIER_B_STATE_ENABLED_FREEZE, config.TIER_B_STATE_ENABLED_LIVE):
             if RERESOLUTION_ENABLED:
                 raise ValueError(
-                    "RERESOLUTION_ENABLED requires TIER_B_ENABLED: re-resolution triggers on a "
-                    "CONTRADICTED certificate, which only Tier B can produce. Enable Tier B or "
-                    "disable re-resolution."
+                    "RERESOLUTION_ENABLED requires an ACTIVE Tier B: re-resolution triggers on a "
+                    "CONTRADICTED certificate, which only Tier B can produce. Configure a Tier B "
+                    "freeze (BIOMAPPER2_TIER_B_SNAPSHOT_PATH) or force-enable Tier B "
+                    "(BIOMAPPER2_TIER_B_ENABLED=1), or disable re-resolution."
+                )
+            if state == config.TIER_B_STATE_INERT:
+                logging.warning(
+                    "Tier B is on by default but no loadable freeze is configured; running INERT "
+                    "(behaves as disabled, certificates report 'off'). Set "
+                    "BIOMAPPER2_TIER_B_SNAPSHOT_PATH to a freeze corpus to enable the safe "
+                    "freeze-first path, or set BIOMAPPER2_TIER_B_ENABLED=1 to force live lookups "
+                    "against Metabolomics Workbench and PubChem behind the circuit breaker."
                 )
             return None
         from .core.tier_b import IndependentStructureLookup
 
-        logging.info("Tier B independent structure evidence is ENABLED for this run")
+        if state == config.TIER_B_STATE_ENABLED_LIVE:
+            logging.warning(
+                "Tier B is force-enabled without a freeze; performing LIVE lookups against "
+                "Metabolomics Workbench and PubChem behind the circuit breaker. Configure "
+                "BIOMAPPER2_TIER_B_SNAPSHOT_PATH to serve the hot path from a freeze."
+            )
+        logging.info("Tier B independent structure evidence is ENABLED for this run (%s)", state)
         if RERESOLUTION_ENABLED:
             logging.info("Structure-guided re-resolution is ENABLED for this run (requires Tier B)")
         return IndependentStructureLookup(lipid_resolver=lipid_resolver)
@@ -553,6 +592,9 @@ class Mapper:
                     "refmet_availability": refmet_availability,
                     "refmet_source": refmet_source,
                     "refmet_snapshot_version": refmet_snapshot_version,
+                    # Mirrored from the certificate (a first-class field) so the row surface carries the
+                    # Tier B freeze version too, parallel to refmet_snapshot_version.
+                    "tier_b_snapshot_version": certificate.tier_b_snapshot_version,
                 }
             )
         )

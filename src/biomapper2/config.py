@@ -215,6 +215,53 @@ def get_refmet_store_path() -> Path | None:
     return p if p.is_absolute() else (PROJECT_ROOT / p)
 
 
+# Pinned local Tier B freeze (deterministic independent structure evidence). Path to a frozen
+# name to InChIKey corpus TSV (see core/tier_b_snapshot.py for the format), mirroring the RefMet
+# freeze above. When set to a loadable file the Tier B lookup consults the freeze FIRST: a freeze HIT
+# returns the frozen structure with no network call, so there are no live per-name calls in the hot
+# path; a freeze MISS falls back to live PubChem behind a circuit breaker. Unset (None) or absent ->
+# the loader reports NOT present and every name goes to the live path behind the breaker, exactly as
+# before. Override via BIOMAPPER2_TIER_B_SNAPSHOT_PATH in the environment; a relative value is
+# resolved against PROJECT_ROOT so a repo-relative default and an absolute deployment path both work.
+_tier_b_snapshot_env = os.getenv("BIOMAPPER2_TIER_B_SNAPSHOT_PATH", "").strip()
+if _tier_b_snapshot_env:
+    _tb_snap = Path(_tier_b_snapshot_env)
+    TIER_B_SNAPSHOT_PATH: Path | None = _tb_snap if _tb_snap.is_absolute() else (PROJECT_ROOT / _tb_snap)
+else:
+    TIER_B_SNAPSHOT_PATH = None
+
+
+def get_tier_b_snapshot_path() -> Path | None:
+    """Return the configured Tier B freeze path, reading os.environ on every call.
+
+    Mirrors ``get_refmet_snapshot_path``: the module-level constant is captured at import time, this
+    function reflects an override applied after import (a test setting BIOMAPPER2_TIER_B_SNAPSHOT_PATH).
+    A relative value resolves against PROJECT_ROOT; empty/unset -> None (loader NOT present).
+    """
+    raw = os.environ.get("BIOMAPPER2_TIER_B_SNAPSHOT_PATH", "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_absolute() else (PROJECT_ROOT / p)
+
+
+def derive_tier_b_snapshot_version(path: Path | None) -> str | None:
+    """Derive the Tier B freeze version from a sidecar or the filename. No read of the TSV itself.
+
+    Mirrors ``derive_refmet_snapshot_version``: a ``<path>.version`` sidecar (first non-empty line)
+    wins so a freeze can be versioned independently of its filename; otherwise the version is the TSV
+    filename stem. None when no path is configured.
+    """
+    if path is None:
+        return None
+    sidecar = path.with_suffix(path.suffix + ".version")
+    with contextlib.suppress(OSError):
+        for line in sidecar.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                return line.strip()
+    return path.stem
+
+
 def derive_refmet_snapshot_version(path: Path | None) -> str | None:
     """Derive the freeze version from a sidecar or the filename. No file read of the TSV itself.
 
@@ -249,12 +296,67 @@ STRUCTURE_LOOKUP_TIMEOUT_S = 3  # per external structure call; mirrors the RefMe
 
 # Tier B of the resolution certificate: independent structure evidence for the QUERY NAME.
 #
-# OFF by default, and that default is part of the contract rather than a deployment convention.
-# Tier A is zero-I/O and reads only what the graph already asserts about the committed node; turning
-# Tier B on moves external calls from a small conflict subset to every unique query name in a run,
-# against rate-limited services, and changes what the emitted certificate state means. An operator
-# enables it deliberately for a supervised sweep. See core/tier_b.py.
-TIER_B_ENABLED = os.getenv("BIOMAPPER2_TIER_B_ENABLED", "").strip().lower() in {"1", "true", "yes"}
+# Enablement is THREE-STATE and, in the default posture, COUPLED to freeze presence. Freeze presence
+# is a runtime fact (the file must be loadable), so the decision is made in Mapper._build_tier_b via
+# ``resolve_tier_b_state`` rather than in a bare import-time boolean. The SAFETY properties are:
+#   (i)  Tier B is SCOPED to SmallMolecule rows only (see mapper.py is_small_molecule and
+#        certificate.issue). A gene, protein, disease or any non-small-molecule row is never looked
+#        up; it reports out_of_scope under an enabled run.
+#   (ii) When a freeze is configured Tier B consults it FIRST (a frozen, pinned name to InChIKey
+#        table, mirroring the RefMet freeze), so there are NO live per-name calls in the hot path: a
+#        HIT returns the frozen structure with no network, and only a MISS falls back to live PubChem
+#        behind a circuit breaker.
+# The three states of BIOMAPPER2_TIER_B_ENABLED:
+#   unset (the default) -> enabled ONLY if a loadable freeze is present (safe, freeze-first). With NO
+#     loadable freeze it is INERT (behaves disabled, certificates report ``off``) and the Mapper logs
+#     one prominent warning to configure BIOMAPPER2_TIER_B_SNAPSHOT_PATH, so a fresh deploy never
+#     silently reaches live services.
+#   truthy (1/true/yes/on) -> force-enabled: runs even with no freeze (live behind the breaker),
+#     which is how the freeze corpus is built in a supervised sweep; the Mapper warns it is doing live
+#     lookups without a freeze.
+#   falsy (0/false/no) -> disabled.
+# See core/tier_b.py and core/tier_b_snapshot.py.
+_TIER_B_TRUTHY = {"1", "true", "yes", "on"}
+_TIER_B_FALSY = {"0", "false", "no"}
+
+
+def tier_b_explicitly_enabled() -> bool:
+    """True iff BIOMAPPER2_TIER_B_ENABLED is set to an explicit truthy value (reads os.environ)."""
+    return os.environ.get("BIOMAPPER2_TIER_B_ENABLED", "").strip().lower() in _TIER_B_TRUTHY
+
+
+def tier_b_explicitly_disabled() -> bool:
+    """True iff BIOMAPPER2_TIER_B_ENABLED is set to an explicit falsy value (reads os.environ)."""
+    return os.environ.get("BIOMAPPER2_TIER_B_ENABLED", "").strip().lower() in _TIER_B_FALSY
+
+
+# The four resolved postures ``resolve_tier_b_state`` returns.
+TIER_B_STATE_DISABLED = "disabled"
+TIER_B_STATE_INERT = "inert"
+TIER_B_STATE_ENABLED_FREEZE = "enabled_freeze"
+TIER_B_STATE_ENABLED_LIVE = "enabled_live"
+
+
+def resolve_tier_b_state(snapshot_present: bool) -> str:
+    """Resolve the three-state Tier B posture given runtime freeze presence. Reads os.environ.
+
+    - explicit falsy -> ``disabled``.
+    - a loadable freeze present -> ``enabled_freeze`` (freeze-first; the safe default-on path). This
+      holds whether the default or an explicit truthy value selected it.
+    - no freeze + explicit truthy -> ``enabled_live`` (force live behind the breaker, e.g. the
+      supervised sweep that BUILDS the freeze corpus).
+    - no freeze + default (unset) -> ``inert`` (behaves disabled; the Mapper warns to configure a
+      freeze), so a fresh deploy never silently hits live services.
+    """
+    if tier_b_explicitly_disabled():
+        return TIER_B_STATE_DISABLED
+    if snapshot_present:
+        return TIER_B_STATE_ENABLED_FREEZE
+    if tier_b_explicitly_enabled():
+        return TIER_B_STATE_ENABLED_LIVE
+    return TIER_B_STATE_INERT
+
+
 TIER_B_MIN_INTERVAL_S = 0.25  # minimum spacing between outbound Tier B calls (PUG-REST is throttled)
 TIER_B_MAX_ATTEMPTS = 3  # attempts per hop before recording lookup_failed
 TIER_B_BACKOFF_BASE_S = 0.5  # first backoff; doubles per retry
@@ -265,9 +367,9 @@ TIER_B_MIN_RESOLUTION_RATE = 0.5
 
 # Structure-guided re-resolution of conflated KG commits (see core/resolver.py:reresolve_on_contradiction).
 #
-# OFF by default, and INERT unless TIER_B_ENABLED: re-resolution keys on a CONTRADICTED certificate,
-# which only Tier B can produce, so enabling this without Tier B does nothing. The Mapper asserts the
-# dependency and logs at build time. When on (and Tier B on), a contradiction triggers a single
+# OFF by default, and INERT unless Tier B is ACTIVE: re-resolution keys on a CONTRADICTED certificate,
+# which only Tier B can produce, so enabling this without an active Tier B does nothing. The Mapper
+# asserts the dependency and logs at build time. When on (and Tier B active), a contradiction triggers a single
 # structure-guided attempt to swap the conflated node for the correct distinct candidate; a
 # still-contradicted swap is a logged REFUSE, never a recursion. A gated production change: the
 # falsifiable benchmark that measures precision/coverage lives in the separate benchmark axis.
