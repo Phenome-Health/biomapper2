@@ -13,7 +13,8 @@ SwissLipids/HMDB grammar proves Goslin did real dialect translation, not an iden
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,12 @@ class LipidParse:
     monoisotopic_mass: float | None
     level: str | None
     dialect: str
+    # Every level pygoslin can render for this parse, keyed by LipidLevel name (SPECIES /
+    # MOLECULAR_SPECIES / SN_POSITION / ... as available). ``canonical_name`` stays species level for
+    # backward compatibility; this is the seam the level cascade reads. ``chains`` is the ordered chain
+    # list (for sn filtering). Both default empty so the shape stays additive.
+    level_names: dict[str, str] = field(default_factory=dict)
+    chains: tuple[str, ...] = ()
 
 
 # (dialect label, parser class path). Ordered: Liebisch/Goslin shorthand first (the common metabolomics
@@ -70,6 +77,7 @@ class LipidGrammar:
             canonical = self._canonical_name(adduct)
             if not canonical:
                 continue
+            level_names = self._level_names(adduct)
             return LipidParse(
                 input_name=text,
                 canonical_name=canonical,
@@ -77,6 +85,8 @@ class LipidGrammar:
                 monoisotopic_mass=self._mass(adduct),
                 level=self._level(adduct),
                 dialect=dialect,
+                level_names=level_names,
+                chains=self._chains(level_names),
             )
         return None
 
@@ -131,3 +141,36 @@ class LipidGrammar:
             return str(level) if level is not None else None
         except Exception:
             return None
+
+    @staticmethod
+    def _level_names(adduct: object) -> dict[str, str]:
+        """Every level pygoslin can render for this parse, keyed by LipidLevel name. A level the parse
+        does not support raises when rendered and is skipped, so the map holds only real levels."""
+        names: dict[str, str] = {}
+        try:
+            from pygoslin.domain.LipidLevel import LipidLevel
+        except Exception:
+            return names
+        for lvl in LipidLevel:
+            try:
+                rendered = adduct.get_lipid_string(lvl)  # type: ignore[attr-defined]
+            except Exception:
+                continue
+            if rendered and str(rendered).strip():
+                names[lvl.name] = str(rendered).strip()
+        return names
+
+    @staticmethod
+    def _chains(level_names: dict[str, str]) -> tuple[str, ...]:
+        """Ordered chain list for sn filtering, from the MOST specific level that carries per-chain
+        detail, so double-bond position/configuration (e.g. ``18:1(5Z)``) is kept rather than reduced
+        to the sn level. sn order is meaningful from SN_POSITION up; MOLECULAR_SPECIES gives the same
+        set with order not asserted. A species sum composition has no individual chains."""
+        for level in ("COMPLETE_STRUCTURE", "FULL_STRUCTURE", "STRUCTURE_DEFINED", "SN_POSITION", "MOLECULAR_SPECIES"):
+            name = level_names.get(level)
+            if not name or " " not in name:
+                continue
+            chains = tuple(chain for chain in re.split(r"[/_]", name.split(" ", 1)[1]) if chain)
+            if chains:
+                return chains
+        return ()

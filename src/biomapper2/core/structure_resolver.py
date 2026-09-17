@@ -207,13 +207,17 @@ class StructureResolver:
     def _fetch_mw_inchikey(self, name: str) -> str | None:
         """Metabolomics Workbench: GET /rest/refmet/name/{name}/inchi_key.
 
-        ``safe=""`` is load-bearing. ``quote`` defaults to ``safe="/"``, which leaves a slash in the
-        name UNESCAPED -- so a lipid-shorthand name splits into extra URL path segments, the request
-        404s, and the caller records the name as structurally unresolvable rather than as a failed
-        lookup. Share of affected names, per arm: artifact field ``slash_bearing_name_rate``.
+        ``safe=""`` encodes the whole name into one path segment. A slash-bearing name (an
+        sn-position lipid shorthand like "PC 16:0/18:1") has no addressable entry here: MW's web
+        server rejects the encoded slash outright (``%2F`` -> 404). A per-name Bad-Request / Not-Found
+        is a definitive "no such structure", returned as None rather than raised, so it is a clean
+        no-match instead of a logged lookup failure. Only 5xx / transport errors propagate to the
+        caller's fail-soft guard.
         """
         url = f"{MW_INCHIKEY_URL}/{quote(name, safe='')}/inchi_key"
         resp = self._session.get(url, timeout=STRUCTURE_LOOKUP_TIMEOUT_S)
+        if resp.status_code in (400, 404):
+            return None
         resp.raise_for_status()
         data = resp.json()
         if isinstance(data, dict):

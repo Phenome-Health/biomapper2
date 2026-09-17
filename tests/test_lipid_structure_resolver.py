@@ -46,6 +46,14 @@ class _FakeEnricher:
         self.calls.append(canonical_name)
         return dict(self._mapping), self._ok
 
+    def candidates_checked(self, canonical_name):
+        # Derive a single candidate from the scripted mapping so these single-mapping tests are
+        # unchanged now that the resolver consults candidates_checked.
+        self.calls.append(canonical_name)
+        if self._mapping.get("INCHIKEY"):
+            return [{"inchi_key": self._mapping["INCHIKEY"], "lm_id": self._mapping.get("LIPIDMAPS", "")}], self._ok
+        return [], self._ok
+
 
 def _resolver(mapping=None, ok=True, canonical="PC 16:0/18:1"):
     return LipidStructureResolver(grammar=_FakeGrammar(canonical), enricher=_FakeEnricher(mapping, ok))
