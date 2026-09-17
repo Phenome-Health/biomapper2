@@ -231,16 +231,28 @@ def test_tier_a_makes_exactly_one_kestrel_enrichment_call_and_no_more() -> None:
 def test_tier_b_is_not_constructed_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     import biomapper2.mapper as mapper_module
 
-    monkeypatch.setattr(mapper_module, "TIER_B_ENABLED", False)
+    monkeypatch.setenv("BIOMAPPER2_TIER_B_ENABLED", "false")
     assert mapper_module.Mapper._build_tier_b() is None
 
 
-def test_tier_b_is_constructed_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_tier_b_is_constructed_when_force_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Explicit truthy force-enables even with no freeze configured (the supervised-sweep path).
     import biomapper2.mapper as mapper_module
 
-    monkeypatch.setattr(mapper_module, "TIER_B_ENABLED", True)
+    monkeypatch.delenv("BIOMAPPER2_TIER_B_SNAPSHOT_PATH", raising=False)
+    monkeypatch.setenv("BIOMAPPER2_TIER_B_ENABLED", "true")
     built = mapper_module.Mapper._build_tier_b()
     assert built is not None
+
+
+def test_tier_b_is_inert_by_default_without_a_freeze(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The default posture with no loadable freeze: INERT (behaves disabled), so a fresh deploy never
+    # silently reaches live services.
+    import biomapper2.mapper as mapper_module
+
+    monkeypatch.delenv("BIOMAPPER2_TIER_B_ENABLED", raising=False)
+    monkeypatch.delenv("BIOMAPPER2_TIER_B_SNAPSHOT_PATH", raising=False)
+    assert mapper_module.Mapper._build_tier_b() is None
 
 
 # --------------------------------------------------------------------------------------------
