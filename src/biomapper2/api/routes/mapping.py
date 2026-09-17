@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Upl
 from fastapi.responses import StreamingResponse
 
 from ...core.annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
+from ...core.resolver import build_lipid_resolution
 from ..auth import validate_api_key
 from ..models import (
     BatchMappingRequest,
@@ -20,6 +21,7 @@ from ..models import (
     EntityMappingRequest,
     EntityMappingResponse,
     EntityMappingResult,
+    LipidResolution,
     RequestMetadata,
 )
 
@@ -56,11 +58,18 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
     # here, so nothing may re-wrap it on the way out.
     certificate = mapped_item.get("resolution_certificate") or None
 
+    # Additive lipid_resolution object, assembled from the goslin metadata + committed node's matched
+    # level the earlier units already put on the mapped item. None (serialized as null) off the lipid path.
+    lipid_fields = build_lipid_resolution(mapped_item)
+    lipid_resolution = LipidResolution(**lipid_fields) if lipid_fields is not None else None
+
     return EntityMappingResult(
         name=original_name,
         curies=mapped_item.get("curies", []) or [],
         chosen_kg_id=mapped_item.get("chosen_kg_id"),
         chosen_kg_id_review=mapped_item.get("chosen_kg_id_review"),
+        chosen_kg_id_lipid_hint=mapped_item.get("chosen_kg_id_lipid_hint"),
+        lipid_resolution=lipid_resolution,
         resolution_certificate=certificate,
         refmet_availability=mapped_item.get("refmet_availability") or "not_queried",
         refmet_source=mapped_item.get("refmet_source") or "not_queried",
@@ -384,6 +393,9 @@ async def map_dataset_stream(
                     "name": entity.get(name_column, ""),
                     "chosen_kg_id": mapped.get("chosen_kg_id"),
                     "chosen_kg_id_review": mapped.get("chosen_kg_id_review"),
+                    "chosen_kg_id_lipid_hint": mapped.get("chosen_kg_id_lipid_hint"),
+                    # Plain dict (or null) already assembled on the mapped item; json-serializable.
+                    "lipid_resolution": mapped.get("lipid_resolution"),
                     "kg_equivalent_ids": mapped.get("kg_equivalent_ids", {}),
                     "curies": mapped.get("curies", []),
                     "kg_ids": mapped.get("kg_ids", {}),

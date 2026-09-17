@@ -85,3 +85,13 @@ def test_extract_mapping_result_passes_availability_through():
     assert result.refmet_availability == "unavailable"
     # A mapped item missing the field (older caller / error row) falls back to not_queried.
     assert extract_mapping_result({"name": "x", "chosen_kg_id": None}, "x").refmet_availability == "not_queried"
+
+
+def test_extract_mapping_result_passes_the_lipid_hint_through():
+    # The resolver's lipid generalization hint must reach API consumers, not only the dataset TSV.
+    result = extract_mapping_result(
+        {"name": "PC", "chosen_kg_id": NODE, "chosen_kg_id_lipid_hint": "lipid_generalized"}, "PC"
+    )
+    assert result.chosen_kg_id_lipid_hint == "lipid_generalized"
+    # A non-lipid row (no hint field) is None, never a fabricated value.
+    assert extract_mapping_result({"name": "x", "chosen_kg_id": None}, "x").chosen_kg_id_lipid_hint is None

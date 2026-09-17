@@ -17,6 +17,29 @@ from biomapper2.core.certificate import CertificateState, TierBOutcome, TierBRes
 COMMITTED_KEY = "AAAAAAAAAAAAAA-BBBBBBBBBB-N"  # committed node's KG structure
 ANCHOR_KEY = "KILNVBDSWZSGLL-KXQOOQHDSA-N"  # the query's independent structure (Tier B)
 
+# Goslin lipid metadata for a swap: the committed node matched at the BROAD species level, the correct
+# distinct candidate at the exact molecular_species level. Shaped like the goslin-lipid annotator's
+# output so build_lipid_resolution reconciles each node to its own level.
+_LIPID_ROW = {
+    "assigned_ids": {
+        "goslin-lipid": {
+            "REFMET": {
+                "committed": {
+                    "matched_level": "species",
+                    "query_lipid_level_asserted": "sn_position",
+                    "query_lipid_level_effective": "molecular_species",
+                },
+                "correct": {
+                    "matched_level": "molecular_species",
+                    "query_lipid_level_asserted": "sn_position",
+                    "query_lipid_level_effective": "molecular_species",
+                },
+            }
+        }
+    },
+    "kg_ids_assigned": {"goslin-lipid": {"CHEBI:committed": ["committed"], "CHEBI:correct": ["correct"]}},
+}
+
 
 class _TierB:
     def __init__(self, block=ANCHOR_KEY):
@@ -62,6 +85,7 @@ class _Mapper:
         self.linker = linker
         self._issue_certificate = Mapper._issue_certificate.__get__(self, _Mapper)
         self._enrich_equivalent_ids = Mapper._enrich_equivalent_ids.__get__(self, _Mapper)
+        self._lipid_structure_evidence = Mapper._lipid_structure_evidence.__get__(self, _Mapper)
         self._certify_and_reresolve = Mapper._certify_and_reresolve.__get__(self, _Mapper)
 
 
@@ -88,12 +112,40 @@ def test_contradiction_swaps_to_matching_candidate_with_fresh_certificate(_on):
     linker = _Linker({"CHEBI:correct": {"INCHIKEY": [ANCHOR_KEY]}})  # correct node structurally matches anchor
     mapper = _Mapper(_TierB(), resolver, linker)
 
-    cert, new_id, new_equiv = _call(mapper)
+    cert, new_id, new_equiv, _lipid = _call(mapper)
 
     assert new_id == "CHEBI:correct"
     assert cert.state is CertificateState.CORROBORATED
     assert new_equiv == {"INCHIKEY": [ANCHOR_KEY]}
     assert resolver.calls == 1
+
+
+def test_swap_rebuilds_lipid_resolution_for_the_committed_node(_on):
+    # Greptile PR #83: a swap must not leave the replaced node's lipid metadata behind. The broad
+    # committed node is swapped for the exact-level candidate; the returned lipid_resolution AND the
+    # certificate provenance must describe the SWAPPED node, never the node re-resolution replaced.
+    resolver = _Resolver(("CHEBI:correct", "reresolved"))
+    linker = _Linker({"CHEBI:correct": {"INCHIKEY": [ANCHOR_KEY]}})
+    mapper = _Mapper(_TierB(), resolver, linker)
+
+    cert, new_id, _new_equiv, lipid = mapper._certify_and_reresolve(
+        query_name="PC 16:0/18:1",
+        category="biolink:SmallMolecule",
+        chosen_kg_id="CHEBI:committed",
+        kg_equivalent_ids={"INCHIKEY": [COMMITTED_KEY]},
+        equivalent_ids_lookup_ok=True,
+        selection_conflict=None,
+        kg_ids={"CHEBI:committed": ["a"], "CHEBI:correct": ["b"]},
+        kg_ids_assigned=_LIPID_ROW["kg_ids_assigned"],
+        lipid_row=_LIPID_ROW,
+    )
+
+    assert new_id == "CHEBI:correct"
+    assert cert.state is CertificateState.CORROBORATED
+    assert lipid is not None
+    assert lipid["matched_lipid_level"] == "molecular_species"  # the swapped node, not "species"
+    assert lipid["mapping_relation"] == "exact"  # not the committed node's "broad"
+    assert cert.provenance["mapping_relation"] == "exact"  # provenance mirrors the committed node too
 
 
 def test_still_contradicted_swap_is_a_single_attempt_refuse(_on):
@@ -102,7 +154,7 @@ def test_still_contradicted_swap_is_a_single_attempt_refuse(_on):
     linker = _Linker({"CHEBI:alsobad": {"INCHIKEY": ["ZZZZZZZZZZZZZZ-XXXXXXXXXX-N"]}})
     mapper = _Mapper(_TierB(), resolver, linker)
 
-    cert, new_id, _ = _call(mapper)
+    cert, new_id, _, _lipid = _call(mapper)
 
     assert new_id == "CHEBI:committed", "a still-contradicted swap must NOT be committed"
     assert cert.state is CertificateState.CONTRADICTED
@@ -114,7 +166,7 @@ def test_refused_no_match_keeps_committed_and_records_reason(_on):
     resolver = _Resolver(("CHEBI:committed", "reresolution_refused_no_match"))
     mapper = _Mapper(_TierB(), resolver, _Linker({}))
 
-    cert, new_id, _ = _call(mapper)
+    cert, new_id, _, _lipid = _call(mapper)
 
     assert new_id == "CHEBI:committed"
     assert cert.state is CertificateState.CONTRADICTED
@@ -126,7 +178,7 @@ def test_flag_off_is_todays_behavior(monkeypatch):
     resolver = _Resolver(("CHEBI:correct", "reresolved"))
     mapper = _Mapper(_TierB(), resolver, _Linker({}))
 
-    cert, new_id, new_equiv = _call(mapper)
+    cert, new_id, new_equiv, _lipid = _call(mapper)
 
     assert new_id == "CHEBI:committed"
     assert cert.state is CertificateState.CONTRADICTED  # unchanged, no swap

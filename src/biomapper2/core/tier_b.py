@@ -186,7 +186,10 @@ class IndependentStructureLookup:
         # folds into the tier's own lookup_failed accounting.
         if self._lipid_resolver is not None:
             lipid = self._lipid_resolver.resolve(name)
-            if lipid.outcome is TierBOutcome.RESOLVED:
+            # AMBIGUOUS is a real verdict (the lipid name maps to several distinct connectivities), not
+            # a miss: forward it so the certificate records ``ambiguous`` and keeps the candidate set,
+            # rather than letting it fall through to ``unresolvable``.
+            if lipid.outcome in (TierBOutcome.RESOLVED, TierBOutcome.AMBIGUOUS):
                 return lipid
             if lipid.outcome is TierBOutcome.LOOKUP_FAILED:
                 any_failure = True
@@ -200,12 +203,12 @@ class IndependentStructureLookup:
     def _fetch_mw(self, name: str) -> tuple[str | None, str | None, bool]:
         """Metabolomics Workbench exact-name endpoint: GET /rest/refmet/name/{name}/inchi_key.
 
-        ``quote(..., safe="")`` is load-bearing, and the default is actively wrong here. ``quote``
-        defaults to ``safe="/"``, so a slash inside a query name survives encoding and becomes an
-        extra URL path segment; the request 404s and the row is recorded ``unresolvable`` rather
-        than ``lookup_failed``. That biases the very ``resolution_rate`` that ``_curve_publishable``
-        gates Figure 5 on, in the direction that makes the gate look satisfied. Lipid shorthand is
-        full of slashes. Share of affected names, per arm: artifact field ``slash_bearing_name_rate``.
+        ``quote(..., safe="")`` encodes the whole name into one path segment. A slash-bearing name
+        (an sn-position lipid shorthand like "PC 16:0/18:1") has no addressable entry here: MW's web
+        server rejects the encoded slash outright (``%2F`` -> 404). That 404 is a clean "unknown", not
+        a lookup failure: ``_get`` already treats a Bad-Request / Not-Found as not-found
+        (``failed=False``), so the row falls through to the next hop rather than being counted against
+        the tier's resolution rate.
         """
 
         def parse(payload: Any) -> str | None:
