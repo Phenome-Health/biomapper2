@@ -424,6 +424,13 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         A CircuitBreakerError (breaker open), a transport error, or a timeout is UNAVAILABLE — the
         service did not answer. A 200 whose refmet_id is "-" (or a non-dict body) is NO_MATCH — the
         service answered "no such metabolite". Data is VOTED.
+
+        A slash-bearing name (an sn-position lipid shorthand like "PC 16:0/18:1") is a NO_MATCH here,
+        not an outage: MW /match is path-segment addressed and its web server rejects the encoded
+        slash outright (%2F -> 404), so RefMet has no entry for that raw string. ``_request_once``
+        classifies that 404 as NO_MATCH rather than raising, so it never counts toward the circuit
+        breaker, which is what used to trip on lipid panels and then skip RefMet /match for EVERY
+        other name (and every other annotator instance) for the recovery window.
         """
         if self._past_batch_deadline():
             # Past the shared batch deadline: mark UNAVAILABLE with NO network call.
@@ -466,15 +473,17 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
     def _request_once(self, metabolite_name: str) -> dict[str, Any] | None:
         """One HTTP attempt. Returns the data dict, or None for a genuine no-match.
 
-        ``safe=""`` is load-bearing, and this is the highest-consequence of the six call sites that
-        needed it. MW's REST is PATH-SEGMENT addressed, and ``quote`` defaults to ``safe="/"``, so a
-        slash in the query name splits into an extra segment: the service reads the tail as
-        ``output_item`` and returns NO CANDIDATE rather than an error. This annotator's candidates
-        enter the vote and the source-weighting, so unlike the ``structure_resolver`` fallback rung
-        this silently reached ``chosen_kg_id``. It also corrupted ``independent_of_selection``: with
-        no RefMet vote, ``metabolomics-workbench`` is absent from the committed node's sources, so a
-        Tier-B-via-MW verdict was reported independent -- true in fact, false in reason, on exactly
-        the lipid population L26 exists to stratify.
+        ``safe=""`` encodes the whole name into one path segment. It does NOT make a slash-bearing
+        name queryable: MW's web server rejects the encoded slash outright (``%2F`` -> 404, and
+        double-encoding ``%252F`` -> the no-match sentinel), so a name with a slash simply has no
+        addressable ``/match`` entry and comes back a 404. The old docstring claimed ``safe=""`` made
+        slash names "safe"; it does not, and that is fine, because the 404 is handled below.
+
+        A per-name client error (Bad Request or Not Found) is a definitive "no such entry", not a
+        service outage: it is returned as the no-match sentinel (None) rather than raised, so it never
+        counts toward the circuit breaker. Only 5xx, timeouts and transport errors should trip it.
+        This is what stops a slash name from tripping the breaker and degrading RefMet for every other
+        name in the process.
         """
         url = f"{self.BASE_URL}/{quote(metabolite_name, safe='')}"
 
@@ -484,6 +493,11 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         if self._batch_deadline is not None:
             timeout = max(0.1, min(timeout, self._batch_deadline - self._clock()))
         response = self._session.get(url, timeout=timeout)
+        if response.status_code in (400, 404):
+            # A path-addressed Bad-Request / Not-Found means "this name is not a match" for a
+            # per-name registry. Classify it as a genuine no-match so it is never raised out of the
+            # circuit-decorated call and never counted as a breaker failure.
+            return None
         response.raise_for_status()
         data = response.json()
 
