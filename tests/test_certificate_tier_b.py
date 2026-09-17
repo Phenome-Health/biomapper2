@@ -66,12 +66,14 @@ def _lookup(responses: dict[str, Any], **kwargs) -> tuple[IndependentStructureLo
     )
 
 
-def test_default_is_off_in_config() -> None:
-    """Default-off is the contract, not a deployment convention. Changing this fires network calls
-    for every unique query name across every arm."""
+def test_default_couples_to_freeze_presence() -> None:
+    """On-by-default is coupled to freeze presence, so a fresh deploy never silently hits live
+    services. Default + a loadable freeze -> enabled_freeze; default + no freeze -> inert. The full
+    three-state matrix and the Mapper-build warnings are pinned in test_tier_b_freeze.py."""
     from biomapper2 import config
 
-    assert config.TIER_B_ENABLED is False
+    assert config.resolve_tier_b_state(snapshot_present=True) == config.TIER_B_STATE_ENABLED_FREEZE
+    assert config.resolve_tier_b_state(snapshot_present=False) == config.TIER_B_STATE_INERT
 
 
 def test_mw_hit_resolves_the_query_name() -> None:
