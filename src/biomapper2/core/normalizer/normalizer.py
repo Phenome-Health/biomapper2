@@ -55,7 +55,7 @@ class Normalizer:
 
         self.vocab_info_map = load_prefix_info(self.biolink_client)
         self.vocab_validator_map = load_validator_map()
-        self.field_name_to_vocab_name_cache: dict[str, set[str]] = dict()
+        self.field_name_to_vocab_name_cache: dict[tuple[str, bool], set[str]] = dict()
         self.dashes = {"-", "–", "—", "−", "‐", "‑", "‒"}
 
     def normalize(
