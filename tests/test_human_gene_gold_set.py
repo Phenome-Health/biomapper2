@@ -146,17 +146,22 @@ class TestHumanGeneGoldSet:
         ], f"{name} -> {row['chosen_kg_id']} whose clique does not contain {POSITIVE_GOLD[name]}"
         assert row["has_hgnc"], f"{name} resolved node lacks an HGNC marker"
 
-    def test_drug_conflated_resolve_into_clique(self, gold_set_run):
+    def test_drug_conflated_resolves_into_clique(self, gold_set_run):
         """The drug-conflated genes resolve into the expected human-gene clique.
 
-        Correctness gate only: each lands in the expected gene's clique (the KG canonicalizes these into a
-        drug/chemical representative, so `chosen_kg_id` is e.g. CHEBI/UNII, not the NCBIGene). We do NOT
-        assert *which mechanism* got it there — the bridge marker (`resolved_via='symbol_fallback'`) is a
-        live-variable signal: depending on Kestrel recall, the conflated HGNC node may itself surface in the
-        gene search (e.g. CHEBI:65307 carries 'CRH' as a synonym and ranks in the window), so `_select_result`
-        picks it directly with no bridge — a correct outcome with `resolved_via=None`. The bridge mechanism
-        is hard-verified deterministically by the offline unit tests (test_kestrel_hybrid_fallback.py,
-        test_gene_symbol_resolver.py); this live gate asserts only the end-to-end clique resolution.
+        Hard gate (correctness): each lands in the expected gene's clique (the KG canonicalizes these
+        into a drug/chemical representative, so `chosen_kg_id` is e.g. CHEBI/UNII, not the NCBIGene) and
+        carries an HGNC marker.
+
+        The resolution *mechanism* is deliberately NOT asserted live. Two mechanisms both count as
+        correct and which one fires depends on live Kestrel recall (a run-to-run variable):
+          * the curated symbol->HGNC bridge (`resolved_via == "symbol_fallback"`), and
+          * a direct search hit when the conflated node itself surfaces in the gene window — e.g.
+            `CRH` ranks in via CHEBI:65307 carrying 'CRH' as a synonym, so `_select_result` picks it
+            directly with `resolved_via = None`. That is a correct outcome, not a regression.
+        The bridge mechanism is hard-verified deterministically by the offline unit tests
+        (test_kestrel_hybrid_fallback.py, test_gene_symbol_resolver.py); this live gate asserts only
+        the end-to-end clique resolution.
         """
         for name in ("GH1", "CALCA", "POMC", "CRH", "CTLA4", "GBA1"):
             row = next(r for r in gold_set_run["rows"] if r["name"] == name)
@@ -164,6 +169,13 @@ class TestHumanGeneGoldSet:
                 "resolved_to_clique"
             ], f"{name} -> {row['chosen_kg_id']} whose clique does not contain {POSITIVE_GOLD[name]}"
             assert row["has_hgnc"], f"{name} resolved node lacks an HGNC marker"
+            # Accept either a correct mechanism: the curated bridge, or a direct search hit
+            # (resolved_via is None) when the conflated node surfaces directly. A *wrong* non-None
+            # mechanism would still fail the clique/HGNC gates above.
+            assert row["resolved_via"] in (
+                None,
+                "symbol_fallback",
+            ), f"{name} resolved into the clique via an unexpected mechanism: {row['resolved_via']!r}"
 
     def test_resolution_and_bridge_usage_reported(self, gold_set_run):
         """The run quantifies clique resolution and how often the bridge fired (R8 observability)."""

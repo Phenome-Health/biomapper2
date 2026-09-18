@@ -1,0 +1,3 @@
+query_name	status	refmet_id	refmet_name	inchi_key	formula	exactmass	pubchem_cid	super_class	main_class	sub_class	panels
+Cholic acid	voted	RM0041813	Cholic acid	BHQCQFFYRZLCQQ-OELDTZBJSA-N	C24H40O5	408.2876	221493	Sterol Lipids	Bile acids and derivatives	Bile acids	panel-a|panel-b
+definitely not a real metabolite	no_match										

@@ -53,9 +53,13 @@ from typing import Any
 REFMET_ANNOTATOR = "metabolomics-workbench"
 
 # Tier B sources, and the annotator each one is NOT independent of. PubChem is independent of every
-# annotator the resolver source-weights toward; MW is the RefMet registry itself.
+# annotator the resolver source-weights toward; MW is the RefMet registry itself. LIPID MAPS binds a
+# Goslin-canonical lipid shorthand to a structure; it is KG-independent (valid for the cross-cohort
+# certificate) but CIRCULAR against the LMSD benchmark arm, so a lipidmaps-sourced structure carries
+# this tag and the benchmark axis excludes those rows from its LMSD lipid oracle.
 TIER_B_SOURCE_MW = "metabolomics-workbench"
 TIER_B_SOURCE_PUBCHEM = "pubchem"
+TIER_B_SOURCE_LIPIDMAPS = "lipidmaps"
 _SOURCE_TO_DEPENDENT_ANNOTATOR = {TIER_B_SOURCE_MW: REFMET_ANNOTATOR}
 
 # Identifier of the rule that produced the verdict (L20). Seeded to the semantics PR #47 shipped:
@@ -63,7 +67,201 @@ _SOURCE_TO_DEPENDENT_ANNOTATOR = {TIER_B_SOURCE_MW: REFMET_ANNOTATOR}
 # lands, introduces a second value here rather than silently changing what this one means.
 COMPARISON_RULE_FIRST_BLOCK_SET_INTERSECTION = "inchikey_first_block_set_intersection/v1"
 
+# The rule that produces the graded ``resolution_level``. It refines the state's agreement into
+# exact/structural/connectivity using the SAME operand and block1/block2 comparison, so it never
+# disagrees with the state; recorded in provenance when a level was computed.
+COMPARISON_RULE_INCHIKEY_LADDER = "inchikey_ladder/v2"
+
+# The rule that produces a STRUCTURE-FREE lipid verdict: a Goslin name-composition comparison between
+# the committed node's name and the query, used when the committed node carries no graph InChIKey (the
+# common case for species-level lipid nodes). It is a DIFFERENT axis from the InChIKey-block rules
+# above; a verdict it produces is graded on ``lipid_resolution_level`` (parallel to ``resolution_level``)
+# and never touches the InChIKey block comparison.
+COMPARISON_RULE_GOSLIN_LEVEL_COMPOSITION = "goslin_level_composition/v1"
+
 INCHIKEY_PREFIX = "INCHIKEY"
+
+# Length of the InChIKey stereo layer prefix folded into the structural key. The second block
+# encodes stereochemistry, isotopes, protonation and charge in a fixed layout; its first 8
+# characters are the stereo/skeleton-refinement layer, and comparing only those keeps the key robust
+# to the protonation/charge suffix while still separating stereoisomers. This is the same
+# ``block1 + block2[:8]`` seam the benchmark scorers use (studies/.../necs_gold_repair.py).
+STRUCTURAL_KEY_BLOCK2_LEN = 8
+
+
+def structural_key_parts(inchikey: str | None) -> tuple[str | None, str | None]:
+    """Split an InChIKey (full OR first-block-only) into ``(block1, block2[:8] | None)``.
+
+    ``block1`` is the connectivity skeleton; ``block2`` (truncated) is the stereo layer, or ``None``
+    when the input carries only a first block (MW/PubChem emit first-block only). Upper-cased so an
+    external service's casing never decides a verdict.
+    """
+    if not inchikey or not str(inchikey).strip():
+        return None, None
+    parts = str(inchikey).strip().upper().split("-")
+    block1 = parts[0] or None
+    block2 = parts[1][:STRUCTURAL_KEY_BLOCK2_LEN] if len(parts) > 1 and parts[1] else None
+    return block1, block2
+
+
+def structural_agree(a: str | None, b: str | None) -> bool:
+    """True when two InChIKeys agree at the structural key (block1, then block2[:8] if BOTH carry it).
+
+    Connectivity is compared on block1. Stereo is compared on block2[:8] ONLY when both operands
+    carry a second block; if either side is first-block-only the agreement is connectivity-only and
+    stereo is deliberately NOT asserted (never a silent stereo pass). A missing/empty key never
+    agrees.
+    """
+    a1, a2 = structural_key_parts(a)
+    b1, b2 = structural_key_parts(b)
+    if a1 is None or b1 is None or a1 != b1:
+        return False
+    if a2 is not None and b2 is not None:
+        return a2 == b2
+    return True
+
+
+class ResolutionLevel(str, Enum):
+    """How deeply the committed node and the independent lookup agree, refining the binary
+    corroborated/contradicted state. Derived from the SAME block1/block2 comparison as
+    ``structural_agree``; a block-1 disagreement is ``contradicted`` here, and the structure
+    escalation (a later unit) can reclaim some of those to a same-molecule level.
+    """
+
+    EXACT_INCHIKEY = "exact_inchikey"  # full keys identical
+    STRUCTURAL = "structural"  # block1 and block2[:8] agree (both operands carry a stereo layer)
+    CONNECTIVITY = "connectivity"  # block1 agrees; stereo not compared (a side is first-block-only)
+    CONTRADICTED = "contradicted"  # block1 disagrees, or block1 agrees but block2[:8] differs
+    UNAVAILABLE = "unavailable"  # no comparison was possible
+
+
+_LEVEL_RANK = {
+    ResolutionLevel.EXACT_INCHIKEY: 4,
+    ResolutionLevel.STRUCTURAL: 3,
+    ResolutionLevel.CONNECTIVITY: 2,
+    ResolutionLevel.CONTRADICTED: 1,
+    ResolutionLevel.UNAVAILABLE: 0,
+}
+
+
+class LipidResolutionLevel(str, Enum):
+    """How deeply a committed LIPID node and the query agree, on a PARALLEL axis to ``ResolutionLevel``.
+
+    ``ResolutionLevel`` grades an InChIKey-block comparison (EXACT_INCHIKEY / STRUCTURAL / CONNECTIVITY);
+    a lipid composition match is a different kind of agreement, so it gets its own axis rather than
+    overloading the InChIKey enum. It is produced by the structure-free Goslin name-composition check
+    for lipid nodes the graph lists no InChIKey for, and stays ``UNAVAILABLE`` on every non-lipid and
+    every InChIKey-bearing row (those keep the ``ResolutionLevel`` axis).
+    """
+
+    LIPID_SPECIES = "lipid_species"  # same lipid class and same sum composition (species level)
+    CONTRADICTED = "contradicted"  # different lipid class or different sum composition
+    UNAVAILABLE = "unavailable"  # no structure-free comparison was possible
+
+
+# The mapping relation a structure-free comparison assigns when it corroborates. ``exact`` when the
+# node expresses the same species composition the query does; ``broad`` when the node is a coarser
+# reading (class only) than the query's species.
+LIPID_STRUCTURE_RELATION_EXACT = "exact"
+LIPID_STRUCTURE_RELATION_BROAD = "broad"
+
+
+@dataclass(frozen=True)
+class LipidStructureEvidence:
+    """A STRUCTURE-FREE lipid verdict for a committed node, pre-computed UPSTREAM (``issue`` never parses).
+
+    Assembled by comparing the committed node's Goslin parse to the query's; the state machine consumes
+    it as plain data. ``level`` grades the composition agreement on the ``LipidResolutionLevel`` axis;
+    ``mapping_relation`` is ``broad`` when the node is coarser than the query, ``exact`` when it matches
+    the query's species, and ``None`` when contradicted or unavailable.
+    """
+
+    level: LipidResolutionLevel
+    mapping_relation: str | None = None
+    comparison_rule: str = COMPARISON_RULE_GOSLIN_LEVEL_COMPOSITION
+
+
+def _norm_lipid_token(value: str | None) -> str | None:
+    """Case/space-normalized lipid token for comparison, or None when empty."""
+    if value is None:
+        return None
+    text = " ".join(str(value).strip().split()).upper()
+    return text or None
+
+
+def compare_lipid_composition(
+    *,
+    query_class: str | None,
+    query_species: str | None,
+    node_class: str | None,
+    node_species: str | None,
+) -> LipidStructureEvidence:
+    """Pure structure-free comparison of a committed lipid node against the query.
+
+    Both operands are parsed UPSTREAM (this never calls Goslin). ``*_class`` is the head group (e.g.
+    ``PC``); ``*_species`` is the sum-composition species name (e.g. ``PC 34:1``) or None when the parse
+    is coarser than species. Same class and same sum composition corroborate at ``LIPID_SPECIES``; a
+    node that is class-only (coarser than the query's species) corroborates ``broad``; a different class
+    or a different composition contradicts; a missing class on either side is unavailable (not a lipid).
+    """
+    qc, nc = _norm_lipid_token(query_class), _norm_lipid_token(node_class)
+    if qc is None or nc is None:
+        return LipidStructureEvidence(level=LipidResolutionLevel.UNAVAILABLE)
+    if qc != nc:
+        return LipidStructureEvidence(level=LipidResolutionLevel.CONTRADICTED)
+    qs, ns = _norm_lipid_token(query_species), _norm_lipid_token(node_species)
+    if ns is None or qs is None:
+        # Class agrees but at least one side has no species composition: the node is a coarser reading
+        # than the query. Corroborate at the class level, flagged broad (a generalization).
+        return LipidStructureEvidence(
+            level=LipidResolutionLevel.LIPID_SPECIES, mapping_relation=LIPID_STRUCTURE_RELATION_BROAD
+        )
+    if qs == ns:
+        return LipidStructureEvidence(
+            level=LipidResolutionLevel.LIPID_SPECIES, mapping_relation=LIPID_STRUCTURE_RELATION_EXACT
+        )
+    return LipidStructureEvidence(level=LipidResolutionLevel.CONTRADICTED)
+
+
+def _pair_level(node_key: str | None, independent_key: str | None) -> ResolutionLevel:
+    """The level of one node key against one independent key, consistent with ``structural_agree``.
+
+    A block-1 match with a differing block2[:8] is ``contradicted`` (never a silent stereo pass), the
+    same way ``structural_agree`` returns False for that case.
+    """
+    n1, n2 = structural_key_parts(node_key)
+    i1, i2 = structural_key_parts(independent_key)
+    if n1 is None or i1 is None:
+        return ResolutionLevel.UNAVAILABLE
+    if n1 != i1:
+        return ResolutionLevel.CONTRADICTED
+    if n2 is None or i2 is None:
+        # At least one side is first-block-only (MW/PubChem, or a graph key with no stereo layer):
+        # only connectivity was compared. Two identical truncated strings are NOT exact -- no full
+        # key or stereo layer was ever seen -- so never grant exact/structural here.
+        return ResolutionLevel.CONNECTIVITY
+    if str(node_key).strip().upper() == str(independent_key).strip().upper():
+        return ResolutionLevel.EXACT_INCHIKEY
+    return ResolutionLevel.STRUCTURAL if n2 == i2 else ResolutionLevel.CONTRADICTED
+
+
+def resolve_level(
+    node_keys: Iterable[str | None] | None, independent_key: str | None
+) -> tuple[ResolutionLevel, ResolutionLevel]:
+    """Best and worst resolution level of ``independent_key`` against the node's key list.
+
+    Set-based over the full multi-valued node keys (never index 0). ``best`` is the strongest
+    agreement any node key reaches; ``worst`` surfaces an internally inconsistent node (one key
+    matching exactly while another contradicts) so it cannot silently grade ``exact_inchikey``.
+    """
+    keys = [k for k in (node_keys or []) if k and str(k).strip()]
+    if not keys or not independent_key or not str(independent_key).strip():
+        return ResolutionLevel.UNAVAILABLE, ResolutionLevel.UNAVAILABLE
+    levels = [_pair_level(k, independent_key) for k in keys]
+    best = max(levels, key=lambda lv: _LEVEL_RANK[lv])
+    worst = min(levels, key=lambda lv: _LEVEL_RANK[lv])
+    return best, worst
+
 
 # Cache provenance. The confound that motivated recording this (a cold cache returning a wrong
 # node) lives in the KESTREL store, which expires; the structure store does not expire at all. Both
@@ -109,6 +307,16 @@ class TierBOutcome(str, Enum):
     RESOLVED = "resolved"
     UNRESOLVABLE = "unresolvable"
     LOOKUP_FAILED = "lookup_failed"
+    # The registry returned several candidates with DISTINCT connectivity (e.g. a lipid species name
+    # that maps to more than one first block). Not RESOLVED (no single structure to compare) and not
+    # UNRESOLVABLE (the name is known); the candidate keys are carried on the result.
+    AMBIGUOUS = "ambiguous"
+    # Tier B is ENABLED for the run but this row is not a case an independent-registry lookup can
+    # adjudicate (a non-small-molecule, an uncommitted row, or a committed node whose structure Tier B
+    # never looked up). Kept DISTINCT from OFF: OFF means Tier B is disabled, OUT_OF_SCOPE means it is
+    # on and simply does not apply here, so a reader cannot mistake an out-of-scope row for a disabled
+    # run.
+    OUT_OF_SCOPE = "out_of_scope"
 
 
 @dataclass(frozen=True)
@@ -118,7 +326,15 @@ class TierBResult:
     source: str | None
     inchikey_block: str | None
     outcome: TierBOutcome
-    cache_state: str | None = None  # 'hit' | 'miss' | 'process_memo' | None
+    cache_state: str | None = None  # 'hit' | 'miss' | 'process_memo' | 'frozen' | None
+    # Candidate InChIKeys when ``outcome is AMBIGUOUS`` (empty otherwise). A tuple so the frozen
+    # dataclass stays hashable; sorted so it is order-independent.
+    candidate_inchikeys: tuple[str, ...] = ()
+    # Version of the Tier B freeze that served this result, when it came from the freeze (see
+    # tier_b_snapshot); None for a live (non-frozen) result. Surfaced in the certificate provenance
+    # as ``tier_b_snapshot_version`` so frozen evidence is auditable, mirroring RefMet's snapshot
+    # version. Appended after the existing defaulted fields so the dataclass shape stays additive.
+    version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -139,6 +355,40 @@ class ResolutionCertificate:
     # Until it does, a consumer cannot distinguish an off-category refusal from a no-match, and
     # refusal must not be described as observable in the released artifact (L30).
     refusal_reason: str | None = None
+    # RefMet (Metabolomics Workbench) availability for the row, on the same axis as
+    # ``equivalent_ids_lookup_ok``: a runtime input about whether a source answered, NOT a verdict.
+    # ``voted`` | ``no_match`` | ``unavailable`` | ``not_queried``. ``not_queried`` when RefMet was
+    # not selected for the row, so the field is total. Appended after the existing defaulted fields
+    # so the dataclass shape stays additive.
+    refmet_availability: str = "not_queried"
+    # WHICH RefMet source served the row, on a parallel axis to ``refmet_availability`` (a provenance
+    # tag, not a verdict): ``local_snapshot`` | ``not_in_snapshot`` | ``live_api`` | ``unavailable`` |
+    # ``not_queried``. With a pinned freeze present the default path is ``local_snapshot`` /
+    # ``not_in_snapshot`` (the circuit breaker is OUT of it); without one it is ``live_api`` /
+    # ``unavailable``, exactly as before. ``refmet_snapshot_version`` pins WHICH freeze produced a
+    # snapshot-served vote (set only when the freeze served or was consulted for the row), else None.
+    refmet_source: str = "not_queried"
+    refmet_snapshot_version: str | None = None
+    # Graded structural agreement between the committed node and the independent lookup, refining the
+    # binary state. Derived from the SAME operand and block1/block2 comparison the state uses, so the
+    # two never disagree: a corroborated row is exact/structural/connectivity, a contradicted row is
+    # contradicted, and a row with no independent comparison is unavailable. ``_worst`` surfaces an
+    # internally inconsistent multi-key node. Appended after the existing defaulted fields so the
+    # dataclass shape stays additive.
+    resolution_level: ResolutionLevel = ResolutionLevel.UNAVAILABLE
+    resolution_level_worst: ResolutionLevel = ResolutionLevel.UNAVAILABLE
+    # Graded agreement of a STRUCTURE-FREE lipid comparison, on an axis PARALLEL to ``resolution_level``
+    # (which is InChIKey-block specific). ``UNAVAILABLE`` on every non-lipid and every InChIKey-bearing
+    # row, so the two axes never overlap. Appended after the existing defaulted fields so the dataclass
+    # shape stays additive.
+    lipid_resolution_level: LipidResolutionLevel = LipidResolutionLevel.UNAVAILABLE
+    # Version of the Tier B freeze that produced a frozen independent result (set only when the freeze
+    # served the row), else None for a live result. A first-class field mirroring
+    # ``refmet_snapshot_version`` so frozen Tier B evidence is auditable on the same footing: it is a
+    # flat ``certificate_tier_b_snapshot_version`` column and an API response field, not only a
+    # provenance entry. Appended after the existing defaulted fields so the dataclass shape stays
+    # additive.
+    tier_b_snapshot_version: str | None = None
     provenance: dict[str, Any] = field(default_factory=dict)
 
     def to_api_dict(self) -> dict[str, Any]:
@@ -153,6 +403,9 @@ class ResolutionCertificate:
             "structure_status": self.structure_status.value,
             "node_inchikey_blocks": list(self.node_inchikey_blocks),
             "comparison_rule": self.comparison_rule,
+            "resolution_level": self.resolution_level.value,
+            "resolution_level_worst": self.resolution_level_worst.value,
+            "lipid_resolution_level": self.lipid_resolution_level.value,
             "equivalent_ids_lookup_ok": self.equivalent_ids_lookup_ok,
             "selection_conflict": self.selection_conflict,
             "independent_source": self.independent_source,
@@ -160,6 +413,10 @@ class ResolutionCertificate:
             "independent_of_selection": self.independent_of_selection,
             "tier_b_outcome": self.tier_b_outcome.value,
             "refusal_reason": self.refusal_reason,
+            "refmet_availability": self.refmet_availability,
+            "refmet_source": self.refmet_source,
+            "refmet_snapshot_version": self.refmet_snapshot_version,
+            "tier_b_snapshot_version": self.tier_b_snapshot_version,
             "provenance": dict(self.provenance),
         }
 
@@ -176,6 +433,9 @@ class ResolutionCertificate:
             "certificate_structure_status": self.structure_status.value,
             "certificate_node_inchikey_blocks": "|".join(self.node_inchikey_blocks),
             "certificate_comparison_rule": self.comparison_rule,
+            "certificate_resolution_level": self.resolution_level.value,
+            "certificate_resolution_level_worst": self.resolution_level_worst.value,
+            "certificate_lipid_resolution_level": self.lipid_resolution_level.value,
             "certificate_equivalent_ids_lookup_ok": self.equivalent_ids_lookup_ok,
             "certificate_selection_conflict": self.selection_conflict,
             "certificate_independent_source": self.independent_source,
@@ -183,6 +443,10 @@ class ResolutionCertificate:
             "certificate_independent_of_selection": self.independent_of_selection,
             "certificate_tier_b_outcome": self.tier_b_outcome.value,
             "certificate_refusal_reason": self.refusal_reason,
+            "certificate_refmet_availability": self.refmet_availability,
+            "certificate_refmet_source": self.refmet_source,
+            "certificate_refmet_snapshot_version": self.refmet_snapshot_version,
+            "certificate_tier_b_snapshot_version": self.tier_b_snapshot_version,
         }
         for key, value in self.provenance.items():
             flat[f"certificate_provenance_{key}"] = value
@@ -221,10 +485,38 @@ def node_blocks_from_equivalent_ids(kg_equivalent_ids: Mapping[str, Any] | None)
     return sorted(blocks)
 
 
-def _default_provenance(tier_b: TierBResult | None) -> dict[str, Any]:
+def node_full_inchikeys_from_equivalent_ids(kg_equivalent_ids: Mapping[str, Any] | None) -> list[str]:
+    """FULL InChIKeys the GRAPH asserts for the committed node, upper-cased. Zero I/O.
+
+    Companion to ``node_blocks_from_equivalent_ids`` (which strips to first blocks for the emitted
+    column). The full keys are kept only for the structural-key comparison, so a stereo-layer
+    difference against a full-key Tier B result is detectable instead of being flattened away.
+    """
+    if not kg_equivalent_ids:
+        return []
+    keys = kg_equivalent_ids.get(INCHIKEY_PREFIX) or []
+    if isinstance(keys, str):
+        keys = [keys]
+    return sorted({k.strip().upper() for k in keys if isinstance(k, str) and k.strip()})
+
+
+def _default_provenance(tier_b: TierBResult | None, tier_b_enabled: bool | None = None) -> dict[str, Any]:
+    # ``tier_b_enabled`` reports whether Tier B is ENABLED for the run, NOT whether a lookup happened
+    # to run on this row. When the caller passes the config flag (the Mapper does), it is authoritative
+    # so an out-of-scope row under an enabled run reads ``True`` rather than the misleading ``False``.
+    # When None (a direct caller that does not know the flag), fall back to the historical derivation so
+    # existing behaviour is byte-identical.
+    enabled = (
+        tier_b_enabled
+        if tier_b_enabled is not None
+        else (tier_b is not None and tier_b.outcome is not TierBOutcome.OFF)
+    )
     return {
-        "tier_b_enabled": tier_b is not None and tier_b.outcome is not TierBOutcome.OFF,
+        "tier_b_enabled": enabled,
         "tier_b_cache_state": tier_b.cache_state if tier_b else None,
+        # The freeze version is NOT recorded here: it is a FIRST-CLASS certificate field
+        # (``tier_b_snapshot_version``, a flat column and an API field), mirroring RefMet's
+        # ``refmet_snapshot_version`` which is likewise not carried in provenance.
         "kestrel_cache_store": KESTREL_CACHE_STORE,
         "kestrel_cache_expiry": KESTREL_CACHE_EXPIRY,
         "structure_cache_store": STRUCTURE_CACHE_STORE,
@@ -260,7 +552,13 @@ def issue(
     committed_node_sources: Iterable[str] | None = None,
     comparison_rule: str = COMPARISON_RULE_FIRST_BLOCK_SET_INTERSECTION,
     refusal_reason: str | None = None,
+    refmet_availability: str = "not_queried",
+    refmet_source: str = "not_queried",
+    refmet_snapshot_version: str | None = None,
+    lipid_structure: LipidStructureEvidence | None = None,
+    tier_b_enabled: bool | None = None,
     provenance: Mapping[str, Any] | None = None,
+    extra_provenance: Mapping[str, Any] | None = None,
 ) -> ResolutionCertificate:
     """Issue a certificate for one committed answer. Pure: no network, no cache, no clock.
 
@@ -274,6 +572,25 @@ def issue(
         selection_conflict: The resolver's intra-KG review flag, on a different axis from ``state``.
         tier_b: An independent lookup for the query name, when Tier B is enabled.
         committed_node_sources: Annotator slugs that supplied the committed node (L26).
+        refmet_availability: Whether the RefMet source answered for this row (voted / no_match /
+            unavailable / not_queried). A runtime availability input like ``equivalent_ids_lookup_ok``,
+            recorded on the certificate; it does not affect the state machine.
+        refmet_source: WHICH RefMet source served the row (local_snapshot / not_in_snapshot /
+            live_api / unavailable / not_queried). A provenance tag on a parallel axis to
+            ``refmet_availability``; like it, recorded but not part of the state machine.
+        refmet_snapshot_version: Version of the freeze that served (or was consulted for) the row,
+            else None. Recorded, not part of the state machine.
+        lipid_structure: A STRUCTURE-FREE lipid verdict, pre-computed upstream (this function never
+            parses). It applies ONLY to a committed lipid node the graph lists no InChIKey for, where it
+            can refine the ``unavailable`` state into ``corroborated`` / ``contradicted`` on the Goslin
+            name-composition axis. None on every other path, so those paths are unchanged.
+        tier_b_enabled: Whether Tier B is ENABLED for the run (the config flag), not whether a lookup
+            ran. Passed by the Mapper so an out-of-scope row under an enabled run reports
+            ``tier_b_outcome=out_of_scope`` and ``provenance.tier_b_enabled=True`` instead of the
+            misleading ``off`` / ``False``. None preserves the historical behaviour for direct callers.
+        extra_provenance: Extra provenance keys MERGED onto the (default or supplied) provenance,
+            so a caller can mirror an out-of-band signal such as the lipid ``mapping_relation`` and
+            ``ambiguous`` onto the certificate without replacing the default cache/Tier B provenance.
     """
     if selection_conflict is not None and (chosen_kg_id is None or not is_small_molecule):
         # The resolver only reaches the flagging branch inside the small-molecule guard and only
@@ -285,7 +602,20 @@ def issue(
         )
 
     blocks = node_blocks_from_equivalent_ids(kg_equivalent_ids)
-    tier_b_outcome = tier_b.outcome if tier_b else TierBOutcome.OFF
+    # OUT_OF_SCOPE (Tier B on, this row not adjudicable) is DISTINCT from OFF (Tier B disabled). It is
+    # reported only when the run enabled Tier B (``tier_b_enabled``) and no lookup ran for the row.
+    if tier_b is not None:
+        tier_b_outcome = tier_b.outcome
+    elif tier_b_enabled:
+        tier_b_outcome = TierBOutcome.OUT_OF_SCOPE
+    else:
+        tier_b_outcome = TierBOutcome.OFF
+    resolution_level = ResolutionLevel.UNAVAILABLE
+    resolution_level_worst = ResolutionLevel.UNAVAILABLE
+    resolution_level_rule: str | None = None
+    lipid_resolution_level = LipidResolutionLevel.UNAVAILABLE
+    effective_comparison_rule = comparison_rule
+    candidate_structure_count: int | None = None
 
     if not is_small_molecule:
         # Not defensive padding. ``unavailable`` means "we looked for a structure and the graph has
@@ -307,21 +637,52 @@ def issue(
     elif not blocks:
         structure_status = StructureStatus.STRUCTURE_ABSENT
         state = CertificateState.UNAVAILABLE
+        if lipid_structure is not None and lipid_structure.level is not LipidResolutionLevel.UNAVAILABLE:
+            # STRUCTURE-FREE lipid check. The graph asserts no InChIKey (``structure_absent`` is honest
+            # and stays), but the committed node's NAME and the query parse to a comparable Goslin
+            # composition, so a real corroborated / contradicted verdict IS possible on a DIFFERENT axis
+            # from the InChIKey block comparison. This does NOT reopen L21: L21 forbids contradicting a
+            # node on the ground that it carries no InChIKey block; a Goslin composition mismatch is a
+            # positive disagreement between two parsed names, tagged with its own comparison rule and
+            # graded on ``lipid_resolution_level`` so it is never conflated with a block-level verdict.
+            lipid_resolution_level = lipid_structure.level
+            effective_comparison_rule = lipid_structure.comparison_rule
+            if lipid_structure.level is LipidResolutionLevel.CONTRADICTED:
+                state = CertificateState.CONTRADICTED
+            else:
+                state = CertificateState.CORROBORATED
     else:
         structure_status = StructureStatus.STRUCTURE_PRESENT
         state = CertificateState.UNCORROBORATED
         if tier_b is not None and tier_b.outcome is TierBOutcome.RESOLVED and tier_b.inchikey_block:
-            # Fold BOTH operands at the comparison too, independently of the producers above, so
-            # a third producer cannot silently reopen this. A case mismatch here does not degrade
-            # gracefully: it emits ``contradicted``, the state asserting that independent evidence
-            # REFUTES the committed node, for two spellings of the same molecule. The study module
-            # folds (twice over), so its controls would score those rows as agreeing while this
-            # scored them as refuted -- an inverted Panel B with every gate satisfied.
-            state = (
-                CertificateState.CORROBORATED
-                if tier_b.inchikey_block.upper() in {b.upper() for b in blocks}
-                else CertificateState.CONTRADICTED
-            )
+            # Structural-key comparison (block1 + block2[:8]), folded over BOTH operands so a full-key
+            # Tier B result (the lipid source emits one) is not tested for membership in a set of
+            # first blocks -- which would never match and would flip every RESOLVED row to
+            # CONTRADICTED. The node side keeps its FULL keys here (the emitted column stays first
+            # blocks) so a stereoisomer difference is detectable; MW/PubChem still emit first-block
+            # only, degrading their rows to a connectivity-only agreement, never a silent stereo
+            # pass. This generalizes the old first-block set-intersection: when every operand is
+            # first-block-only the verdict is identical, so default (Tier-A) output is unchanged.
+            node_full_keys = node_full_inchikeys_from_equivalent_ids(kg_equivalent_ids)
+            agrees = any(structural_agree(tier_b.inchikey_block, nk) for nk in node_full_keys)
+            state = CertificateState.CORROBORATED if agrees else CertificateState.CONTRADICTED
+            # Same operand and comparison as the state above, graded rather than binary, so the level
+            # never disagrees with the state.
+            resolution_level, resolution_level_worst = resolve_level(node_full_keys, tier_b.inchikey_block)
+            resolution_level_rule = COMPARISON_RULE_INCHIKEY_LADDER
+        elif tier_b is not None and tier_b.outcome is TierBOutcome.AMBIGUOUS and tier_b.candidate_inchikeys:
+            # SET-BASED structure check. The registry returned several candidate structures for the query
+            # name (a lipid species that pins no single connectivity) and the committed node DOES carry
+            # graph InChIKeys, so corroborate when the two SETS of first blocks intersect. A
+            # non-intersection is deliberately NOT a contradiction: the node may be a valid variant the
+            # candidate set does not enumerate, so it stays ``uncorroborated``. The candidate count is
+            # recorded either way.
+            candidate_structure_count = len(tier_b.candidate_inchikeys)
+            candidate_blocks = {str(k).split("-")[0].upper() for k in tier_b.candidate_inchikeys if k}
+            if candidate_blocks & set(blocks):
+                state = CertificateState.CORROBORATED
+                resolution_level = ResolutionLevel.CONNECTIVITY
+                resolution_level_worst = ResolutionLevel.CONNECTIVITY
 
     # Independent-evidence fields belong ONLY to rows the evidence was actually weighed on -- i.e.
     # ``structure_present``. A row that is out of scope, or that committed no node, has nothing for
@@ -347,11 +708,27 @@ def issue(
         independent_block = tier_b.inchikey_block
         independence = _independent_of_selection(tier_b, committed_node_sources)
 
+    _prov = dict(provenance) if provenance is not None else _default_provenance(tier_b, tier_b_enabled)
+    if resolution_level_rule is not None:
+        _prov["resolution_level_rule"] = resolution_level_rule
+    if candidate_structure_count is not None:
+        _prov["candidate_structure_count"] = candidate_structure_count
+    if lipid_structure is not None and lipid_structure.mapping_relation is not None:
+        # The structure-free comparison's own relation (broad when the node is coarser than the query),
+        # under a dedicated key so it never collides with the level-based ``mapping_relation`` the Mapper
+        # mirrors from ``build_lipid_resolution`` via ``extra_provenance``.
+        _prov["lipid_composition_relation"] = lipid_structure.mapping_relation
+    if extra_provenance:
+        _prov.update(extra_provenance)
+
     certificate = ResolutionCertificate(
         state=state,
         structure_status=structure_status,
         node_inchikey_blocks=blocks,
-        comparison_rule=comparison_rule,
+        comparison_rule=effective_comparison_rule,
+        resolution_level=resolution_level,
+        resolution_level_worst=resolution_level_worst,
+        lipid_resolution_level=lipid_resolution_level,
         equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
         selection_conflict=selection_conflict,
         independent_source=independent_source,
@@ -359,12 +736,25 @@ def issue(
         independent_of_selection=independence,
         tier_b_outcome=tier_b_outcome,
         refusal_reason=refusal_reason,
-        provenance=dict(provenance) if provenance is not None else _default_provenance(tier_b),
+        refmet_availability=refmet_availability,
+        refmet_source=refmet_source,
+        refmet_snapshot_version=refmet_snapshot_version,
+        # Read the freeze version off the passed-in result (None for a live result). issue() stays
+        # pure: it neither loads the freeze nor knows how the version was derived.
+        tier_b_snapshot_version=(tier_b.version if tier_b is not None else None),
+        provenance=_prov,
     )
 
-    # G3, asserted at the point of construction as well as in the suite. ``contradicted`` is
-    # reachable only from ``structure_present`` above; this makes a future branch that reintroduces
-    # it fail here rather than in a figure.
-    if certificate.state is CertificateState.CONTRADICTED and not certificate.node_inchikey_blocks:
+    # G3, asserted at the point of construction as well as in the suite. On the INCHIKEY-BLOCK axis
+    # ``contradicted`` is reachable only from ``structure_present``; this makes a future branch that
+    # reintroduces a block-level contradiction on an absent structure fail here rather than in a figure.
+    # The ONE deliberate exception is the structure-free lipid check, which contradicts on the Goslin
+    # name-composition axis (two parsed names positively disagree) and is tagged with its own comparison
+    # rule -- L21's "no InChIKey block, so nothing to contradict" reasoning does not apply to it.
+    if (
+        certificate.state is CertificateState.CONTRADICTED
+        and not certificate.node_inchikey_blocks
+        and certificate.comparison_rule != COMPARISON_RULE_GOSLIN_LEVEL_COMPOSITION
+    ):
         raise AssertionError("contradicted issued for a node the graph asserts no structure for (L21)")
     return certificate

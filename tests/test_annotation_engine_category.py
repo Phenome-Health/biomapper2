@@ -48,6 +48,7 @@ class _SpyAnnotator(BaseAnnotator):
         prefer_human=True,
         preferred_prefixes=None,
         accepted_categories=None,
+        candidate_limit=None,
         cache=None,
     ):
         self.received.append(accepted_categories)
@@ -62,6 +63,7 @@ class _SpyAnnotator(BaseAnnotator):
         prefer_human=True,
         preferred_prefixes=None,
         accepted_categories=None,
+        candidate_limit=None,
     ):
         self.received.append(accepted_categories)
         return pd.Series([{self.slug: {}} for _ in range(len(entities))], index=entities.index)

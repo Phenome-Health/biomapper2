@@ -13,10 +13,6 @@ the certificate most needs to describe -- the ones with no committed node -- wou
 certificate at all, and the two surfaces would disagree precisely there.
 """
 
-# Tests inject stub collaborators onto a real Mapper (mapper.linker = _StubLinker(), etc.).
-# Building the real ones would hit Kestrel; the stubs implement only the surface each path calls.
-# pyright: reportAttributeAccessIssue=false
-
 from __future__ import annotations
 
 import json
@@ -77,8 +73,10 @@ def _stub_mapper(
     model; this suite must stay offline.
     """
     mapper = Mapper.__new__(Mapper)
-    mapper.biolink_client = _StubBiolink()
-    mapper.linker = _StubLinker(equiv if equiv is not None else {}, lookup_ok)
+    mapper.biolink_client = _StubBiolink()  # pyright: ignore[reportAttributeAccessIssue]
+    mapper.linker = _StubLinker(  # pyright: ignore[reportAttributeAccessIssue]
+        equiv if equiv is not None else {}, lookup_ok
+    )
     mapper.tier_b = tier_b
 
     resolved = {
@@ -115,9 +113,9 @@ def _stub_mapper(
                 return pd.DataFrame([fields] * len(item), index=item.index)
             return pd.Series(fields)
 
-    mapper.resolver = _StubResolver()
-    mapper.annotation_engine = _StubAnnotation()
-    mapper.normalizer = _StubNormalizer()
+    mapper.resolver = _StubResolver()  # pyright: ignore[reportAttributeAccessIssue]
+    mapper.annotation_engine = _StubAnnotation()  # pyright: ignore[reportAttributeAccessIssue]
+    mapper.normalizer = _StubNormalizer()  # pyright: ignore[reportAttributeAccessIssue]
     # kg_ids_assigned is threaded through the linker stub's output for the dataset path.
     mapper.linker.link = _patched_link(assigned)  # type: ignore[method-assign]
     return mapper
@@ -233,16 +231,28 @@ def test_tier_a_makes_exactly_one_kestrel_enrichment_call_and_no_more() -> None:
 def test_tier_b_is_not_constructed_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     import biomapper2.mapper as mapper_module
 
-    monkeypatch.setattr(mapper_module, "TIER_B_ENABLED", False)
+    monkeypatch.setenv("BIOMAPPER2_TIER_B_ENABLED", "false")
     assert mapper_module.Mapper._build_tier_b() is None
 
 
-def test_tier_b_is_constructed_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_tier_b_is_constructed_when_force_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Explicit truthy force-enables even with no freeze configured (the supervised-sweep path).
     import biomapper2.mapper as mapper_module
 
-    monkeypatch.setattr(mapper_module, "TIER_B_ENABLED", True)
+    monkeypatch.delenv("BIOMAPPER2_TIER_B_SNAPSHOT_PATH", raising=False)
+    monkeypatch.setenv("BIOMAPPER2_TIER_B_ENABLED", "true")
     built = mapper_module.Mapper._build_tier_b()
     assert built is not None
+
+
+def test_tier_b_is_inert_by_default_without_a_freeze(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The default posture with no loadable freeze: INERT (behaves disabled), so a fresh deploy never
+    # silently reaches live services.
+    import biomapper2.mapper as mapper_module
+
+    monkeypatch.delenv("BIOMAPPER2_TIER_B_ENABLED", raising=False)
+    monkeypatch.delenv("BIOMAPPER2_TIER_B_SNAPSHOT_PATH", raising=False)
+    assert mapper_module.Mapper._build_tier_b() is None
 
 
 # --------------------------------------------------------------------------------------------

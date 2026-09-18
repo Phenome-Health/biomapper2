@@ -8,9 +8,11 @@ import uuid
 from typing import Any
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
+from ...core.annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
+from ...core.resolver import build_lipid_resolution
 from ..auth import validate_api_key
 from ..models import (
     BatchMappingRequest,
@@ -19,6 +21,7 @@ from ..models import (
     EntityMappingRequest,
     EntityMappingResponse,
     EntityMappingResult,
+    LipidResolution,
     RequestMetadata,
 )
 
@@ -38,6 +41,14 @@ def get_mapper(request: Request):
     return mapper
 
 
+def _count_by_source(results: list[EntityMappingResult]) -> dict[str, int]:
+    """Tally the batch's rows by RefMet source (a run-level provenance metric)."""
+    counts: dict[str, int] = {}
+    for r in results:
+        counts[r.refmet_source] = counts.get(r.refmet_source, 0) + 1
+    return counts
+
+
 def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_name: str) -> EntityMappingResult:
     """Extract mapping result from mapped item."""
     if isinstance(mapped_item, pd.Series):
@@ -47,12 +58,23 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
     # here, so nothing may re-wrap it on the way out.
     certificate = mapped_item.get("resolution_certificate") or None
 
+    # Additive lipid_resolution object, assembled from the goslin metadata + committed node's matched
+    # level the earlier units already put on the mapped item. None (serialized as null) off the lipid path.
+    lipid_fields = build_lipid_resolution(mapped_item)
+    lipid_resolution = LipidResolution(**lipid_fields) if lipid_fields is not None else None
+
     return EntityMappingResult(
         name=original_name,
         curies=mapped_item.get("curies", []) or [],
         chosen_kg_id=mapped_item.get("chosen_kg_id"),
         chosen_kg_id_review=mapped_item.get("chosen_kg_id_review"),
+        chosen_kg_id_lipid_hint=mapped_item.get("chosen_kg_id_lipid_hint"),
+        lipid_resolution=lipid_resolution,
         resolution_certificate=certificate,
+        refmet_availability=mapped_item.get("refmet_availability") or "not_queried",
+        refmet_source=mapped_item.get("refmet_source") or "not_queried",
+        refmet_snapshot_version=mapped_item.get("refmet_snapshot_version"),
+        tier_b_snapshot_version=mapped_item.get("tier_b_snapshot_version"),
         kg_equivalent_ids=mapped_item.get("kg_equivalent_ids", {}) or {},
         kg_ids=mapped_item.get("kg_ids", {}) or {},
         assigned_ids=mapped_item.get("assigned_ids", {}) or {},
@@ -104,6 +126,7 @@ async def map_entity(
             annotators=body.options.annotators,
             prefer_human=body.options.prefer_human,
             prefer_canonical=body.options.prefer_canonical,
+            candidate_limit=body.options.candidate_limit,
         )
 
         result = extract_mapping_result(mapped_item, body.name)
@@ -147,47 +170,57 @@ async def map_batch(
     successful = 0
     failed = 0
 
-    for entity_req in body.entities:
-        try:
-            # Build entity dict
-            entity: dict[str, Any] = {"name": entity_req.name}
-            provided_id_fields = []
+    # Arm the shared RefMet per-batch wall-clock deadline across the WHOLE per-entity loop, so a
+    # slow-but-succeeding endpoint cannot make an N-row batch scale unbounded (the single-entity
+    # path never arms it). Disarmed in finally so it never leaks into the next request.
+    mw_annotator = mapper.annotation_engine.annotator_registry.get(MetabolomicsWorkbenchAnnotator.slug)
+    armed_batch_deadline = mw_annotator.arm_batch_deadline() if mw_annotator is not None else False
+    try:
+        for entity_req in body.entities:
+            try:
+                # Build entity dict
+                entity: dict[str, Any] = {"name": entity_req.name}
+                provided_id_fields = []
 
-            for vocab, ids in entity_req.identifiers.items():
-                field_name = vocab.lower()
-                if isinstance(ids, list):
-                    entity[field_name] = ",".join(str(i) for i in ids)
-                else:
-                    entity[field_name] = str(ids)
-                provided_id_fields.append(field_name)
+                for vocab, ids in entity_req.identifiers.items():
+                    field_name = vocab.lower()
+                    if isinstance(ids, list):
+                        entity[field_name] = ",".join(str(i) for i in ids)
+                    else:
+                        entity[field_name] = str(ids)
+                    provided_id_fields.append(field_name)
 
-            # Run mapping
-            mapped_item = mapper.map_entity_to_kg(
-                item=entity,
-                name_field="name",
-                provided_id_fields=provided_id_fields,
-                entity_type=entity_req.entity_type,
-                vocab=entity_req.options.vocab,
-                array_delimiters=entity_req.options.array_delimiters,
-                annotation_mode=entity_req.options.annotation_mode,
-                annotators=entity_req.options.annotators,
-                prefer_human=entity_req.options.prefer_human,
-                prefer_canonical=entity_req.options.prefer_canonical,
-            )
-
-            result = extract_mapping_result(mapped_item, entity_req.name)
-            results.append(result)
-            successful += 1
-
-        except Exception as e:
-            logger.exception(f"Error mapping entity '{entity_req.name}': {e}")
-            results.append(
-                EntityMappingResult(
-                    name=entity_req.name,
-                    error=str(e),
+                # Run mapping
+                mapped_item = mapper.map_entity_to_kg(
+                    item=entity,
+                    name_field="name",
+                    provided_id_fields=provided_id_fields,
+                    entity_type=entity_req.entity_type,
+                    vocab=entity_req.options.vocab,
+                    array_delimiters=entity_req.options.array_delimiters,
+                    annotation_mode=entity_req.options.annotation_mode,
+                    annotators=entity_req.options.annotators,
+                    prefer_human=entity_req.options.prefer_human,
+                    prefer_canonical=entity_req.options.prefer_canonical,
+                    candidate_limit=entity_req.options.candidate_limit,
                 )
-            )
-            failed += 1
+
+                result = extract_mapping_result(mapped_item, entity_req.name)
+                results.append(result)
+                successful += 1
+
+            except Exception as e:
+                logger.exception(f"Error mapping entity '{entity_req.name}': {e}")
+                results.append(
+                    EntityMappingResult(
+                        name=entity_req.name,
+                        error=str(e),
+                    )
+                )
+                failed += 1
+    finally:
+        if mw_annotator is not None and armed_batch_deadline:
+            mw_annotator.disarm_batch_deadline()
 
     processing_time = (time.time() - start_time) * 1000
 
@@ -201,6 +234,14 @@ async def map_batch(
             "total": len(body.entities),
             "successful": successful,
             "failed": failed,
+            # Run-level RefMet availability metric (D5): rows a degraded RefMet service left
+            # uncovered. Cold-run-attributable only — the RefMet HTTP cache serves successes, so a
+            # warm rerun understates this count.
+            "refmet_unavailable": sum(1 for r in results if r.refmet_availability == "unavailable"),
+            # Run-level RefMet SOURCE provenance: counts by which source served each row. With a
+            # pinned freeze present this is dominated by local_snapshot / not_in_snapshot (the
+            # circuit breaker is out of the default path); without one it is live_api / unavailable.
+            "refmet_source_counts": _count_by_source(results),
         },
     )
 
@@ -217,6 +258,7 @@ async def map_dataset(
     vocab: str | None = None,
     prefer_human: bool = True,
     prefer_canonical: bool = True,
+    candidate_limit: int | None = Query(default=None, ge=1, le=100),
     _api_key: str = Depends(validate_api_key),
 ) -> DatasetMappingResponse:
     """
@@ -265,6 +307,7 @@ async def map_dataset(
             annotators=annotator_list,
             prefer_human=prefer_human,
             prefer_canonical=prefer_canonical,
+            candidate_limit=candidate_limit,
         )
 
     except Exception as e:
@@ -295,6 +338,7 @@ async def map_dataset_stream(
     vocab: str | None = None,
     prefer_human: bool = True,
     prefer_canonical: bool = True,
+    candidate_limit: int | None = Query(default=None, ge=1, le=100),
     _api_key: str = Depends(validate_api_key),
 ) -> StreamingResponse:
     """
@@ -342,6 +386,7 @@ async def map_dataset_stream(
                     annotators=annotator_list,
                     prefer_human=prefer_human,
                     prefer_canonical=prefer_canonical,
+                    candidate_limit=candidate_limit,
                 )
 
                 result = {
@@ -349,6 +394,9 @@ async def map_dataset_stream(
                     "name": entity.get(name_column, ""),
                     "chosen_kg_id": mapped.get("chosen_kg_id"),
                     "chosen_kg_id_review": mapped.get("chosen_kg_id_review"),
+                    "chosen_kg_id_lipid_hint": mapped.get("chosen_kg_id_lipid_hint"),
+                    # Plain dict (or null) already assembled on the mapped item; json-serializable.
+                    "lipid_resolution": mapped.get("lipid_resolution"),
                     "kg_equivalent_ids": mapped.get("kg_equivalent_ids", {}),
                     "curies": mapped.get("curies", []),
                     "kg_ids": mapped.get("kg_ids", {}),

@@ -43,7 +43,7 @@ def _mock_bulk_request(method: str, endpoint: str, auth_required: bool = True, *
 
     if endpoint == "text-search":
         payload = kwargs.get("json", {})
-        cat = payload.get("category_filter", "")
+        cat = payload.get("category", "")
         terms = payload.get("search_text", [])
         if cat == "biolink:SmallMolecule":
             return {term: MOCK_NODES_SMALL_MOL for term in terms}

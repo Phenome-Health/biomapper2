@@ -20,19 +20,25 @@ from ..config import (
     PUBCHEM_INCHIKEY_URL,
     STRUCTURE_LOOKUP_TIMEOUT_S,
 )
+from .annotators import refmet_snapshot
 from .linker import Linker
 
 
 class StructureResolver:
     """Adjudicates whether two KG nodes share InChIKey connectivity (2-D structure)."""
 
-    def __init__(self, linker: Linker) -> None:
+    def __init__(self, linker: Linker, lipid_resolver: Any | None = None) -> None:
         self.linker = linker
         self._session = requests_cache.CachedSession(
             str(CACHE_DIR / "structure_http"),
             ignored_parameters=CACHE_IGNORED_PARAMETERS,
         )
         self._name_cache: dict[str, str | None] = {}  # inchikey block by node name (per process)
+        self._name_full_cache: dict[str, str | None] = {}  # FULL inchikey by node name (per process)
+        # Candidate-side lipid hop (KTD6). Lipid shorthand nodes never resolve via KG/MW/PubChem by
+        # name, so a lipid candidate is un-matchable in re-resolution without this. Shared with the
+        # query-side Tier B lookup so both sides read one lipid resolver + cache. None disables it.
+        self._lipid_resolver = lipid_resolver
 
     def connectivity_match(self, node_a: str, node_b: str) -> bool | None:
         """True if the nodes share ANY InChIKey first block, False if both resolve and share none,
@@ -63,7 +69,7 @@ class StructureResolver:
         return bool(blocks_a & blocks_b)
 
     def inchikey_block(self, node_id: str, node_name: str | None, records: dict[str, Any] | None = None) -> str | None:
-        """First InChIKey block for a node: KG record -> MW by name -> PubChem by name."""
+        """First InChIKey block for a node: KG record -> MW by name -> PubChem by name -> lipid."""
         records = records if records is not None else self.linker.get_node_records([node_id])
         keys = ((records.get(node_id) or {}).get("equivalent_ids") or {}).get("INCHIKEY") or []
         if keys:
@@ -72,14 +78,108 @@ class StructureResolver:
             return None
         if node_name in self._name_cache:
             return self._name_cache[node_name]
-        try:
-            key = self._fetch_mw_inchikey(node_name) or self._fetch_pubchem_inchikey(node_name)
-            block = self._first_block(key) if key else None
-        except Exception:
-            logging.warning("Structure lookup failed for '%s'; treating as unresolvable", node_name, exc_info=True)
-            block = None
+        block = self._first_block(self._resolve_name_key(node_name))
         self._name_cache[node_name] = block
         return block
+
+    def structural_inchikey(
+        self, node_id: str, node_name: str | None, records: dict[str, Any] | None = None
+    ) -> str | None:
+        """FULL InChIKey for a node: KG record -> MW by name -> PubChem by name -> lipid.
+
+        Companion to :meth:`inchikey_block` that keeps the second (stereo) block so re-resolution can
+        compare at the structural key (block1 + block2[:8]) instead of connectivity alone. Used only
+        on the CANDIDATE nodes; the committed node's key is never read as the re-resolution anchor.
+        """
+        records = records if records is not None else self.linker.get_node_records([node_id])
+        keys = ((records.get(node_id) or {}).get("equivalent_ids") or {}).get("INCHIKEY") or []
+        if keys:
+            first = next((k for k in keys if k), None)
+            return str(first).upper() if first else None
+        if not node_name:
+            return None
+        if node_name in self._name_full_cache:
+            return self._name_full_cache[node_name]
+        key = self._resolve_name_key(node_name)
+        full = str(key).upper() if key else None
+        self._name_full_cache[node_name] = full
+        return full
+
+    def structural_inchikeys(
+        self, node_id: str, node_name: str | None, records: dict[str, Any] | None = None
+    ) -> list[str]:
+        """ALL FULL InChIKeys graph-asserted for a node, else the single name-resolved key.
+
+        A candidate node may carry SEVERAL graph-asserted InChIKeys, and the query's independent
+        structure can match any one of them. :meth:`structural_inchikey` returns only the first, so
+        re-resolution matching on it would reject a valid candidate whose match is a non-first key.
+        This companion returns the full set (order-preserving, de-duplicated, upper-cased) so the
+        caller can accept a match against ANY asserted structure. Falls back to the name-resolved key.
+        """
+        records = records if records is not None else self.linker.get_node_records([node_id])
+        keys = ((records.get(node_id) or {}).get("equivalent_ids") or {}).get("INCHIKEY") or []
+        out: list[str] = []
+        seen: set[str] = set()
+        for k in keys:
+            if k:
+                ku = str(k).upper()
+                if ku not in seen:
+                    seen.add(ku)
+                    out.append(ku)
+        if out:
+            return out
+        if not node_name:
+            return []
+        # Reuse the single-key name hop (and its cache); a name resolves to at most one structure.
+        one = self.structural_inchikey(node_id, node_name, records)
+        return [one] if one else []
+
+    @staticmethod
+    def _frozen_inchikey(node_name: str) -> str | None:
+        """Full InChIKey pinned in the RefMet freeze for this name, else None. Deterministic, no network.
+
+        Axis 4: a node with no KG-asserted InChIKey (e.g. a RefMet ``RM:`` node) otherwise resolves its
+        structure via a LIVE MW/PubChem name lookup, which is fail-soft ``None`` on a transient error.
+        A ``None`` flips ``connectivity_match`` (same-molecule test) to "unresolvable", which flips the
+        committed node between the RefMet node and the majority run-to-run. Serving the InChIKey from the
+        pinned freeze when present makes that structure deterministic; absent/blank falls to live.
+        """
+        if not node_name:
+            return None
+        try:
+            hit = refmet_snapshot.lookup(node_name)
+        except Exception:  # noqa: BLE001 - broken snapshot -> live hop, never aborts
+            logging.warning(
+                "Frozen structure lookup failed for '%s'; falling through to live", node_name, exc_info=True
+            )
+            return None
+        if hit is None:
+            return None
+        key = (hit.extra or {}).get("inchi_key")
+        # Treat the upstream "-" missing-value sentinel (and blanks) as NO structure, matching the live
+        # MW lookup's own "-" filter — a sentinel must never be accepted as a real InChIKey.
+        return key.upper() if key and key != "-" else None
+
+    def _resolve_name_key(self, node_name: str) -> str | None:
+        """Full InChIKey for a NAME via pinned freeze -> MW -> PubChem -> lipid hop. Fail-soft (``None``)."""
+        # Prefer a pinned freeze structure (deterministic, no network) over the live MW/PubChem hop.
+        frozen = self._frozen_inchikey(node_name)
+        if frozen:
+            return frozen
+        try:
+            key = self._fetch_mw_inchikey(node_name) or self._fetch_pubchem_inchikey(node_name)
+        except Exception:
+            logging.warning("Structure lookup failed for '%s'; treating as unresolvable", node_name, exc_info=True)
+            return None
+        if key:
+            return key
+        if self._lipid_resolver is not None:
+            from .certificate import TierBOutcome
+
+            lipid = self._lipid_resolver.resolve(node_name)
+            if lipid.outcome is TierBOutcome.RESOLVED and lipid.inchikey_block:
+                return lipid.inchikey_block
+        return None
 
     def inchikey_blocks(self, node_id: str, node_name: str | None, records: dict[str, Any] | None = None) -> set[str]:
         """ALL KG-asserted InChIKey first-blocks for a node (the full ``equivalent_ids`` list).
@@ -107,13 +207,17 @@ class StructureResolver:
     def _fetch_mw_inchikey(self, name: str) -> str | None:
         """Metabolomics Workbench: GET /rest/refmet/name/{name}/inchi_key.
 
-        ``safe=""`` is load-bearing. ``quote`` defaults to ``safe="/"``, which leaves a slash in the
-        name UNESCAPED -- so a lipid-shorthand name splits into extra URL path segments, the request
-        404s, and the caller records the name as structurally unresolvable rather than as a failed
-        lookup. Share of affected names, per arm: artifact field ``slash_bearing_name_rate``.
+        ``safe=""`` encodes the whole name into one path segment. A slash-bearing name (an
+        sn-position lipid shorthand like "PC 16:0/18:1") has no addressable entry here: MW's web
+        server rejects the encoded slash outright (``%2F`` -> 404). A per-name Bad-Request / Not-Found
+        is a definitive "no such structure", returned as None rather than raised, so it is a clean
+        no-match instead of a logged lookup failure. Only 5xx / transport errors propagate to the
+        caller's fail-soft guard.
         """
         url = f"{MW_INCHIKEY_URL}/{quote(name, safe='')}/inchi_key"
         resp = self._session.get(url, timeout=STRUCTURE_LOOKUP_TIMEOUT_S)
+        if resp.status_code in (400, 404):
+            return None
         resp.raise_for_status()
         data = resp.json()
         if isinstance(data, dict):
