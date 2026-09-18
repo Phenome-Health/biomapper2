@@ -395,9 +395,7 @@ class TestEnsemblIds:
         ],
     )
     def test_accepts_every_feature_type(self, normalizer, local_id, why):
-        curies, invalid, _ = normalizer.get_curies(
-            {"ensembl": local_id}, log_warnings=False, fuzzy_match_vocab=False
-        )
+        curies, invalid, _ = normalizer.get_curies({"ensembl": local_id}, log_warnings=False, fuzzy_match_vocab=False)
         assert f"ENSEMBL:{local_id}" in curies, why
         assert not invalid
 
@@ -413,9 +411,7 @@ class TestEnsemblIds:
     )
     def test_rejects_non_ensembl_ids(self, normalizer, local_id, why):
         """Mislabeled ids must stay rejected so the report surfaces them, rather than being blessed."""
-        curies, invalid, _ = normalizer.get_curies(
-            {"ensembl": local_id}, log_warnings=False, fuzzy_match_vocab=False
-        )
+        curies, invalid, _ = normalizer.get_curies({"ensembl": local_id}, log_warnings=False, fuzzy_match_vocab=False)
         assert not curies, why
         assert invalid["ensembl"] == [local_id]
 
@@ -461,9 +457,7 @@ class TestRepeatedColons:
         ],
     )
     def test_repeated_colons_are_cleaned_up(self, normalizer, vocab, local_id, expected):
-        curies, invalid, _ = normalizer.get_curies(
-            {vocab: local_id}, log_warnings=False, fuzzy_match_vocab=False
-        )
+        curies, invalid, _ = normalizer.get_curies({vocab: local_id}, log_warnings=False, fuzzy_match_vocab=False)
         assert expected in curies
         assert not invalid
 
@@ -482,9 +476,7 @@ class TestRepeatedColons:
         Note the fix proposed on the issue -- take the LAST colon-separated segment -- would have
         reduced these to 'g.109175441A>G' and 'SF473'.
         """
-        curies, invalid, _ = normalizer.get_curies(
-            {vocab: local_id}, log_warnings=False, fuzzy_match_vocab=False
-        )
+        curies, invalid, _ = normalizer.get_curies({vocab: local_id}, log_warnings=False, fuzzy_match_vocab=False)
         assert not invalid
         assert any(c.endswith(local_id) or c.endswith(local_id.split(":", 1)[1]) for c in curies)
 
