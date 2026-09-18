@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0](https://github.com/Phenome-Health/biomapper2/compare/v1.0.1...v1.1.0) (2026-09-18)
+
+
+### Features
+
+* add HGVS and CAID to Normalizer ([7ec969a](https://github.com/Phenome-Health/biomapper2/commit/7ec969a0f01745da02c6862e9ab527134676c19d))
+* add panther, hgnc.family, MP, more ensembl ([479267f](https://github.com/Phenome-Health/biomapper2/commit/479267f1567aa3d0967ea4da670f3229ec9b4843))
+* handle double colons in input ids [#59](https://github.com/Phenome-Health/biomapper2/issues/59) ([57ef3b9](https://github.com/Phenome-Health/biomapper2/commit/57ef3b9a53436a0c74262f9314212f96717a13f6))
+
+
+### Bug Fixes
+
+* add substring match min length; include fuzzy param in cache key ([0e33100](https://github.com/Phenome-Health/biomapper2/commit/0e33100a98ed5efc60feaa7be002dae9ce682e78))
+* keep trailing zeroes for string ids, not floats [#58](https://github.com/Phenome-Health/biomapper2/issues/58) ([5596dd6](https://github.com/Phenome-Health/biomapper2/commit/5596dd69f304a1ef75064e97625d1850fa426168))
+
 ## [1.0.1](https://github.com/Phenome-Health/biomapper2/compare/v1.0.0...v1.0.1) (2026-09-10)
 
 
