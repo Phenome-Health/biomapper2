@@ -53,6 +53,21 @@ class MappingOptions(BaseModel):
             "unchanged. Bounded to 1..100; out-of-range values are rejected with a 422."
         ),
     )
+    kestrel_top_n: int | None = Field(
+        default=None,
+        ge=1,
+        le=100,
+        description=(
+            "Opt-in: return the top-N RAW rows Kestrel returned for each search endpoint the pipeline "
+            "actually used, alongside the normal result (in EntityMappingResult.kestrel_results). "
+            "PASSTHROUGH ONLY — unlike candidate_limit, this NEVER changes chosen_kg_id, assigned_ids, "
+            "the resolver vote, or the certificate: selection is byte-identical across any kestrel_top_n. "
+            "None (default) disables the feature and leaves responses byte-unchanged. Bounded to 1..100; "
+            "out-of-range values are rejected with a 422. Worst case is large (up to len(entities) x N x "
+            "3 endpoints of raw rows), so the batch/dataset-stream routes hard-enforce a payload cap and "
+            "/map/dataset (non-streaming) rejects this option with a 422 — use /map/dataset/stream."
+        ),
+    )
 
     # Ignore unknown fields so a newer client sending extra options to an older server does not 422.
     # (Pydantic v2 already defaults to ignore; set explicitly as documentation of the contract.)

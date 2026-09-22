@@ -1,0 +1,29 @@
+{
+  "endpoint": "hybrid-search",
+  "search_text": "TP53",
+  "note": "Sanitized/representative Kestrel hybrid-search response for a gene symbol; shows HGNC-bearing (human) and ortholog rows. No host/headers/keys captured.",
+  "response": {
+    "TP53": [
+      {
+        "id": "HGNC:11998",
+        "score": 4.02,
+        "name": "TP53",
+        "synonyms": ["p53", "tumor protein p53", "LFS1"],
+        "prefixes": ["HGNC", "NCBIGene", "ENSEMBL"],
+        "categories": ["biolink:Gene"],
+        "description": "Human tumor protein p53 gene.",
+        "taxon": "NCBITaxon:9606"
+      },
+      {
+        "id": "NCBIGene:22059",
+        "score": 3.10,
+        "name": "TP53",
+        "synonyms": ["Trp53", "p53"],
+        "prefixes": ["NCBIGene", "ENSEMBL"],
+        "categories": ["biolink:Gene"],
+        "description": "Mouse ortholog.",
+        "taxon": "NCBITaxon:10090"
+      }
+    ]
+  }
+}

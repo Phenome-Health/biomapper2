@@ -112,6 +112,11 @@ def _bump(endpoint: str, field_name: str, amount: int = 1) -> None:
     bucket[field_name] += amount
 
 
+def _bump_noop(endpoint: str, field_name: str, amount: int = 1) -> None:
+    """No-op counter for requests that must not touch the shared manifest counters (passthrough)."""
+    return None
+
+
 def reset_request_counters() -> None:
     """Zero every endpoint's counters. Call once per dataset, not once per suite."""
     _REQUEST_COUNTERS.clear()
@@ -346,6 +351,7 @@ def bulk_kestrel_request(
     *,
     max_retries: int = 3,
     retry_backoff_base: float = 2.0,
+    count_requests: bool = True,
     **kwargs,
 ) -> Any:
     """
@@ -370,6 +376,10 @@ def bulk_kestrel_request(
             timeout) before giving up. 0 disables retrying.
         retry_backoff_base: Base for exponential backoff; the delay before retry
             ``attempt`` (0-indexed) is ``retry_backoff_base ** attempt`` seconds.
+        count_requests: Whether to record this request in the process-global per-endpoint
+            counters (``request_counter_snapshot``). Default True. Set False for the raw-passthrough
+            side channel so a response-only option never inflates the shared request/cache/retry/
+            failure counts that benchmark manifests persist.
         **kwargs: Additional arguments to pass to requests (json, params, etc.)
 
     Returns:
@@ -390,6 +400,10 @@ def bulk_kestrel_request(
         # The inline construction this replaced carried the cache-redaction arguments. They now
         # live in ``get_session``; see the note there -- dropping them re-opens PR #50's defect.
         session = get_session()
+
+    # Counter recording is opt-out (default on). The passthrough side channel passes
+    # count_requests=False so its traffic leaves the shared benchmark counters untouched.
+    bump = _bump if count_requests else _bump_noop
 
     # A default, not plumbing: the kwarg already forwarded to the transport, but the mapping-path
     # callers supply none, so without this a wedged request has no timeout at all. See
@@ -423,12 +437,12 @@ def bulk_kestrel_request(
     )
     for attempt in range(max_retries + 1):
         try:
-            _bump(endpoint, "requests")
+            bump(endpoint, "requests")
             response = session.request(method, url, headers=headers, **kwargs)
             # Cache hit-vs-miss belongs in the manifest: a repeat run that replays a large cache
             # reports a flip rate near zero and would publish "the backend is perfectly stable"
             # from an instrument that cannot observe its own failure mode.
-            _bump(endpoint, "from_cache_hits" if getattr(response, "from_cache", False) else "from_cache_misses")
+            bump(endpoint, "from_cache_hits" if getattr(response, "from_cache", False) else "from_cache_misses")
             response.raise_for_status()
             return response.json()
         except requests.exceptions.HTTPError as e:
@@ -436,7 +450,7 @@ def bulk_kestrel_request(
             # Retry only transient server errors (5xx); 4xx (auth, bad payload) won't self-heal.
             if status is not None and 500 <= status < 600 and attempt < max_retries:
                 delay = retry_backoff_base**attempt
-                _bump(endpoint, "retries")
+                bump(endpoint, "retries")
                 logging.warning(
                     f"Kestrel API {status} on {endpoint} "
                     f"(attempt {attempt + 1}/{max_retries + 1}); retrying in {delay:.1f}s"
@@ -444,7 +458,7 @@ def bulk_kestrel_request(
                 time.sleep(delay)
                 continue
             if status is not None and 500 <= status < 600:
-                _bump(endpoint, "terminal_5xx")
+                bump(endpoint, "terminal_5xx")
             # Remediation hint for the keyless-default misconfiguration, appended rather than
             # branched so the auth path keeps the exception text and traceback.
             hint = ""
@@ -459,18 +473,18 @@ def bulk_kestrel_request(
         except transient as e:
             if attempt < max_retries:
                 delay = retry_backoff_base**attempt
-                _bump(endpoint, "retries")
+                bump(endpoint, "retries")
                 logging.warning(
                     f"Kestrel API transient error on {endpoint} ({type(e).__name__}) "
                     f"(attempt {attempt + 1}/{max_retries + 1}); retrying in {delay:.1f}s"
                 )
                 time.sleep(delay)
                 continue
-            _bump(endpoint, "transient_errors")
+            bump(endpoint, "transient_errors")
             logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
             raise
         except requests.exceptions.RequestException as e:
-            _bump(endpoint, "transient_errors")
+            bump(endpoint, "transient_errors")
             logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
             raise
 
