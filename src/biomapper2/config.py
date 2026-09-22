@@ -128,6 +128,20 @@ KESTREL_BATCHING_ENABLED = True  # Set to False to disable batching (for perform
 KESTREL_BATCH_SIZE_SEARCH = 1000  # For text-search, vector-search, hybrid-search
 KESTREL_BATCH_SIZE_CANONICALIZE = 2000  # For canonicalize endpoint
 
+# ------------------------------------------------------------------------------------------------
+# Raw Kestrel passthrough (opt-in `kestrel_top_n`) — resource cap
+# ------------------------------------------------------------------------------------------------
+# The passthrough side channel (MappingOptions.kestrel_top_n) issues ONE extra Kestrel round trip
+# per used search endpoint per entity, each returning up to `kestrel_top_n` raw rows. Left uncapped a
+# large batch is a resource-exhaustion vector (its worst-case row count is entities x kestrel_top_n x
+# KESTREL_PASSTHROUGH_MAX_ENDPOINTS), so the routes HARD-ENFORCE a cap: a request is rejected with an
+# HTTP validation error when its projected passthrough row count exceeds KESTREL_PASSTHROUGH_MAX_ROWS.
+# The projection uses the WORST-CASE endpoint count (text + vector + hybrid) so the cap is enforceable
+# BEFORE any passthrough call is made, rather than after the amplification has already been paid. Both
+# values are read at request time (not captured at import) so a test can monkeypatch them.
+KESTREL_PASSTHROUGH_MAX_ENDPOINTS = 3
+KESTREL_PASSTHROUGH_MAX_ROWS = 100_000
+
 # Pinned local RefMet freeze (deterministic resolution). Path to a frozen ``/match`` corpus TSV
 # (see core/annotators/refmet_snapshot.py for the format). When set to a loadable file the RefMet
 # annotator consults the freeze FIRST and the live-endpoint circuit breaker leaves the default

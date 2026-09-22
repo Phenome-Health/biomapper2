@@ -1,0 +1,29 @@
+{
+  "endpoint": "vector-search",
+  "search_text": "carnitine",
+  "note": "Sanitized/representative Kestrel vector-search response. No host/headers/keys captured.",
+  "response": {
+    "carnitine": [
+      {
+        "id": "CHEBI:17126",
+        "score": 0.84,
+        "name": "carnitine",
+        "synonyms": ["L-carnitine", "vitamin BT"],
+        "prefixes": ["CHEBI", "KEGG.COMPOUND"],
+        "categories": ["biolink:SmallMolecule"],
+        "description": "A quaternary ammonium compound.",
+        "xrefs": ["KEGG.COMPOUND:C00487"]
+      },
+      {
+        "id": "CHEBI:16347",
+        "score": 0.79,
+        "name": "L-carnitine",
+        "synonyms": ["(R)-carnitine"],
+        "prefixes": ["CHEBI"],
+        "categories": ["biolink:SmallMolecule"],
+        "description": "The L-enantiomer of carnitine.",
+        "xrefs": []
+      }
+    ]
+  }
+}

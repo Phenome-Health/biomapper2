@@ -124,6 +124,45 @@ The API docs are available at:
 | POST | `/api/v1/map/dataset` | Map an uploaded TSV/CSV file |
 | POST | `/api/v1/map/dataset/stream` | Stream mapping results as NDJSON |
 
+### Raw Kestrel passthrough (`kestrel_top_n`)
+
+`kestrel_top_n` is an opt-in request option that returns the top-N **raw** rows Kestrel returned for
+each search endpoint the pipeline actually used, alongside the normal result, so downstream consumers
+can audit why a `chosen_kg_id` won or inspect near-misses without re-querying Kestrel.
+
+**`candidate_limit` vs `kestrel_top_n` — they are not the same knob:**
+
+| Option | What it controls | Can it change `chosen_kg_id`? |
+|--------|------------------|-------------------------------|
+| `candidate_limit` | The **selection window** — how many candidates each Kestrel search annotator retrieves and re-ranks. | **Yes.** Widening the window can change which node wins. |
+| `kestrel_top_n` | **Passthrough only** — how many raw rows are returned in `kestrel_results`. | **No.** `chosen_kg_id`, `assigned_ids`, the resolver vote, and the certificate are byte-identical across any `kestrel_top_n` (including `None`). |
+
+Details:
+
+- Set on the request body for `/map/entity` and `/map/batch` (`options.kestrel_top_n`, 1..100), or as a
+  query param on `/map/dataset/stream`. **`/map/dataset` (non-streaming) rejects it with a 422** — it
+  returns a TSV path, not per-entity JSON, so use `/map/dataset/stream`.
+- The response carries `kestrel_results`: one entry per used endpoint, each with the exact `request`
+  params, the raw `rows` (Kestrel's order, truncated to N, **before** the hybrid `score>=0.5` filter and
+  any re-ranking), `fetch_strategy` (`separate_call`), and a classified `error` (`timeout` |
+  `upstream_error` | `malformed_response` | `other`) when that endpoint's passthrough call failed. A
+  passthrough failure never turns a successful mapping into an error, and empty when the entity made no
+  Kestrel call.
+- **Rows are untrusted external data** (passed through verbatim, not biomapper-attested) — any renderer
+  must treat every field as unescaped.
+- **Payload cap:** the worst case is `len(entities) × kestrel_top_n × 3 endpoints` raw rows
+  (e.g. `1000 × 100 × 3 = 300,000`). `/map/batch` and `/map/dataset/stream` hard-enforce a cap
+  (`KESTREL_PASSTHROUGH_MAX_ROWS`, default 100,000 worst-case rows) and reject an over-cap request with
+  a 422; reduce `kestrel_top_n` or the batch size, or page the request.
+
+Example (single entity, 10 raw rows per used endpoint):
+
+```bash
+curl -X POST http://localhost:8001/api/v1/map/entity \
+  -H "Content-Type: application/json" \
+  -d '{"name": "glucose", "entity_type": "metabolite", "options": {"kestrel_top_n": 10}}'
+```
+
 ### Authentication
 
 Set `BIOMAPPER_API_KEY` or `BIOMAPPER2_API_KEYS` (comma-separated) in your `.env` file to require API key authentication via the `X-API-Key` header. If no keys are configured, the API runs in open-access mode.
