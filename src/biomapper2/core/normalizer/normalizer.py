@@ -23,6 +23,14 @@ from ...utils import (
 from . import cleaners
 from .vocab_config import load_prefix_info, load_validator_map
 
+# Shortest vocabulary name that may be matched as a BARE SUBSTRING of a field name (the last, fuzziest
+# tier of determine_vocab -- how "labcorploincid" finds "loinc"). A third of our vocab names are two or
+# three characters ('mi', 'go', 'so', 'pr', 'cl', 'ec', 'chr', 'cas', ...), and as bare substrings those
+# match almost any English word -- 'mi' is inside "family", 'so' inside "sodium", 'pr' inside "protein".
+# One such match silently resolves an id to a completely unrelated vocabulary, so short names are
+# matchable only by the exact and alias tiers above, never by substring.
+MIN_SUBSTRING_MATCH_LENGTH = 4
+
 
 class Normalizer:
     """
@@ -47,7 +55,7 @@ class Normalizer:
 
         self.vocab_info_map = load_prefix_info(self.biolink_client)
         self.vocab_validator_map = load_validator_map()
-        self.field_name_to_vocab_name_cache: dict[str, set[str]] = dict()
+        self.field_name_to_vocab_name_cache: dict[tuple[str, bool], set[str]] = dict()
         self.dashes = {"-", "–", "—", "−", "‐", "‑", "‒"}
 
     def normalize(
@@ -249,9 +257,15 @@ class Normalizer:
         if field_name_cleaned in self.vocab_validator_map:
             # We have an exact match, so we return it
             return {field_name_cleaned}
-        elif field_name_cleaned in self.field_name_to_vocab_name_cache:
+        # The cache is keyed by the fuzzy flag as well as the field name: a substring match is only
+        # valid for a CALLER THAT ASKED FOR ONE, and serving it to a caller that passed
+        # do_fuzzy_matching=False would make the answer depend on what happened to be looked up
+        # earlier in the process. (That silently turned 'hgnc.family:1561' into 'MI:1561' whenever
+        # any fuzzy lookup ran first.)
+        cache_key = (field_name_cleaned, do_fuzzy_matching)
+        if cache_key in self.field_name_to_vocab_name_cache:
             # We've already processed this field name before, so we return the cached mapping
-            return self.field_name_to_vocab_name_cache[field_name_cleaned]
+            return self.field_name_to_vocab_name_cache[cache_key]
         else:
             # Check explicit and implicit aliases
             matches_on_alias = set()
@@ -267,7 +281,7 @@ class Normalizer:
                     matches_on_alias.add(vocab)
 
             if matches_on_alias:
-                self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_alias
+                self.field_name_to_vocab_name_cache[cache_key] = matches_on_alias
                 return matches_on_alias
 
             if do_fuzzy_matching:
@@ -277,12 +291,12 @@ class Normalizer:
                 for vocab in self.vocab_validator_map:
                     # Use the root vocab name for substring matching
                     vocab_root = vocab.split(".")[0] if "." in vocab else vocab
-                    if vocab_root in field_name_cleaned:
+                    if len(vocab_root) >= MIN_SUBSTRING_MATCH_LENGTH and vocab_root in field_name_cleaned:
                         matches_on_substring.add(vocab)
 
                 if matches_on_substring:
                     logging.debug(f"Found substring match(es) for '{id_field_name}': {matches_on_substring}")
-                    self.field_name_to_vocab_name_cache[field_name_cleaned] = matches_on_substring
+                    self.field_name_to_vocab_name_cache[cache_key] = matches_on_substring
                     return matches_on_substring
 
             return None
@@ -346,20 +360,17 @@ class Normalizer:
         Returns:
             Tuple of (curie, iri) - empty strings if validation fails
         """
-        # If a full curie was passed (e.g. "NCIT:C123"), strip the single leading prefix to get the
-        # bare local id. A local id with MULTIPLE colons is treated as malformed (e.g. an un-split
-        # compound like "C1:C2:C3") -- left intact so it fails validation below rather than silently
-        # resolving to one of its parts. Genuine compounds should be split via get_curies'
-        # array_delimiters, which runs before this and removes the colons, so ':' as a delimiter and
-        # ':' as a prefix separator never collide here.
-        if not local_id.startswith("http") and local_id.count(":") == 1:
-            local_id = local_id.split(":", 1)[1]
         # Construct a standardized curie for the given local ID and vocab (or list of vocabs; first valid kept)
         prefixes_lowercase = [vocab_name_cleaned] if isinstance(vocab_name_cleaned, str) else vocab_name_cleaned
+        candidate_local_ids = self._candidate_local_ids(local_id)
         curie = ""
         iri = ""
         for prefix_lowercase in prefixes_lowercase:
-            is_valid_id, cleaned_local_id = self.is_valid_id(local_id, prefix_lowercase)
+            is_valid_id, cleaned_local_id = False, local_id
+            for candidate in candidate_local_ids:
+                is_valid_id, cleaned_local_id = self.is_valid_id(candidate, prefix_lowercase)
+                if is_valid_id:
+                    break
             if is_valid_id:
                 # Return the standardized curie and its corresponding IRI
                 prefix_normalized = self.vocab_info_map[prefix_lowercase]["prefix"]
@@ -379,6 +390,47 @@ class Normalizer:
                 logging.warning(f"Local id '{local_id}' is invalid for {vocab_name_cleaned}. Skipping.")
 
         return curie, iri
+
+    def _candidate_local_ids(self, local_id: str) -> list[str]:
+        """The forms of ``local_id`` to try validating, most literal first.
+
+        Most vocabularies' ids carry no colon, so a leading "PREFIX:" on one is a full curie whose
+        prefix should come off -- and it comes off whether or not we recognize the prefix, since
+        sources use nonstandard and aliased ones ("foo:C34831" is still NCIT's C34831).
+
+        But a few vocabularies' ids DO contain a colon -- an HGVS expression is
+        "NC_000001.11:g.109175441A>G", where "NC_000001.11" is a reference sequence, not a prefix.
+        Blind stripping would leave a meaningless fragment, so the id AS GIVEN is always tried
+        first: if it validates for the target vocabulary, that is what it is.
+
+        A REPEATED colon ("DOID::12386") is a typo rather than structure, so a colon-collapsed form
+        is offered too. It is an extra candidate, not a rewrite, so an id that legitimately contains
+        a colon is still tried untouched first. (Note the obvious one-line fix for this -- taking the
+        LAST colon-separated segment -- would quietly destroy those ids: HGVS's
+        "NC_000001.11:g.109175441A>G" would become "g.109175441A>G", and PANTHER's "PTHR22884:SF473"
+        would become "SF473".)
+
+        An un-split compound ("C1:C2:C3") yields no valid candidate and so fails validation rather
+        than resolving to one of its parts -- unless its leading segment names a known vocabulary,
+        which makes it a full curie wrapping a colon-bearing local id
+        ("HGVS:NC_000021.9:g.25840043C>G"). Genuine compounds should be split via get_curies'
+        array_delimiters, which runs before this.
+        """
+        candidates = [local_id]
+        if local_id.startswith("http") or ":" not in local_id:
+            return candidates
+        collapsed = re.sub(r":{2,}", ":", local_id)
+        if collapsed != local_id:
+            candidates.append(collapsed)
+        # Then, for each form, the same id with a leading prefix removed.
+        for candidate in list(candidates):
+            if ":" not in candidate:
+                continue
+            prefix, remainder = candidate.split(":", 1)
+            known_prefix = cleaners.clean_vocab_prefix(prefix) in self.vocab_validator_map
+            if remainder and remainder not in candidates and (candidate.count(":") == 1 or known_prefix):
+                candidates.append(remainder)
+        return candidates
 
     @staticmethod
     def _parse_delimited_string(value: Any, array_delimiters: list[str]) -> Any:
@@ -400,13 +452,20 @@ class Normalizer:
             return value
 
     def clean_id(self, local_id: str | float | int) -> str:
-        """Convert numeric IDs to strings, strip whitespace, removing trailing .0 for whole numbers..."""
+        """Convert numeric IDs to strings, strip whitespace, removing the trailing '.0' a whole
+        number picks up when it arrives as a float.
+
+        The '.0' is stripped ONLY for an actual float input, never for a string. A float is the
+        spreadsheet artifact we mean to undo (pandas types an integer column containing blanks as
+        float64, so the code 12345 arrives as 12345.0), whereas in a string the '.0' is part of the
+        identifier -- ICD9 '250.0' (diabetes with coma) is a DIFFERENT code from '250' (diabetes
+        mellitus), so stripping it silently changes the entity being referenced. Anything that can
+        reach us as text (an ICD/OMOP/HCPCS-style dotted code) is therefore left intact.
+        """
+        # NaN is never a whole number (and int(nan) raises), so screen it out before the int compare.
+        if isinstance(local_id, float) and local_id == local_id and local_id == int(local_id):
+            return str(int(local_id))
         local_id = str(local_id).strip()
-        try:
-            if local_id.endswith(".0") and float(local_id) == int(float(local_id)):
-                return local_id.removesuffix(".0")
-        except (ValueError, TypeError):
-            pass
         if local_id in self.dashes:
             return ""
         else:

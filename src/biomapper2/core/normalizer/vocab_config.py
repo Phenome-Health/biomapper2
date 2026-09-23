@@ -72,11 +72,18 @@ def load_prefix_info(biolink_client: BiolinkClient) -> dict[str, dict[str, str]]
     prefix_to_iri_map["ttd.target"] = "https://db.idrblab.net/ttd/data/target/details/"
     prefix_to_iri_map["dictybase.gene"] = "http://dictybase.org/gene/"
     prefix_to_iri_map["AraPort"] = "https://www.arabidopsis.org/servlets/TairObject?accession="
+    prefix_to_iri_map["BGD"] = "https://bovinegenome.elsiklab.missouri.edu/gene/"  # Bovine Genome Database
     prefix_to_iri_map["CGNC"] = "https://vertebrate.genenames.org/data/gene-symbol-report/#!/cgnc_id/"
+    prefix_to_iri_map["VGNC"] = "https://vertebrate.genenames.org/data/gene-symbol-report/#!/vgnc_id/VGNC:"
     prefix_to_iri_map["ecogene"] = "https://ecocyc.org/gene?orgid=ECOLI&id="
     prefix_to_iri_map["EnsemblGenomes"] = "https://www.ensemblgenomes.org/id/"
     prefix_to_iri_map["OBA"] = "http://purl.obolibrary.org/obo/OBA_"
     prefix_to_iri_map["OBO"] = "http://purl.obolibrary.org/obo/"
+    # HGVS sequence-variant expressions (ROBOKOP records these as the original endpoints of its
+    # variant edges). Not in the Biolink prefix map, so the prefix is minted here; an HGVS
+    # expression names a change rather than a registered record, so there is no IRI to resolve to.
+    # (CAID, the ClinGen Allele Registry, IS in Biolink's map already -- it only needed a validator.)
+    prefix_to_iri_map["HGVS"] = ""
 
     # KRAKEN source-ingest prefixes (minted for sources without a registered infores)
     prefix_to_iri_map["PGS"] = "https://www.pgscatalog.org/score/PGS"  # PGS:000027 -> .../score/PGS000027
@@ -116,7 +123,9 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "bioage": {validator: validators.is_biological_measure_label},
         "biobmi": {validator: validators.is_biological_measure_label},
         "bspo": {validator: validators.is_seven_digit_id},
+        "bgd": {validator: validators.is_bgd_id},
         "bvbrc": {validator: validators.is_bvbrc_id},
+        "caid": {validator: validators.is_caid_id, cleaner: lambda x: x.upper(), aliases: ["clingenallele"]},
         "cas": {validator: validators.is_cas_id},
         "cdcsvi": {validator: validators.is_cdcsvi_id},
         "cde": {validator: validators.is_cde_id},
@@ -145,7 +154,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "efo": {validator: validators.is_efo_id},
         "ehdaa2": {validator: validators.is_seven_digit_id},
         "emapa": {validator: validators.is_numeric_id},
-        "ensembl": {validator: validators.is_ensembl_gene_id, aliases: ["gene"]},
+        "ensembl": {validator: validators.is_ensembl_id, aliases: ["gene"]},
         "ensemblgenomes": {validator: validators.is_ensemblgenomes_id},
         "envo": {validator: validators.is_envo_id},
         "fao": {validator: validators.is_seven_digit_id},
@@ -161,6 +170,8 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "gtopdb": {validator: validators.is_gtopdb_id},
         "hcpcs": {validator: validators.is_hcpcs_id},
         "hgnc": {validator: validators.is_numeric_id},
+        "hgnc.family": {validator: validators.is_numeric_id},
+        "hgvs": {validator: validators.is_hgvs_id},
         "hmdb": {validator: validators.is_hmdb_id, cleaner: cleaners.clean_hmdb_id},
         "hp": {validator: validators.is_seven_digit_id, aliases: ["hpo"]},
         "hps": {validator: validators.is_hps_id},
@@ -195,6 +206,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "mirdb": {validator: validators.is_mirdb_id},
         "mod": {validator: validators.is_mod_id},
         "mondo": {validator: validators.is_mondo_id},
+        "mp": {validator: validators.is_seven_digit_id},  # Mammalian Phenotype ontology
         "nbo": {validator: validators.is_seven_digit_id},
         "ncbigene": {validator: validators.is_ncbigene_id, aliases: ["entrez", "entrezgene", "gene"]},
         "ncbitaxon": {validator: validators.is_ncbitaxon_id, aliases: ["ncbitaxonomy"]},
@@ -205,7 +217,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "oba": {validator: validators.is_oba_id},
         "obi": {validator: validators.is_seven_digit_id},
         "obo": {validator: validators.is_obo_id},
-        "omim": {validator: validators.is_omim_id},
+        "omim": {validator: validators.is_omim_id, aliases: ["mim"]},
         "omim.ps": {validator: validators.is_omim_ps_id},
         "orphanet": {validator: validators.is_numeric_id, aliases: ["orpha"]},
         "pathwhiz": {validator: validators.is_pathwhiz_id},
@@ -215,6 +227,8 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "pathwhiz.nucleicacid": {validator: validators.is_numeric_id},
         "pathwhiz.proteincomplex": {validator: validators.is_numeric_id},
         "pathwhiz.reaction": {validator: validators.is_numeric_id},
+        "panther.family": {validator: validators.is_panther_family_id},
+        "panther.pathway": {validator: validators.is_panther_pathway_id},
         "pato": {validator: validators.is_seven_digit_id},
         "pdq": {validator: validators.is_pdq_id},
         "pfam": {validator: validators.is_pfam_id},
@@ -251,8 +265,10 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "uszipcode": {validator: validators.is_uszipcode_id, cleaner: cleaners.clean_zipcode},
         "vandf": {validator: validators.is_vandf_id},
         "vesiclepedia": {validator: validators.is_vesiclepedia_id},
+        "vgnc": {validator: validators.is_numeric_id},
         "wb": {validator: validators.is_wormbase_gene_id, aliases: ["wormbase"]},
         "wikipathways": {validator: validators.is_wikipathways_id, cleaner: cleaners.clean_wikipathways_id},
+        "xenbase": {validator: validators.is_xenbase_id},
         "zfa": {validator: validators.is_zfa_id},
         "zfin": {validator: validators.is_zfin_id},
     }

@@ -88,9 +88,32 @@ def is_uberon_id(local_id: str) -> bool:
     return bool(re.match(r"^[0-9]+$", local_id))
 
 
+def is_caid_id(local_id: str) -> bool:
+    """ClinGen Allele Registry IDs: 'CA' followed by digits.
+    Examples: CA15984545, CA321211"""
+    return bool(re.match(r"^CA\d+$", local_id))
+
+
 def is_dbsnp_id(local_id: str) -> bool:
     """Allows: rs followed by digits, with an optional version suffix (e.g., .1)"""
     return bool(re.match(r"^rs[0-9]+(\.\d+)?$", local_id))
+
+
+def is_hgvs_id(local_id: str) -> bool:
+    """HGVS sequence-variant expressions: '<reference sequence>:<type>.<change>', where type is one
+    of g/o/m/c/n/r/p (genomic, circular, mitochondrial, coding, non-coding, RNA, protein).
+    Examples: NC_000001.11:g.109175441A>G, NC_000001.11:g.1398673_1398677del,
+    NM_000546.5:c.215C>G, NP_000537.3:p.Pro72Arg
+
+    NOTE these local ids CONTAIN a colon, unlike every other vocabulary here. _construct_curie
+    therefore strips a leading prefix only when it names a known vocabulary, so a reference sequence
+    ('NC_000001.11') is never mistaken for one and chopped off.
+
+    The change portion is deliberately not parsed -- HGVS grammar covers substitutions, indels,
+    duplications, inversions, repeats and more, and this is an id validator, not an HGVS parser. We
+    check the shape that identifies the expression and let the rest through.
+    """
+    return bool(re.match(r"^[A-Za-z][A-Za-z0-9_.]*:[gomcnrp]\.\S+$", local_id))
 
 
 def is_ec_id(local_id: str) -> bool:
@@ -116,10 +139,26 @@ def is_efo_id(local_id: str) -> bool:
     return bool(re.match(r"^[0-9]{7}$", local_id))
 
 
-def is_ensembl_gene_id(local_id: str) -> bool:
-    """Allows: ENSG followed by exactly 11 digits
-    Example: ENSG00000138675"""
-    return bool(re.match(r"^ENSG\d{11}$", local_id))
+def is_ensembl_id(local_id: str) -> bool:
+    """Allows: ENS + optional species code + feature type + exactly 11 digits + optional version.
+
+    Ensembl stable IDs name any of several feature types, not just genes -- E(xon), FM (protein
+    family), G(ene), GT (gene tree), P(rotein), R(egulatory feature), T(ranscript) -- and a gene-only
+    pattern silently rejects the rest. Proteins in particular are a large share of what sources
+    carry, and usually versioned.
+
+    They also carry a species code for every species EXCEPT human, which omits it, so a human-only
+    '^ENSG' pattern silently rejects every other organism.
+
+    Examples: ENSG00000138675 (human gene), ENSMUSG00000000001 (mouse gene),
+              ENSBTAG00070005236 (cow gene), ENSP00000252486.3 (human protein, versioned),
+              ENST00000379044 (transcript), ENSE00001234567 (exon)
+
+    Ids from other resources that sources sometimes file under the Ensembl prefix (FlyBase FBgn...,
+    Locus Reference Genomic LRG_...) are deliberately NOT accepted -- they are not Ensembl ids, and
+    treating them as such would bless the mislabeling instead of surfacing it.
+    """
+    return bool(re.match(r"^ENS[A-Z]{0,6}?(FM|GT|[EGPRT])\d{11}(\.\d+)?$", local_id))
 
 
 def is_envo_id(local_id: str) -> bool:
@@ -342,6 +381,12 @@ def is_bfo_id(local_id: str) -> bool:
     return bool(re.match(r"^\d+$", local_id))
 
 
+def is_bgd_id(local_id: str) -> bool:
+    """Bovine Genome Database gene IDs: BT followed by digits.
+    Examples: BT11878, BT10361"""
+    return bool(re.match(r"^BT\d+$", local_id))
+
+
 def is_bvbrc_id(local_id: str) -> bool:
     """Allows: digits, a period, and more digits"""
     return bool(re.match(r"^\d+\.\d+$", local_id))
@@ -422,6 +467,24 @@ def is_numeric_id(local_id: str) -> bool:
     """Generic validator for pure numeric identifiers (positive integers).
     Used by: HGNC, MGI, RGD, RxNorm, RXCUI, DrugCentral, RHEA, orphanet, FMA, etc."""
     return local_id.isdigit() and int(local_id) > 0
+
+
+def is_panther_family_id(local_id: str) -> bool:
+    """PANTHER protein families, and their subfamilies: 'PTHR' + digits, optionally followed by
+    ':SF' + digits for a subfamily.
+    Examples: PTHR22884, PTHR22884:SF473, PTHR10110:SF59
+
+    NOTE a subfamily id CONTAINS a colon (like HGVS), so _construct_curie validates the id as given
+    before trying it with a leading prefix removed -- otherwise 'PTHR22884' would be mistaken for a
+    prefix and only ':SF473' would survive.
+    """
+    return bool(re.match(r"^PTHR\d+(:SF\d+)?$", local_id))
+
+
+def is_panther_pathway_id(local_id: str) -> bool:
+    """PANTHER pathways: 'P' followed by digits.
+    Examples: P00013, P06664"""
+    return bool(re.match(r"^P\d+$", local_id))
 
 
 def is_seven_digit_id(local_id: str) -> bool:
@@ -617,6 +680,12 @@ def is_zfin_id(local_id: str) -> bool:
     """ZFIN zebrafish IDs: ZDB-TYPE-digits-digits.
     Examples: ZDB-GENE-130109-1, ZDB-GENE-041014-10"""
     return bool(re.match(r"^ZDB-[A-Z]+-\d+-\d+$", local_id))
+
+
+def is_xenbase_id(local_id: str) -> bool:
+    """Xenbase (Xenopus) IDs: XB-TYPE-digits.
+    Examples: XB-GENE-1010722, XB-GENE-865691"""
+    return bool(re.match(r"^XB-[A-Z]+-\d+$", local_id))
 
 
 def is_sgd_id(local_id: str) -> bool:
