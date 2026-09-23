@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.1.0](https://github.com/Phenome-Health/biomapper2/compare/v1.0.1...v1.1.0) (2026-09-23)
+
+
+### Features
+
+* add HGVS and CAID to Normalizer ([7ec969a](https://github.com/Phenome-Health/biomapper2/commit/7ec969a0f01745da02c6862e9ab527134676c19d))
+* add panther, hgnc.family, MP, more ensembl ([479267f](https://github.com/Phenome-Health/biomapper2/commit/479267f1567aa3d0967ea4da670f3229ec9b4843))
+* **api:** optional raw Kestrel search passthrough (port of fork [#87](https://github.com/Phenome-Health/biomapper2/issues/87)) ([ebc5205](https://github.com/Phenome-Health/biomapper2/commit/ebc5205834faa0c5867fb4528ecba259b4d3a892))
+* **certificate,tier-b:** resolution-level ladder + cross-cohort readjudication (port of fork [#75](https://github.com/Phenome-Health/biomapper2/issues/75)-[#77](https://github.com/Phenome-Health/biomapper2/issues/77)) ([b60d1ff](https://github.com/Phenome-Health/biomapper2/commit/b60d1ff6c166810216ee0a4ad6baaad47cab661a))
+* **certificate,tier-b:** resolution-level ladder + cross-cohort readjudication (port of fork [#75](https://github.com/Phenome-Health/biomapper2/issues/75)-[#77](https://github.com/Phenome-Health/biomapper2/issues/77)) ([c5c01c1](https://github.com/Phenome-Health/biomapper2/commit/c5c01c12c06c8371cd1656bbd58178a9865056a0))
+* handle double colons in input ids [#59](https://github.com/Phenome-Health/biomapper2/issues/59) ([57ef3b9](https://github.com/Phenome-Health/biomapper2/commit/57ef3b9a53436a0c74262f9314212f96717a13f6))
+* **lipid:** Goslin hierarchy-aware mapping + RefMet breaker + lipid_resolution output (port of fork [#78](https://github.com/Phenome-Health/biomapper2/issues/78)-[#85](https://github.com/Phenome-Health/biomapper2/issues/85)) ([c40b3ac](https://github.com/Phenome-Health/biomapper2/commit/c40b3ac519908796b588f2d058a13f47a219228f))
+* **lipid:** Goslin hierarchy-aware mapping + RefMet breaker + lipid_resolution output (port of fork [#78](https://github.com/Phenome-Health/biomapper2/issues/78)-[#85](https://github.com/Phenome-Health/biomapper2/issues/85)) ([6b8a38a](https://github.com/Phenome-Health/biomapper2/commit/6b8a38acd32b95e92e32c2ff1a006ce81792d5a2))
+* **tier-b:** default-ON + freeze-first corpus, SmallMolecule-scoped (port of fork [#86](https://github.com/Phenome-Health/biomapper2/issues/86)) ([9375fae](https://github.com/Phenome-Health/biomapper2/commit/9375faea17255e61c5b54fe5f1c4db203b1e22a4))
+* **tier-b:** default-ON + freeze-first corpus, SmallMolecule-scoped (port of fork [#86](https://github.com/Phenome-Health/biomapper2/issues/86)) ([e27a4a7](https://github.com/Phenome-Health/biomapper2/commit/e27a4a76aad34c389214ed0e04a187dce5619e9f))
+
+
+### Bug Fixes
+
+* add substring match min length; include fuzzy param in cache key ([0e33100](https://github.com/Phenome-Health/biomapper2/commit/0e33100a98ed5efc60feaa7be002dae9ce682e78))
+* keep trailing zeroes for string ids, not floats [#58](https://github.com/Phenome-Health/biomapper2/issues/58) ([5596dd6](https://github.com/Phenome-Health/biomapper2/commit/5596dd69f304a1ef75064e97625d1850fa426168))
+
 ## [1.0.1](https://github.com/Phenome-Health/biomapper2/compare/v1.0.0...v1.0.1) (2026-09-10)
 
 
