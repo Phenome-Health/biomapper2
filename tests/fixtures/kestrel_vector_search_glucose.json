@@ -1,0 +1,29 @@
+{
+  "endpoint": "vector-search",
+  "search_text": "glucose",
+  "note": "Sanitized/representative Kestrel vector-search response. No host/headers/keys captured.",
+  "response": {
+    "glucose": [
+      {
+        "id": "CHEBI:17234",
+        "score": 0.89,
+        "name": "glucose",
+        "synonyms": ["D-glucose", "dextrose"],
+        "prefixes": ["CHEBI"],
+        "categories": ["biolink:SmallMolecule"],
+        "description": "A monosaccharide aldohexose.",
+        "xrefs": []
+      },
+      {
+        "id": "CHEBI:4167",
+        "score": 0.66,
+        "name": "D-glucopyranose",
+        "synonyms": ["D-glucose"],
+        "prefixes": ["CHEBI"],
+        "categories": ["biolink:SmallMolecule"],
+        "description": "A glucopyranose.",
+        "xrefs": []
+      }
+    ]
+  }
+}

@@ -11,7 +11,9 @@ import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
+from ... import config
 from ...core.annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
+from ...core.kestrel_passthrough import collect as collect_kestrel_passthrough
 from ...core.resolver import build_lipid_resolution
 from ..auth import validate_api_key
 from ..models import (
@@ -21,6 +23,7 @@ from ..models import (
     EntityMappingRequest,
     EntityMappingResponse,
     EntityMappingResult,
+    KestrelSearchResult,
     LipidResolution,
     RequestMetadata,
 )
@@ -47,6 +50,46 @@ def _count_by_source(results: list[EntityMappingResult]) -> dict[str, int]:
     for r in results:
         counts[r.refmet_source] = counts.get(r.refmet_source, 0) + 1
     return counts
+
+
+def _enforce_passthrough_cap(projected_rows: int) -> None:
+    """Reject a request whose worst-case passthrough payload exceeds the configured cap (R9).
+
+    ``projected_rows`` is computed with the WORST-CASE endpoint count (config
+    ``KESTREL_PASSTHROUGH_MAX_ENDPOINTS``) so the cap is enforced BEFORE any passthrough call is made,
+    not after the amplification has already been paid. The threshold is read at call time so it can be
+    tuned (or monkeypatched in tests) without touching this module.
+    """
+    cap = config.KESTREL_PASSTHROUGH_MAX_ROWS
+    if projected_rows > cap:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"kestrel_top_n passthrough would produce up to {projected_rows} raw rows (worst case, "
+                f"{config.KESTREL_PASSTHROUGH_MAX_ENDPOINTS} endpoints/entity), exceeding the cap of {cap}. "
+                f"Reduce kestrel_top_n or the number of entities, or page the request."
+            ),
+        )
+
+
+def _collect_passthrough(mapped_item: dict[str, Any] | pd.Series, kestrel_top_n: int) -> list[KestrelSearchResult]:
+    """Execute the raw Kestrel passthrough from the plan the mapper recorded on the mapped item.
+
+    Reads the private ``_kestrel_passthrough_plan`` (category / prefixes / recorded endpoints /
+    search_text) and issues one dedicated ``limit=N`` call per recorded endpoint. Never raises: a
+    per-endpoint failure is classified and isolated inside the collector (R7). Empty recorded endpoints
+    -> [] (R6).
+    """
+    if isinstance(mapped_item, pd.Series):
+        mapped_item = mapped_item.to_dict()
+    plan = mapped_item.get("_kestrel_passthrough_plan") or {}
+    return collect_kestrel_passthrough(
+        search_text=plan.get("search_text", "") or "",
+        category=plan.get("category", "") or "",
+        prefixes=plan.get("prefixes") or None,
+        endpoints=plan.get("endpoints") or [],
+        n=kestrel_top_n,
+    )
 
 
 def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_name: str) -> EntityMappingResult:
@@ -127,9 +170,13 @@ async def map_entity(
             prefer_human=body.options.prefer_human,
             prefer_canonical=body.options.prefer_canonical,
             candidate_limit=body.options.candidate_limit,
+            kestrel_top_n=body.options.kestrel_top_n,
         )
 
         result = extract_mapping_result(mapped_item, body.name)
+        # Opt-in raw passthrough (single path arms no batch deadline, so per-entity collection is fine).
+        if body.options.kestrel_top_n is not None:
+            result.kestrel_results = _collect_passthrough(mapped_item, body.options.kestrel_top_n)
 
     except Exception as e:
         logger.exception(f"Error mapping entity: {e}")
@@ -166,7 +213,16 @@ async def map_batch(
 
     mapper = get_mapper(request)
 
+    # Hard-enforce the passthrough payload cap up front (R9), before any mapping work. Uses each
+    # entity's own kestrel_top_n and the worst-case endpoint count.
+    _enforce_passthrough_cap(
+        sum((e.options.kestrel_top_n or 0) for e in body.entities) * config.KESTREL_PASSTHROUGH_MAX_ENDPOINTS
+    )
+
     results: list[EntityMappingResult] = []
+    # Parallel to ``results``: the (mapped_item, kestrel_top_n) needed to collect passthrough in a
+    # SECOND pass after the RefMet-armed window closes; None for a row whose mapping raised.
+    passthrough_jobs: list[tuple[dict[str, Any] | pd.Series, int] | None] = []
     successful = 0
     failed = 0
 
@@ -203,10 +259,15 @@ async def map_batch(
                     prefer_human=entity_req.options.prefer_human,
                     prefer_canonical=entity_req.options.prefer_canonical,
                     candidate_limit=entity_req.options.candidate_limit,
+                    kestrel_top_n=entity_req.options.kestrel_top_n,
                 )
 
                 result = extract_mapping_result(mapped_item, entity_req.name)
                 results.append(result)
+                if entity_req.options.kestrel_top_n is not None:
+                    passthrough_jobs.append((mapped_item, entity_req.options.kestrel_top_n))
+                else:
+                    passthrough_jobs.append(None)
                 successful += 1
 
             except Exception as e:
@@ -217,10 +278,21 @@ async def map_batch(
                         error=str(e),
                     )
                 )
+                passthrough_jobs.append(None)
                 failed += 1
     finally:
         if mw_annotator is not None and armed_batch_deadline:
             mw_annotator.disarm_batch_deadline()
+
+    # SECOND PASS — AFTER the loop and AFTER disarm_batch_deadline(): collect the raw passthrough here
+    # so its extra Kestrel round trips never enter the armed RefMet wall-clock budget and cannot tip a
+    # late-batch entity past the deadline (which would flip its refmet_availability/certificate and
+    # break selection invariance across kestrel_top_n, R4). Passthrough never raises (R7).
+    for result, job in zip(results, passthrough_jobs):
+        if job is None:
+            continue
+        mapped_item, top_n = job
+        result.kestrel_results = _collect_passthrough(mapped_item, top_n)
 
     processing_time = (time.time() - start_time) * 1000
 
@@ -259,6 +331,7 @@ async def map_dataset(
     prefer_human: bool = True,
     prefer_canonical: bool = True,
     candidate_limit: int | None = Query(default=None, ge=1, le=100),
+    kestrel_top_n: int | None = Query(default=None, ge=1, le=100),
     _api_key: str = Depends(validate_api_key),
 ) -> DatasetMappingResponse:
     """
@@ -266,6 +339,15 @@ async def map_dataset(
 
     Upload a file and specify column mappings. Returns statistics about the mapping.
     """
+    # This route returns a TSV path + stats, not per-entity JSON, so it has nowhere to carry raw
+    # passthrough rows. Reject the option (422) and point callers to the streaming route (R8).
+    if kestrel_top_n is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="kestrel_top_n is not supported on /map/dataset (it returns a TSV path, not per-entity "
+            "JSON); use /map/dataset/stream, which carries raw passthrough rows per NDJSON line.",
+        )
+
     start_time = time.time()
     request_id = str(uuid.uuid4())
 
@@ -339,13 +421,15 @@ async def map_dataset_stream(
     prefer_human: bool = True,
     prefer_canonical: bool = True,
     candidate_limit: int | None = Query(default=None, ge=1, le=100),
+    kestrel_top_n: int | None = Query(default=None, ge=1, le=100),
     _api_key: str = Depends(validate_api_key),
 ) -> StreamingResponse:
     """
     Map a dataset and stream results as NDJSON.
 
     Useful for large datasets - streams results row by row instead of waiting
-    for full processing.
+    for full processing. When kestrel_top_n is set, each NDJSON line carries a
+    ``kestrel_results`` array of raw passthrough rows (R8).
     """
     mapper = get_mapper(request)
 
@@ -369,6 +453,10 @@ async def map_dataset_stream(
     id_columns = [col.strip() for col in provided_id_columns.split(",")]
     annotator_list = [a.strip() for a in annotators.split(",")] if annotators else None
 
+    # Hard-enforce the passthrough payload cap up front (R9); worst-case endpoint count, whole file.
+    if kestrel_top_n is not None:
+        _enforce_passthrough_cap(len(df) * kestrel_top_n * config.KESTREL_PASSTHROUGH_MAX_ENDPOINTS)
+
     async def generate_ndjson():
         """Generator that yields NDJSON lines."""
         import json
@@ -387,6 +475,7 @@ async def map_dataset_stream(
                     prefer_human=prefer_human,
                     prefer_canonical=prefer_canonical,
                     candidate_limit=candidate_limit,
+                    kestrel_top_n=kestrel_top_n,
                 )
 
                 result = {
@@ -405,6 +494,13 @@ async def map_dataset_stream(
                     # has already been sent and the client sees a truncated body.
                     "resolution_certificate": mapped.get("resolution_certificate"),
                 }
+                # Opt-in raw passthrough as JSON-native dicts (model_dump), so json.dumps below — which
+                # runs OUTSIDE this try/except — cannot fail on them mid-stream. The stream path arms no
+                # RefMet batch deadline, so per-row collection here is safe. collect never raises (R7).
+                if kestrel_top_n is not None:
+                    result["kestrel_results"] = [
+                        ksr.model_dump() for ksr in _collect_passthrough(mapped, kestrel_top_n)
+                    ]
 
             except Exception as e:
                 result = {

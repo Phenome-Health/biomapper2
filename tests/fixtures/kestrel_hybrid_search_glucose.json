@@ -1,0 +1,39 @@
+{
+  "endpoint": "hybrid-search",
+  "search_text": "glucose",
+  "note": "Sanitized/representative Kestrel hybrid-search response. Schema derived from the fields the annotators consume (id, score, name, synonyms, prefixes, categories) plus representative unknown fields (description, xrefs) to exercise KestrelRow extra='allow'. Includes a score<0.5 row so passthrough raw-fidelity (R3) can be proven against the hybrid >=0.5 selection filter. No host/headers/keys captured.",
+  "response": {
+    "glucose": [
+      {
+        "id": "CHEBI:17234",
+        "score": 3.21,
+        "name": "glucose",
+        "synonyms": ["D-glucose", "dextrose", "grape sugar"],
+        "prefixes": ["CHEBI", "KEGG.COMPOUND", "HMDB"],
+        "categories": ["biolink:SmallMolecule"],
+        "description": "A monosaccharide aldohexose.",
+        "xrefs": ["KEGG.COMPOUND:C00031", "HMDB:HMDB0000122"]
+      },
+      {
+        "id": "CHEBI:4167",
+        "score": 1.84,
+        "name": "D-glucopyranose",
+        "synonyms": ["D-glucose"],
+        "prefixes": ["CHEBI"],
+        "categories": ["biolink:SmallMolecule"],
+        "description": "A glucopyranose.",
+        "xrefs": []
+      },
+      {
+        "id": "UMLS:C0017725",
+        "score": 0.37,
+        "name": "Glucose measurement",
+        "synonyms": [],
+        "prefixes": ["UMLS"],
+        "categories": ["biolink:ClinicalAttribute"],
+        "description": "A laboratory measurement.",
+        "xrefs": []
+      }
+    ]
+  }
+}

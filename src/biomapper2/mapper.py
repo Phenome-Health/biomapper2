@@ -471,6 +471,7 @@ class Mapper:
         prefer_human: bool = True,
         prefer_canonical: bool = True,
         candidate_limit: int | None = None,
+        kestrel_top_n: int | None = None,
     ) -> pd.Series | dict[str, Any]:
         """
         Map a single entity to knowledge graph nodes.
@@ -516,6 +517,9 @@ class Mapper:
         )
         assert isinstance(annotation_result, pd.Series)
         entity = entity.update_from(annotation_result)
+        # Kestrel endpoints the annotation step ACTUALLY invoked for this entity ([] when it skipped
+        # or used no Kestrel annotator). Read here for the raw-passthrough plan; never feeds selection.
+        kestrel_endpoints_used = list(annotation_result.get("kestrel_endpoints_used") or [])
         # RefMet availability for the row, read from the engine's TOTAL availability map (present on
         # every path, including skips). Threaded into the certificate and mirrored on the output.
         annotator_availability = annotation_result.get("annotator_availability") or {}
@@ -598,6 +602,26 @@ class Mapper:
                 }
             )
         )
+
+        # Raw Kestrel passthrough (opt-in): attach a PRIVATE plan the route layer executes AFTER the
+        # RefMet-armed batch-deadline window closes. Recording (not executing) here keeps selection
+        # byte-identical across any kestrel_top_n (R4) — the plan never enters AssignedIDsDict, the
+        # resolver, or the certificate. ``Entity`` is extra="allow", so the plan survives to_series()/
+        # to_dict(). Attached ONLY when the feature is on, so a default run is byte-unchanged (R2).
+        if kestrel_top_n is not None:
+            entity = entity.update_from(
+                pd.Series(
+                    {
+                        "_kestrel_passthrough_plan": {
+                            "category": entity_type,
+                            "prefixes": list(prefixes) if prefixes else [],
+                            "endpoints": kestrel_endpoints_used,
+                            "search_text": entity.name,
+                            "top_n": kestrel_top_n,
+                        }
+                    }
+                )
+            )
 
         if input_is_series:
             return entity.to_series()
@@ -811,7 +835,10 @@ class Mapper:
         # Drop the availability + source helper columns: their per-row values are already emitted as
         # the flat ``certificate_refmet_availability`` / ``certificate_refmet_source`` columns, so the
         # TSV keeps no repr'd dict for either.
-        df = df.drop(columns=["annotator_availability", "annotator_source"], errors="ignore")
+        # ``kestrel_endpoints_used`` is a passthrough-plan helper column; the dataset (non-stream) path
+        # does not carry raw passthrough rows (/map/dataset 422s the option), so drop it too rather than
+        # writing a repr'd list column to the TSV.
+        df = df.drop(columns=["annotator_availability", "annotator_source", "kestrel_endpoints_used"], errors="ignore")
 
         # Dump the final dataframe to a TSV
 

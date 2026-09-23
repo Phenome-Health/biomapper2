@@ -1,0 +1,29 @@
+{
+  "endpoint": "text-search",
+  "search_text": "glucose",
+  "note": "Sanitized/representative Kestrel text-search response. No host/headers/keys captured.",
+  "response": {
+    "glucose": [
+      {
+        "id": "CHEBI:17234",
+        "score": 0.98,
+        "name": "glucose",
+        "synonyms": ["D-glucose", "dextrose"],
+        "prefixes": ["CHEBI", "KEGG.COMPOUND"],
+        "categories": ["biolink:SmallMolecule"],
+        "description": "A monosaccharide aldohexose.",
+        "xrefs": ["KEGG.COMPOUND:C00031"]
+      },
+      {
+        "id": "MESH:D005947",
+        "score": 0.71,
+        "name": "Glucose",
+        "synonyms": ["Blood Sugar"],
+        "prefixes": ["MESH"],
+        "categories": ["biolink:SmallMolecule"],
+        "description": "MeSH descriptor.",
+        "xrefs": []
+      }
+    ]
+  }
+}

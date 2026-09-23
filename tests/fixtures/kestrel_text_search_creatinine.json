@@ -1,0 +1,19 @@
+{
+  "endpoint": "text-search",
+  "search_text": "creatinine",
+  "note": "Sanitized/representative Kestrel text-search response. No host/headers/keys captured.",
+  "response": {
+    "creatinine": [
+      {
+        "id": "CHEBI:16737",
+        "score": 0.95,
+        "name": "creatinine",
+        "synonyms": ["2-amino-1-methyl-5H-imidazol-4-one"],
+        "prefixes": ["CHEBI", "KEGG.COMPOUND", "HMDB"],
+        "categories": ["biolink:SmallMolecule"],
+        "description": "A cyclic derivative of creatine.",
+        "xrefs": ["KEGG.COMPOUND:C00791", "HMDB:HMDB0000562"]
+      }
+    ]
+  }
+}
