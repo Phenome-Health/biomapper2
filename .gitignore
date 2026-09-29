@@ -59,3 +59,6 @@ reports/
 
 # Serena AI tool
 .serena/
+
+# memtrace runtime state (rewritten by the local daemon)
+.memdb/
