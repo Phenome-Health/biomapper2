@@ -6,7 +6,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, cast
-from urllib.parse import quote
 
 import pandas as pd
 import requests
@@ -15,7 +14,7 @@ from circuitbreaker import CircuitBreakerError, circuit
 
 from ... import config
 from ...config import CACHE_DIR, CACHE_IGNORED_PARAMETERS
-from ...utils import AssignedIDsDict
+from ...utils import AssignedIDsDict, quote_name_path_segment
 from . import refmet_snapshot, refmet_store
 from .base import (
     AVAILABILITY_NO_MATCH,
@@ -472,12 +471,10 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
     def _request_once(self, metabolite_name: str) -> dict[str, Any] | None:
         """One HTTP attempt. Returns the data dict, or None for a genuine no-match.
 
-        The name is percent-encoded with ``safe="/"``: a slash in the name is sent as a literal
-        ``/``, which the Workbench resolves as part of the name (``.../match/PC%2016%3A0/18%3A1``
-        returns RM0015001, ``PC 16:0/18:1``). Encoding the slash as ``%2F`` is what breaks: the
-        Workbench web server rejects an encoded slash with a 404 before the name is looked up, so
-        every slash-bearing name (sn-position lipid shorthand, ``butyrate/isobutyrate``) silently
-        lost its RefMet answer. Verified live against the service on 2026-10-21.
+        The name goes through ``quote_name_path_segment``: a slash between lipid chain specs is sent
+        literally (the Workbench resolves ``PC 16:0/18:1`` that way and 404s on ``%2F``), and any other
+        slash is encoded, because sent literally the Workbench answers for the text before the slash
+        alone (``mannitol/sorbitol`` -> Mannitol). Verified live 2026-10-21.
 
         A per-name client error (Bad Request or Not Found) is a definitive "no such entry", not a
         service outage: it is returned as the no-match sentinel (None) rather than raised, so it never
@@ -485,7 +482,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         This is what stops an unknown name from tripping the breaker and degrading RefMet for every
         other name in the process.
         """
-        url = f"{self.BASE_URL}/{quote(metabolite_name, safe='/')}"
+        url = f"{self.BASE_URL}/{quote_name_path_segment(metabolite_name)}"
 
         # When a batch deadline is armed, cap this attempt's timeout by the remaining budget so a
         # lookup started just before the deadline cannot run a full timeout past it.

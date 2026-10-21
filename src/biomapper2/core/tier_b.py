@@ -62,6 +62,7 @@ from ..config import (
     TIER_B_MAX_ATTEMPTS,
     TIER_B_MIN_INTERVAL_S,
 )
+from ..utils import MW_UNPARSEABLE_PATH_PREFIX, quote_name_path_segment
 from . import tier_b_snapshot
 from .certificate import (
     STRUCTURE_CACHE_STORE,
@@ -318,9 +319,12 @@ class IndependentStructureLookup:
     def _fetch_mw(self, name: str) -> tuple[str | None, str | None, bool]:
         """Metabolomics Workbench exact-name endpoint: GET /rest/refmet/name/{name}/inchi_key.
 
-        The name is encoded with ``safe="/"``: the Workbench resolves a literal slash as part of the
-        name (``GalCer 20:0;O3/36:0`` returns its InChIKey) but rejects an encoded ``%2F`` with a 404
-        before any lookup (verified live 2026-10-21). A 404 for an unknown name is a clean "unknown", not
+        The name goes through ``quote_name_path_segment``: a slash between lipid chain specs is sent
+        literally (``GalCer 20:0;O3/36:0`` returns its InChIKey; the ``%2F`` form 404s), and any other
+        slash is encoded. Names with several chain slashes (multi-isomer sphingomyelins) can still make
+        the Workbench answer 200 with a plain-text "This output item does not exist"; that is a name it
+        cannot address, so it is treated as not-found, never as a lookup failure. Verified live
+        2026-10-21. A 404 for an unknown name is a clean "unknown", not
         a lookup failure: ``_get`` already treats a Bad-Request / Not-Found as not-found
         (``failed=False``), so the row falls through to the next hop rather than being counted against
         the tier's resolution rate.
@@ -332,7 +336,7 @@ class IndependentStructureLookup:
                 return key if key and key != "-" else None
             return None
 
-        return self._get(f"{MW_INCHIKEY_URL}/{quote(name, safe='/')}/inchi_key", parse)
+        return self._get(f"{MW_INCHIKEY_URL}/{quote_name_path_segment(name)}/inchi_key", parse)
 
     def _fetch_pubchem(self, name: str) -> tuple[str | None, str | None, bool]:
         """PubChem PUG-REST: GET /rest/pug/compound/name/{name}/property/InChIKey/JSON."""
@@ -357,6 +361,9 @@ class IndependentStructureLookup:
                 if status in _NOT_FOUND_STATUSES:
                     return None, self._cache_state(response), False
                 response.raise_for_status()
+                if str(getattr(response, "text", "") or "").startswith(MW_UNPARSEABLE_PATH_PREFIX):
+                    # The Workbench's 200 for a path it cannot parse: the name's problem, not an outage.
+                    return None, self._cache_state(response), False
                 return parse(response.json()), self._cache_state(response), False
             except Exception as exc:  # noqa: BLE001 - a Tier B failure must never reach the mapping loop
                 status = self._status_of(exc)
