@@ -20,6 +20,7 @@ from ..config import (
     PUBCHEM_INCHIKEY_URL,
     STRUCTURE_LOOKUP_TIMEOUT_S,
 )
+from ..utils import MW_UNPARSEABLE_PATH_PREFIX, quote_name_path_segment
 from .annotators import refmet_snapshot
 from .linker import Linker
 
@@ -207,18 +208,23 @@ class StructureResolver:
     def _fetch_mw_inchikey(self, name: str) -> str | None:
         """Metabolomics Workbench: GET /rest/refmet/name/{name}/inchi_key.
 
-        The name is encoded with ``safe="/"``: the Workbench resolves a literal slash as part of the
-        name, but rejects an encoded ``%2F`` with a 404 before any lookup, which silently dropped
-        every slash-bearing name (verified live 2026-10-21). A per-name Bad-Request / Not-Found
+        The name goes through ``quote_name_path_segment``: a slash between lipid chain specs is sent
+        literally (``GalCer 20:0;O3/36:0`` returns its InChIKey; the ``%2F`` form 404s), and any other
+        slash is encoded. Names with several chain slashes (multi-isomer sphingomyelins) can still make
+        the Workbench answer 200 with a plain-text "This output item does not exist"; that is a name it
+        cannot address, so it is treated as not-found, never as a lookup failure. Verified live
+        2026-10-21. A per-name Bad-Request / Not-Found
         is a definitive "no such structure", returned as None rather than raised, so it is a clean
         no-match instead of a logged lookup failure. Only 5xx / transport errors propagate to the
         caller's fail-soft guard.
         """
-        url = f"{MW_INCHIKEY_URL}/{quote(name, safe='/')}/inchi_key"
+        url = f"{MW_INCHIKEY_URL}/{quote_name_path_segment(name)}/inchi_key"
         resp = self._session.get(url, timeout=STRUCTURE_LOOKUP_TIMEOUT_S)
         if resp.status_code in (400, 404):
             return None
         resp.raise_for_status()
+        if str(getattr(resp, "text", "") or "").startswith(MW_UNPARSEABLE_PATH_PREFIX):
+            return None
         data = resp.json()
         if isinstance(data, dict):
             key = data.get("inchi_key")
