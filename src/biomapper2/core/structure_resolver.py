@@ -207,14 +207,14 @@ class StructureResolver:
     def _fetch_mw_inchikey(self, name: str) -> str | None:
         """Metabolomics Workbench: GET /rest/refmet/name/{name}/inchi_key.
 
-        ``safe=""`` encodes the whole name into one path segment. A slash-bearing name (an
-        sn-position lipid shorthand like "PC 16:0/18:1") has no addressable entry here: MW's web
-        server rejects the encoded slash outright (``%2F`` -> 404). A per-name Bad-Request / Not-Found
+        The name is encoded with ``safe="/"``: the Workbench resolves a literal slash as part of the
+        name, but rejects an encoded ``%2F`` with a 404 before any lookup, which silently dropped
+        every slash-bearing name (verified live 2026-10-21). A per-name Bad-Request / Not-Found
         is a definitive "no such structure", returned as None rather than raised, so it is a clean
         no-match instead of a logged lookup failure. Only 5xx / transport errors propagate to the
         caller's fail-soft guard.
         """
-        url = f"{MW_INCHIKEY_URL}/{quote(name, safe='')}/inchi_key"
+        url = f"{MW_INCHIKEY_URL}/{quote(name, safe='/')}/inchi_key"
         resp = self._session.get(url, timeout=STRUCTURE_LOOKUP_TIMEOUT_S)
         if resp.status_code in (400, 404):
             return None
@@ -228,8 +228,8 @@ class StructureResolver:
     def _fetch_pubchem_inchikey(self, name: str) -> str | None:
         """PubChem: GET /rest/pug/compound/name/{name}/property/InChIKey/JSON.
 
-        ``safe=""`` for the same reason as :meth:`_fetch_mw_inchikey` -- an unescaped slash injects
-        URL path segments and turns a resolvable name into a silent 404.
+        PubChem, unlike the Workbench, decodes an encoded slash, so ``safe=""`` keeps the whole name
+        in one path segment here; an unescaped slash would be parsed as a PUG-REST path separator.
         """
         url = f"{PUBCHEM_INCHIKEY_URL}/{quote(name, safe='')}/property/InChIKey/JSON"
         resp = self._session.get(url, timeout=STRUCTURE_LOOKUP_TIMEOUT_S)

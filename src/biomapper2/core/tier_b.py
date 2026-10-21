@@ -318,9 +318,9 @@ class IndependentStructureLookup:
     def _fetch_mw(self, name: str) -> tuple[str | None, str | None, bool]:
         """Metabolomics Workbench exact-name endpoint: GET /rest/refmet/name/{name}/inchi_key.
 
-        ``quote(..., safe="")`` encodes the whole name into one path segment. A slash-bearing name
-        (an sn-position lipid shorthand like "PC 16:0/18:1") has no addressable entry here: MW's web
-        server rejects the encoded slash outright (``%2F`` -> 404). That 404 is a clean "unknown", not
+        The name is encoded with ``safe="/"``: the Workbench resolves a literal slash as part of the
+        name (``GalCer 20:0;O3/36:0`` returns its InChIKey) but rejects an encoded ``%2F`` with a 404
+        before any lookup (verified live 2026-10-21). A 404 for an unknown name is a clean "unknown", not
         a lookup failure: ``_get`` already treats a Bad-Request / Not-Found as not-found
         (``failed=False``), so the row falls through to the next hop rather than being counted against
         the tier's resolution rate.
@@ -332,7 +332,7 @@ class IndependentStructureLookup:
                 return key if key and key != "-" else None
             return None
 
-        return self._get(f"{MW_INCHIKEY_URL}/{quote(name, safe='')}/inchi_key", parse)
+        return self._get(f"{MW_INCHIKEY_URL}/{quote(name, safe='/')}/inchi_key", parse)
 
     def _fetch_pubchem(self, name: str) -> tuple[str | None, str | None, bool]:
         """PubChem PUG-REST: GET /rest/pug/compound/name/{name}/property/InChIKey/JSON."""
