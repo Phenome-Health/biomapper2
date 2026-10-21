@@ -211,19 +211,17 @@ class TestMetabolomicsWorkbenchAnnotator:
         assert "RM0008606" in mw_annotations["refmet_id"]
 
 
-def test_a_slash_in_the_query_name_is_percent_encoded():
-    """MW's REST is path-segment addressed, so an unescaped slash silently loses the candidate.
+def test_a_slash_in_the_query_name_is_sent_literally():
+    """The Workbench resolves a literal slash as part of the name and 404s on an encoded one.
 
-    ``quote`` defaults to ``safe="/"``. With that default ``PC 16:0/18:1`` becomes
-    ``.../match/PC%2016%3A0/18%3A1``, which the service reads as ``name='PC 16:0'`` plus an
-    ``output_item`` -- returning NO candidate rather than an error, so nothing upstream notices.
+    Live (2026-10-21): ``.../match/PC%2016%3A0/18%3A1`` returns RM0015001 (``PC 16:0/18:1``), while
+    ``.../match/PC%2016%3A0%2F18%3A1`` is rejected with a 404 before any lookup. Encoding the slash
+    (``safe=""``, engine a4aeef7) silently dropped the RefMet answer for every slash-bearing name.
 
-    This is the consequential site of the six: unlike the ``structure_resolver`` fallback rung
-    (which is keyed on the NODE name and feeds only the review flag), this annotator is called with
-    the QUERY name and its candidates enter the vote and the source-weighting, so the miss reaches
-    ``chosen_kg_id``. It also silently corrupts ``independent_of_selection``: with no RefMet vote,
-    ``metabolomics-workbench`` is absent from the committed node's sources, so a Tier-B-via-MW
-    verdict reports as independent on exactly the lipid population L26 exists to stratify.
+    This is the consequential site: the annotator is called with the QUERY name and its candidates
+    enter the vote and the source-weighting, so a lost answer reaches ``chosen_kg_id``. It also
+    corrupts ``independent_of_selection``: with no RefMet vote, ``metabolomics-workbench`` is absent
+    from the committed node's sources.
     """
     from biomapper2.core.annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
 
@@ -236,7 +234,7 @@ def test_a_slash_in_the_query_name_is_percent_encoded():
             return None
 
         def json(self):
-            return {"refmet_id": "RM0001", "name": "PC 16:0/18:1"}
+            return {"refmet_id": "RM0015001", "name": "PC 16:0/18:1"}
 
     class _Session:
         def get(self, url, timeout=None):
@@ -248,6 +246,6 @@ def test_a_slash_in_the_query_name_is_percent_encoded():
     annotator._do_refmet_request("PC 16:0/18:1")
 
     url = calls[0]
-    assert "%2F" in url, f"the slash was not encoded: {url}"
     base = MetabolomicsWorkbenchAnnotator.BASE_URL
-    assert url.count("/") == base.count("/") + 1, f"the name injected a path segment: {url}"
+    assert "%2F" not in url.upper(), f"the slash was percent-encoded, which the Workbench 404s: {url}"
+    assert url == f"{base}/PC%2016%3A0/18%3A1", url

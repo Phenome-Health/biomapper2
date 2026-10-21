@@ -5,9 +5,8 @@ raised as an HTTPError and counted as a circuit-breaker failure. After three suc
 opened for the recovery window and RefMet /match was skipped for EVERY name and EVERY annotator
 instance in the process. The fix classifies a per-name Bad-Request / Not-Found from /match as
 ``no_match`` -- a normal result, never raised -- so only 5xx / timeouts / transport errors can trip
-the breaker. A slash name is an honest ``no_match``: MW's web server rejects the encoded slash
-outright (%2F -> 404), so RefMet has no entry for that raw string. No name is rewritten to any other
-form (the semantically-correct slash->queryable-level transform is deferred to later units).
+the breaker. Any per-name 404 is an honest ``no_match``. (These tests fake the 404; since the slash-encoding fix,
+a slash-bearing name is sent with a literal slash and the live Workbench resolves it normally.)
 
 Fake session only -- nothing here may touch a live service. The breaker is process-global (decorated
 once at class definition), so it is reset around every test.
@@ -82,25 +81,24 @@ def _annotator(session: _FakeSession, monkeypatch: pytest.MonkeyPatch) -> Metabo
     return ann
 
 
-def _name_segment_has_no_raw_slash(url: str) -> bool:
-    """The name's slash must be percent-encoded (%2F), never sent as a raw extra path segment."""
-    tail = url.split("/refmet/match/", 1)[-1] if "/refmet/match/" in url else url.split("/refmet/name/", 1)[-1]
-    name_part = tail.split("/inchi_key", 1)[0]
-    return "/" not in name_part
+def _slash_sent_literally(url: str) -> bool:
+    """The name's slash is sent as a literal ``/`` (which the Workbench resolves), never as ``%2F``
+    (which the Workbench web server rejects with a 404 before any lookup)."""
+    return "%2F" not in url.upper() and "PC%2016%3A0/18%3A1" in url
 
 
 # -- annotator (core/annotators/metabolomics_workbench.py) ------------------------------------
 
 
 def test_slash_name_is_no_match_not_unavailable(monkeypatch: pytest.MonkeyPatch):
-    """Call site 1/3: a slash name 404s -> no_match (not unavailable), the slash is encoded, breaker stays closed."""
+    """Call site 1/3: a slash name 404s -> no_match (not unavailable), slash sent literally, breaker stays closed."""
     session = _FakeSession(lambda _url: _FakeResponse({}, status=404))
     ann = _annotator(session, monkeypatch)
     result = ann._fetch_refmet_data("PC 16:0/18:1")
     assert result.status == AVAILABILITY_NO_MATCH
     assert _breaker().failure_count == 0
     assert len(session.calls) == 1
-    assert "%2F" in session.calls[0] and _name_segment_has_no_raw_slash(session.calls[0])
+    assert _slash_sent_literally(session.calls[0])
 
 
 def test_slash_names_do_not_trip_the_breaker_for_other_names(monkeypatch: pytest.MonkeyPatch):
@@ -173,7 +171,7 @@ def test_tier_b_mw_slash_name_is_a_clean_not_found(monkeypatch: pytest.MonkeyPat
     lookup = IndependentStructureLookup(session=session, sleep=lambda _s: None, clock=lambda: 0.0)
     result = lookup.lookup("PC 16:0/18:1")
     mw_calls = [url for url in session.calls if "refmet/name" in url]
-    assert mw_calls and all("%2F" in url and _name_segment_has_no_raw_slash(url) for url in mw_calls)
+    assert mw_calls and all(_slash_sent_literally(url) for url in mw_calls)
     assert result.outcome is TierBOutcome.UNRESOLVABLE  # a 404 is a clean "unknown", not lookup_failed
     assert lookup.stats()["n_tier_b_lookup_failed"] == 0
 
@@ -182,10 +180,10 @@ def test_tier_b_mw_slash_name_is_a_clean_not_found(monkeypatch: pytest.MonkeyPat
 
 
 def test_structure_resolver_mw_slash_name_is_no_match(monkeypatch: pytest.MonkeyPatch):
-    """Call site 3/3: the candidate-side MW fetch 404s on a slash name -> None, no raise, slash encoded."""
+    """Call site 3/3: the candidate-side MW fetch 404s on a slash name -> None, no raise, slash sent literally."""
     resolver = StructureResolver(linker=MagicMock())
     session = _FakeSession(lambda _url: _FakeResponse({}, status=404))
     monkeypatch.setattr(resolver, "_session", session)
     assert resolver._fetch_mw_inchikey("PC 16:0/18:1") is None
     assert len(session.calls) == 1
-    assert "%2F" in session.calls[0] and _name_segment_has_no_raw_slash(session.calls[0])
+    assert _slash_sent_literally(session.calls[0])

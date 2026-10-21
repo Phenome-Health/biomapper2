@@ -47,11 +47,11 @@ def test_enrich_blank_name_makes_no_call():
     assert session.calls == 0
 
 
-def test_a_slash_in_the_lipid_name_is_percent_encoded():
-    """LIPID MAPS is path-segment addressed and lipid shorthand is full of slashes.
+def test_a_slash_in_the_lipid_name_is_sent_literally():
+    """LIPID MAPS answers a literal slash in the abbreviation and 404s on an encoded ``%2F``.
 
-    ``quote``'s default ``safe="/"`` leaves the slash intact, adding a path segment so the service
-    returns nothing -- silently, with no error to notice.
+    Live (2026-10-21): ``/rest/compound/abbrev/PC%2016%3A0/18%3A1/all/json`` returns a normal
+    JSON answer; the ``%2F`` form returns the web server's 404 page before any lookup.
     """
     from biomapper2.core.annotators.lipidmaps_rest import _LIPIDMAPS_REST, LipidMapsRestEnricher
 
@@ -71,9 +71,8 @@ def test_a_slash_in_the_lipid_name_is_percent_encoded():
     LipidMapsRestEnricher(session=_Session()).enrich("PC 16:0/18:1")
 
     url = calls[0]
-    assert "%2F" in url, f"the slash was not encoded: {url}"
-    # Only the template's own separators survive: the name contributes none.
-    assert url.count("/") == _LIPIDMAPS_REST.count("/"), f"the name injected a path segment: {url}"
+    assert "%2F" not in url.upper(), f"the slash was percent-encoded, which LIPID MAPS 404s: {url}"
+    assert url == _LIPIDMAPS_REST.format(name="PC%2016%3A0/18%3A1"), url
 
 
 # --- Unit 1: failure signal (enrich_checked) ------------------------------------------------

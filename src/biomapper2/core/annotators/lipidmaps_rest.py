@@ -114,9 +114,11 @@ class LipidMapsRestEnricher:
 
     def _fetch_json(self, canonical_name: str) -> tuple[Any, bool]:
         """GET the LIPID MAPS response, splitting a network failure (ok=False) from an unknown-lipid
-        answer (ok=True, empty). ``safe=""`` encodes the slash-heavy lipid names into one path
-        segment; the endpoint still 404s on the encoded slash, which is a clean unknown-lipid here."""
-        url = _LIPIDMAPS_REST.format(name=quote(str(canonical_name).strip(), safe=""))
+        answer (ok=True, empty). The name is encoded with ``safe="/"``: LIPID MAPS answers a literal
+        slash in the abbreviation normally, but its web server returns a 404 page for an encoded
+        ``%2F`` before any lookup (verified live 2026-10-21), which silently dropped every slash-bearing
+        lipid shorthand."""
+        url = _LIPIDMAPS_REST.format(name=quote(str(canonical_name).strip(), safe="/"))
         try:
             resp = self._session.get(url, timeout=self._timeout)
             status = getattr(resp, "status_code", 200)
