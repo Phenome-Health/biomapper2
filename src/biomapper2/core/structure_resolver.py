@@ -20,6 +20,7 @@ from ..config import (
     PUBCHEM_INCHIKEY_URL,
     STRUCTURE_LOOKUP_TIMEOUT_S,
 )
+from ..utils import MW_UNPARSEABLE_PATH_PREFIX, quote_name_path_segment
 from .annotators import refmet_snapshot
 from .linker import Linker
 
@@ -207,18 +208,23 @@ class StructureResolver:
     def _fetch_mw_inchikey(self, name: str) -> str | None:
         """Metabolomics Workbench: GET /rest/refmet/name/{name}/inchi_key.
 
-        ``safe=""`` encodes the whole name into one path segment. A slash-bearing name (an
-        sn-position lipid shorthand like "PC 16:0/18:1") has no addressable entry here: MW's web
-        server rejects the encoded slash outright (``%2F`` -> 404). A per-name Bad-Request / Not-Found
+        The name goes through ``quote_name_path_segment``: a slash between lipid chain specs is sent
+        literally (``GalCer 20:0;O3/36:0`` returns its InChIKey; the ``%2F`` form 404s), and any other
+        slash is encoded. Names with several chain slashes (multi-isomer sphingomyelins) can still make
+        the Workbench answer 200 with a plain-text "This output item does not exist"; that is a name it
+        cannot address, so it is treated as not-found, never as a lookup failure. Verified live
+        2026-10-21. A per-name Bad-Request / Not-Found
         is a definitive "no such structure", returned as None rather than raised, so it is a clean
         no-match instead of a logged lookup failure. Only 5xx / transport errors propagate to the
         caller's fail-soft guard.
         """
-        url = f"{MW_INCHIKEY_URL}/{quote(name, safe='')}/inchi_key"
+        url = f"{MW_INCHIKEY_URL}/{quote_name_path_segment(name)}/inchi_key"
         resp = self._session.get(url, timeout=STRUCTURE_LOOKUP_TIMEOUT_S)
         if resp.status_code in (400, 404):
             return None
         resp.raise_for_status()
+        if str(getattr(resp, "text", "") or "").startswith(MW_UNPARSEABLE_PATH_PREFIX):
+            return None
         data = resp.json()
         if isinstance(data, dict):
             key = data.get("inchi_key")
@@ -228,8 +234,8 @@ class StructureResolver:
     def _fetch_pubchem_inchikey(self, name: str) -> str | None:
         """PubChem: GET /rest/pug/compound/name/{name}/property/InChIKey/JSON.
 
-        ``safe=""`` for the same reason as :meth:`_fetch_mw_inchikey` -- an unescaped slash injects
-        URL path segments and turns a resolvable name into a silent 404.
+        PubChem, unlike the Workbench, decodes an encoded slash, so ``safe=""`` keeps the whole name
+        in one path segment here; an unescaped slash would be parsed as a PUG-REST path separator.
         """
         url = f"{PUBCHEM_INCHIKEY_URL}/{quote(name, safe='')}/property/InChIKey/JSON"
         resp = self._session.get(url, timeout=STRUCTURE_LOOKUP_TIMEOUT_S)

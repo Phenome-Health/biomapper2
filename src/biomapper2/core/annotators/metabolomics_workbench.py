@@ -6,7 +6,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, cast
-from urllib.parse import quote
 
 import pandas as pd
 import requests
@@ -15,7 +14,7 @@ from circuitbreaker import CircuitBreakerError, circuit
 
 from ... import config
 from ...config import CACHE_DIR, CACHE_IGNORED_PARAMETERS
-from ...utils import AssignedIDsDict
+from ...utils import AssignedIDsDict, quote_name_path_segment
 from . import refmet_snapshot, refmet_store
 from .base import (
     AVAILABILITY_NO_MATCH,
@@ -425,12 +424,11 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         service did not answer. A 200 whose refmet_id is "-" (or a non-dict body) is NO_MATCH — the
         service answered "no such metabolite". Data is VOTED.
 
-        A slash-bearing name (an sn-position lipid shorthand like "PC 16:0/18:1") is a NO_MATCH here,
-        not an outage: MW /match is path-segment addressed and its web server rejects the encoded
-        slash outright (%2F -> 404), so RefMet has no entry for that raw string. ``_request_once``
-        classifies that 404 as NO_MATCH rather than raising, so it never counts toward the circuit
-        breaker, which is what used to trip on lipid panels and then skip RefMet /match for EVERY
-        other name (and every other annotator instance) for the recovery window.
+        A per-name 404 (a name the Workbench does not know) is a NO_MATCH here, not an outage.
+        ``_request_once`` classifies it as NO_MATCH rather than raising, so it never counts toward the
+        circuit breaker, which is what used to trip on lipid panels and then skip RefMet /match for
+        EVERY other name (and every other annotator instance) for the recovery window. Slash-bearing
+        names are sent with a literal slash and resolve normally (see ``_request_once``).
         """
         if self._past_batch_deadline():
             # Past the shared batch deadline: mark UNAVAILABLE with NO network call.
@@ -473,19 +471,18 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
     def _request_once(self, metabolite_name: str) -> dict[str, Any] | None:
         """One HTTP attempt. Returns the data dict, or None for a genuine no-match.
 
-        ``safe=""`` encodes the whole name into one path segment. It does NOT make a slash-bearing
-        name queryable: MW's web server rejects the encoded slash outright (``%2F`` -> 404, and
-        double-encoding ``%252F`` -> the no-match sentinel), so a name with a slash simply has no
-        addressable ``/match`` entry and comes back a 404. The old docstring claimed ``safe=""`` made
-        slash names "safe"; it does not, and that is fine, because the 404 is handled below.
+        The name goes through ``quote_name_path_segment``: a slash between lipid chain specs is sent
+        literally (the Workbench resolves ``PC 16:0/18:1`` that way and 404s on ``%2F``), and any other
+        slash is encoded, because sent literally the Workbench answers for the text before the slash
+        alone (``mannitol/sorbitol`` -> Mannitol). Verified live 2026-10-21.
 
         A per-name client error (Bad Request or Not Found) is a definitive "no such entry", not a
         service outage: it is returned as the no-match sentinel (None) rather than raised, so it never
         counts toward the circuit breaker. Only 5xx, timeouts and transport errors should trip it.
-        This is what stops a slash name from tripping the breaker and degrading RefMet for every other
-        name in the process.
+        This is what stops an unknown name from tripping the breaker and degrading RefMet for every
+        other name in the process.
         """
-        url = f"{self.BASE_URL}/{quote(metabolite_name, safe='')}"
+        url = f"{self.BASE_URL}/{quote_name_path_segment(metabolite_name)}"
 
         # When a batch deadline is armed, cap this attempt's timeout by the remaining budget so a
         # lookup started just before the deadline cannot run a full timeout past it.

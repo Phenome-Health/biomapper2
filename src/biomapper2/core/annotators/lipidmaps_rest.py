@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import re
 from typing import Any, Protocol, runtime_checkable
-from urllib.parse import quote
+
+from ...utils import quote_name_path_segment
 
 _LIPIDMAPS_REST = "https://www.lipidmaps.org/rest/compound/abbrev/{name}/all/json"
 # LIPID MAPS returns a flat object for one hit but a ``{"Row1": {...}, "Row2": {...}}`` envelope for
@@ -114,9 +115,10 @@ class LipidMapsRestEnricher:
 
     def _fetch_json(self, canonical_name: str) -> tuple[Any, bool]:
         """GET the LIPID MAPS response, splitting a network failure (ok=False) from an unknown-lipid
-        answer (ok=True, empty). ``safe=""`` encodes the slash-heavy lipid names into one path
-        segment; the endpoint still 404s on the encoded slash, which is a clean unknown-lipid here."""
-        url = _LIPIDMAPS_REST.format(name=quote(str(canonical_name).strip(), safe=""))
+        answer (ok=True, empty). The name goes through ``quote_name_path_segment``: LIPID MAPS answers a
+        literal chain-spec slash in the abbreviation normally, but its web server returns a 404 page
+        for an encoded ``%2F`` before any lookup (verified live 2026-10-21)."""
+        url = _LIPIDMAPS_REST.format(name=quote_name_path_segment(str(canonical_name).strip()))
         try:
             resp = self._session.get(url, timeout=self._timeout)
             status = getattr(resp, "status_code", 200)

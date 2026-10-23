@@ -32,6 +32,10 @@ The API is deployed to the same Lightsail instance as kraken-backend:
    EOF
    ```
 
+   Confirm which KRAKEN build a deployment is serving with `curl $KESTREL_API_URL/health`
+   (keyless), which reports `kg_version`, `kraken_package_version`, `biolink_version`, the build
+   `git_commit` and the ingested `sources`; `/metagraph` alone does not identify the build.
+
 3. **Install uv and dependencies:**
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh

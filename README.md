@@ -14,15 +14,14 @@ All CURIEs are represented in [Biolink](https://github.com/biolink/biolink-model
 
 ⚠️ **Note**: This package is in active development. Feedback and issues welcome!
 
-### Quick access via PyPI
+### Quick access: the hosted API
 
-If you just want to **map entities against the hosted production API** without running your own server, install the lightweight client package:
+If you just want to **map entities against the hosted production API** without running your own server, you have two options. Neither needs an API key.
 
-```bash
-pip install ddharmon
-```
+- **Over plain HTTP, from any language:** the API is served at `https://biomapper.expertintheloop.io/api/v1`. The [REST API tutorial notebook](examples/biomapper_api_tutorial.ipynb) walks through health and provenance pins, single and batch resolution across entity types, target namespaces, reading the resolution certificate, and batching safely.
+- **From Python:** install the client package, `pip install biomapper` ([repository and README](https://github.com/Phenome-Health/biomapper), [tutorial notebook](https://github.com/Phenome-Health/biomapper/blob/main/notebooks/biomapper_tutorial.ipynb)). It wraps the same REST API.
 
-See [ddharmon on PyPI](https://pypi.org/project/ddharmon/) for usage. It wraps the same REST API documented below, pointed at the production Kestrel instance.
+(`ddharmon` on PyPI is a separate project, a data-dictionary harmonization tool; it is not a client for this API.)
 
 ## Setup
 
@@ -106,7 +105,9 @@ uv run uvicorn biomapper2.api.main:app --reload --port 8001
 docker compose --profile prod up -d
 ```
 
-The API docs are available at:
+The hosted service is at `https://biomapper.expertintheloop.io/api/v1` (Swagger UI at `/api/v1/docs`). For a worked, executed walkthrough of these endpoints over plain HTTP, see the [REST API tutorial notebook](examples/biomapper_api_tutorial.ipynb).
+
+For a local server, the API docs are available at:
 - **Swagger UI**: http://localhost:8001/api/v1/docs
 - **ReDoc**: http://localhost:8001/api/v1/redoc
 - **OpenAPI spec**: http://localhost:8001/api/v1/openapi.json
@@ -165,7 +166,7 @@ curl -X POST http://localhost:8001/api/v1/map/entity \
 
 ### Authentication
 
-Set `BIOMAPPER_API_KEY` or `BIOMAPPER2_API_KEYS` (comma-separated) in your `.env` file to require API key authentication via the `X-API-Key` header. If no keys are configured, the API runs in open-access mode.
+Set `BIOMAPPER_API_KEY` or `BIOMAPPER2_API_KEYS` (comma-separated) in your `.env` file to require API key authentication via the `X-API-Key` header (a missing key returns 401, a wrong one 403; `/health` never requires a key). If no keys are configured, the API runs in open-access mode. The hosted service at `https://biomapper.expertintheloop.io/api/v1` currently runs in open-access mode.
 
 ## Docker
 
@@ -201,7 +202,7 @@ docker build --target dev -t biomapper2:dev .     # Development image
 ### Generate KG-performance across datasets
 ```python
 
-from biomapper.visualizer import Visualizer
+from biomapper2.visualizer import Visualizer
 
 viz = Visualizer()
 
@@ -223,6 +224,9 @@ viz.render_heatmap(
 ```bash
 uv run python examples/basic_entity_kg_mapping.py
 uv run python examples/basic_dataset_kg_mapping.py
+
+# Notebooks (the REST API tutorial needs only requests and pandas, both in this environment)
+uv run --with jupyter jupyter lab examples/biomapper_api_tutorial.ipynb
 ```
 
 ## Run tests
@@ -263,7 +267,11 @@ src/biomapper2/
 │   ├── annotation_engine.py    # Orchestrates annotation of entities with ontology local IDs
 │   ├── annotators/             # Individual annotator implementations (Kestrel text search, etc.)
 │   │   ├── base.py             # Base annotator interface
-│   │   └── kestrel_text.py     # Kestrel text search annotator
+│   │   ├── kestrel_text.py     # Kestrel text search annotator
+│   │   ├── kestrel_vector.py   # Kestrel vector search annotator
+│   │   ├── kestrel_hybrid.py   # Kestrel hybrid search annotator
+│   │   ├── metabolomics_workbench.py  # RefMet match API annotator
+│   │   └── goslin_lipid.py     # Lipid shorthand normalization via Goslin
 │   ├── normalizer/             # ID normalization package
 │   │   ├── normalizer.py       # Main Normalizer class
 │   │   ├── validators.py       # ID validation functions for different vocabularies
@@ -276,7 +284,7 @@ src/biomapper2/
 
 Dockerfile                      # Multi-stage build (builder → dev → prod)
 compose.yaml                    # Docker Compose with prod and dev profiles
-examples/                       # Working code examples
+examples/                       # Working code examples and notebooks (incl. the REST API tutorial)
 tests/                          # Pytest test suite
 data/                           # Example and groundtruth datasets
 scripts/                        # Development scripts (check.sh, fix.sh)
@@ -285,8 +293,14 @@ scripts/                        # Development scripts (check.sh, fix.sh)
 ### Configuration
 
 Environment variables (set in `.env`):
-- `KESTREL_API_URL` - Knowledge graph API endpoint (defaults to production)
-- `KESTREL_API_KEY` - API key for the Kestrel API
+- `KESTREL_API_URL` - Knowledge graph API endpoint. Defaults to the public Kestrel
+  (`https://kestrel.krakenkg.com/api`), which requires no key. Point it at
+  `https://kestrel.nathanpricelab.com/api` for the internal endpoint, which serves a
+  different KRAKEN build. Pin the build from `GET $KESTREL_API_URL/health` (keyless), which reports
+  `kg_version`, `kraken_package_version`, `biolink_version`, the build `git_commit` and the ingested
+  `sources`; `/metagraph` alone does not identify the build.
+- `KESTREL_API_KEY` - API key for the Kestrel API (required only by the internal endpoint;
+  the public one ignores it)
 
 Additional settings in `src/biomapper2/config.py`:
 - `BIOLINK_VERSION_DEFAULT` - Default Biolink model version

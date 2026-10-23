@@ -203,17 +203,13 @@ def test_lookup_never_touches_kestrel(name: str) -> None:
     assert all("kestrel" not in url and "krakenkg" not in url for url in session.calls)
 
 
-def test_a_slash_in_the_query_name_is_percent_encoded() -> None:
-    """A slash must not survive into the URL as a path separator.
+def test_a_slash_in_the_query_name_is_sent_literally_to_the_workbench() -> None:
+    """The Workbench name endpoint resolves a literal slash and 404s on an encoded ``%2F``.
 
-    ``quote`` defaults to ``safe="/"``. With that default a lipid-shorthand name splits the URL into
-    extra path segments, the registry 404s, and the row is recorded ``unresolvable`` -- a statement
-    about the NAME -- when nothing about the name was ever actually asked. That biases the
-    ``resolution_rate`` the figure's admissibility gate reads, in the direction that makes the gate
-    look satisfied.
-
-    The same default was live in shipped code at ``StructureResolver._fetch_mw_inchikey`` and
-    ``_fetch_pubchem_inchikey``; ``test_structure_resolver_name_fallback_encodes_slashes`` pins those.
+    Live (2026-10-21): ``/rest/refmet/name/GalCer%2020%3A0%3BO3/36%3A0/inchi_key`` returns
+    ``IQNQXSNSMQIGQH-MMVILJOCSA-N``; the ``%2F`` form 404s before any lookup. Encoding the slash
+    recorded every slash-bearing name ``unresolvable`` without the name ever being asked, which
+    biases the ``resolution_rate`` the figure's admissibility gate reads.
     """
     name = "GlcCer 16:0;O3/10:0"
     lookup, session = _lookup({"refmet/name": _FakeResponse({"inchi_key": MW_KEY})})
@@ -221,14 +217,13 @@ def test_a_slash_in_the_query_name_is_percent_encoded() -> None:
 
     assert session.calls, "no request was made"
     url = session.calls[0]
-    assert "%2F" in url, f"the slash was not encoded: {url}"
-    # Exactly the service's own path separators remain: nothing the name contributed.
-    assert url.count("/") == MW_INCHIKEY_URL.count("/") + 2, f"the name injected a path segment: {url}"
+    assert "%2F" not in url.upper(), f"the slash was percent-encoded, which the Workbench 404s: {url}"
+    assert url == f"{MW_INCHIKEY_URL}/GlcCer%2016%3A0%3BO3/10%3A0/inchi_key", url
 
 
-def test_structure_resolver_name_fallback_encodes_slashes() -> None:
-    """The same bug pre-existed on the shipped name-fallback rung, which fires whenever the KG
-    carries no InChIKey -- so a slash-bearing name 404s and is recorded structurally unresolvable."""
+def test_structure_resolver_name_fallback_slash_handling() -> None:
+    """The structure ladder's Workbench rung sends a literal slash; its PubChem rung keeps ``%2F``
+    (PubChem decodes it, and a literal slash would be read as a PUG-REST path separator)."""
     from biomapper2.core.structure_resolver import StructureResolver
 
     resolver = StructureResolver.__new__(StructureResolver)
@@ -236,11 +231,12 @@ def test_structure_resolver_name_fallback_encodes_slashes() -> None:
     resolver._session = session  # type: ignore[assignment]  # fake session, records the outbound URL only
 
     resolver._fetch_mw_inchikey("GlcCer 16:0;O3/10:0")
-    assert "%2F" in session.calls[0], f"the slash was not encoded: {session.calls[0]}"
+    assert "%2F" not in session.calls[0].upper(), f"the Workbench slash was encoded: {session.calls[0]}"
+    assert "/GlcCer%2016%3A0%3BO3/10%3A0/inchi_key" in session.calls[0], session.calls[0]
 
     session.responses = {"pug/compound/name": _FakeResponse({"PropertyTable": {"Properties": [{"InChIKey": MW_KEY}]}})}
     resolver._fetch_pubchem_inchikey("PC 16:0/18:1")
-    assert "%2F" in session.calls[1], f"the slash was not encoded: {session.calls[1]}"
+    assert "%2F" in session.calls[1], f"the PubChem slash was not encoded: {session.calls[1]}"
 
 
 # --- Unit 4: the lipid independent-structure hop (MW -> PubChem -> Goslin/LIPID MAPS) ----------
