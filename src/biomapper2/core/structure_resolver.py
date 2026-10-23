@@ -236,9 +236,17 @@ class StructureResolver:
 
         PubChem, unlike the Workbench, decodes an encoded slash, so ``safe=""`` keeps the whole name
         in one path segment here; an unescaped slash would be parsed as a PUG-REST path separator.
+
+        A Bad-Request / Not-Found (``PUGREST.NotFound``: PubChem has no compound by that name) is a definitive
+        no-match, returned as None like the Workbench rung. It used to be raised, which logged a full
+        traceback for every unknown lipid name and, because the caller's fail-soft guard returns
+        immediately, skipped the lipid-resolver hop that follows in ``_resolve_name_key``. Only 5xx /
+        transport errors propagate.
         """
         url = f"{PUBCHEM_INCHIKEY_URL}/{quote(name, safe='')}/property/InChIKey/JSON"
         resp = self._session.get(url, timeout=STRUCTURE_LOOKUP_TIMEOUT_S)
+        if resp.status_code in (400, 404):
+            return None
         resp.raise_for_status()
         data = resp.json()
         props = data.get("PropertyTable", {}).get("Properties", [])
