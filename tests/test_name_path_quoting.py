@@ -113,3 +113,59 @@ def test_tier_b_treats_the_unparseable_path_page_as_a_clean_unknown() -> None:
     key, _cache, failed = lookup._fetch_mw("sphingomyelin (d18:1/20:2, d18:2/20:1, d16:1/22:2)*")
     assert key is None
     assert failed is False  # a name the Workbench cannot address is not a service failure
+
+
+class _StatusResponse:
+    def __init__(self, status_code: int, payload: Any = None) -> None:
+        self.status_code = status_code
+        self._payload = payload
+        self.text = ""
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            import requests
+
+            raise requests.HTTPError(f"{self.status_code}")
+
+    def json(self) -> Any:
+        return self._payload
+
+
+def test_pubchem_not_found_is_a_clean_miss_not_an_exception() -> None:
+    from unittest.mock import MagicMock
+
+    from biomapper2.core.structure_resolver import StructureResolver
+
+    resolver = StructureResolver(linker=MagicMock())
+
+    class _Session:
+        def get(self, url: str, timeout: Any = None) -> _StatusResponse:
+            return _StatusResponse(404, {"Fault": {"Code": "PUGREST.NotFound"}})
+
+    resolver._session = _Session()  # type: ignore[assignment]
+    assert resolver._fetch_pubchem_inchikey("PC 16:0_18:1") is None
+
+
+def test_pubchem_miss_still_reaches_the_lipid_resolver_hop() -> None:
+    """A PubChem 404 used to raise out of the MW/PubChem try, so _resolve_name_key returned None
+    before ever consulting the lipid resolver. It must now fall through to that hop."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from biomapper2.core.certificate import TierBOutcome
+    from biomapper2.core.structure_resolver import StructureResolver
+
+    lipid = MagicMock()
+    lipid.resolve.return_value = SimpleNamespace(outcome=TierBOutcome.RESOLVED, inchikey_block="WTJKGGKOPKCXLL")
+    resolver = StructureResolver(linker=MagicMock(), lipid_resolver=lipid)
+    resolver._frozen_inchikey = lambda _name: None  # type: ignore[method-assign]
+
+    class _Session:
+        def get(self, url: str, timeout: Any = None) -> _StatusResponse:
+            if "metabolomicsworkbench" in url:
+                return _StatusResponse(200, [])  # Workbench: no structure for this name
+            return _StatusResponse(404, {"Fault": {"Code": "PUGREST.NotFound"}})
+
+    resolver._session = _Session()  # type: ignore[assignment]
+    assert resolver._resolve_name_key("PC 16:0_18:1") == "WTJKGGKOPKCXLL"
+    lipid.resolve.assert_called_once_with("PC 16:0_18:1")
