@@ -2,7 +2,7 @@
 
 These tests read the config files as text. They do not run nginx. They guard the
 policy in deploy/README.md ("Rate limiting (nginx)"): both mapping mounts carry a
-per-IP limit_req and a global limit_conn, rejections return 429, biomapper-ui's
+per-IP limit_req and a global limit_conn, rejections use the configured limit_*_status, biomapper-ui's
 same-host address is exempt from the per-IP limit, and each limited location keeps
 the full proxy setup (a nested location does not inherit it from `location /`).
 """
@@ -84,7 +84,9 @@ def test_mount_has_per_ip_limit_req_on_declared_zone(mount, locations, zones):
     req_zones = _req_zones(zones)
     limit_req = _directives(locations[mount], "limit_req")
     assert limit_req, f"{mount} has no limit_req"
-    zone_name = re.search(r"zone=(\S+)", limit_req[0]).group(1)
+    zone_match = re.search(r"zone=(\S+)", limit_req[0])
+    assert zone_match, f"{mount} limit_req names no zone: {limit_req[0]}"
+    zone_name = zone_match.group(1)
     assert zone_name in req_zones, f"{mount} uses undeclared limit_req zone {zone_name}"
     # Per-IP via the exemption map, not keyed on a constant.
     assert req_zones[zone_name] == "$biomapper2_ratelimit_key"
