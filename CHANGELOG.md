@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.1](https://github.com/Phenome-Health/biomapper2/compare/v1.1.0...v1.1.1) (2026-10-29)
+
+
+### Features
+
+* **annotators:** keep only chain-spec slashes literal; encode mixture slashes (port of fork [#93](https://github.com/Phenome-Health/biomapper2/issues/93)) ([ee5d5f8](https://github.com/Phenome-Health/biomapper2/commit/ee5d5f83199d84b8ae6619b334c7f20ca6187e96))
+* **annotators:** send slash-bearing names to the Workbench and LIPID MAPS with a literal slash (port of fork [#92](https://github.com/Phenome-Health/biomapper2/issues/92)) ([33e2456](https://github.com/Phenome-Health/biomapper2/commit/33e245685c4d801a1d8749d562ff60f608a1de04))
+* **docs,chore:** pin the build from Kestrel /health; stop tracking .memdb/ (port of fork [#91](https://github.com/Phenome-Health/biomapper2/issues/91)) ([09b9f32](https://github.com/Phenome-Health/biomapper2/commit/09b9f32ba985af42f3f70c4ebe92742e23b22a29))
+* **docs:** REST API tutorial notebook (port of fork [#90](https://github.com/Phenome-Health/biomapper2/issues/90)) ([679478e](https://github.com/Phenome-Health/biomapper2/commit/679478e8d8a9fc4c8cf1ed7459ffa1ebf6a1a69b))
+* **structure:** treat a PubChem Not-Found as a clean miss so the lipid hop still runs (port of fork [#94](https://github.com/Phenome-Health/biomapper2/issues/94)) ([bb74fdf](https://github.com/Phenome-Health/biomapper2/commit/bb74fdf43a06da19de0fb3f20d474fbace7d228b))
+
 ## [1.1.0](https://github.com/Phenome-Health/biomapper2/compare/v1.0.1...v1.1.0) (2026-09-23)
 
 
