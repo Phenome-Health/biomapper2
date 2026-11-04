@@ -68,6 +68,12 @@ The API is deployed to the same Lightsail instance as kraken-backend:
    }
    ```
 
+   A new file under `sites-available/` is not loaded until it is linked into `sites-enabled/`:
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/biomapper /etc/nginx/sites-enabled/biomapper
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
 6. **Get SSL certificate:**
    ```bash
    sudo certbot --nginx -d biomapper.expertintheloop.io
@@ -90,8 +96,12 @@ Policy:
 - **Global:** `limit_conn` of 2 concurrent mapping requests for the whole server block (matches
   `--workers 2`). A third concurrent request gets an immediate `429`. It does not queue.
 - **Exempt from the per-IP limit:** `127.0.0.1`, `::1`, and the host's own public IP
-  `35.161.242.62`. biomapper-ui runs on this host and calls the public URL, so all UI users
-  arrive from one address. Exempt hosts still count against the global cap of 2.
+  `35.161.242.62`. Exempt hosts still count against the global cap of 2.
+- **What the limits cover:** only traffic that passes through nginx, i.e. external callers (MCP
+  users, scripts, the public API). biomapper-ui on this host calls `http://localhost:8001`
+  directly, so its requests bypass nginx and neither limit applies to them. The `geo` exemption
+  is there in case the UI is ever pointed at the public URL, where all UI users would otherwise
+  arrive from one address.
 
 These are conservative starting values. Tune `rate`/`burst` through a PR to these files, not by
 hand-editing the host.
