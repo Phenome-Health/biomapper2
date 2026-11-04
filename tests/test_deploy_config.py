@@ -170,15 +170,8 @@ def test_unit_file_workers_match_global_cap():
     assert f"--workers {WORKERS}" in UNIT_FILE.read_text()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Follow-up PR: bind uvicorn to 127.0.0.1 so nginx cannot be bypassed. Kept separate "
-        "because deploy-api.yml deploys the unit file on merge to main. When that PR lands, "
-        "this XPASSes and fails (strict): remove the xfail marker then."
-    ),
-)
 def test_unit_file_binds_loopback_only():
+    """uvicorn listens on loopback only, so nginx (and its rate limit) cannot be bypassed."""
     text = UNIT_FILE.read_text()
     assert "--host 127.0.0.1" in text
     assert "0.0.0.0" not in text
