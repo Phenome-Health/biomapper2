@@ -13,7 +13,7 @@ Environment="PATH=/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin"
 EnvironmentFile=/home/ubuntu/biomapper2/.env
 
 # Use uv to run uvicorn
-ExecStart=/home/ubuntu/.local/bin/uv run uvicorn biomapper2.api.main:app --host 0.0.0.0 --port 8001 --workers 2
+ExecStart=/home/ubuntu/.local/bin/uv run uvicorn biomapper2.api.main:app --host 127.0.0.1 --port 8001 --workers 2
 
 # Restart policy
 Restart=always
