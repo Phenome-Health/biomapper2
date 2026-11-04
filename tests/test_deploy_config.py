@@ -90,6 +90,32 @@ def test_mount_has_per_ip_limit_req_on_declared_zone(mount, locations, zones):
     assert req_zones[zone_name] == "$biomapper2_ratelimit_key"
 
 
+# Pinned policy values (deploy/README.md "Rate limiting (nginx)"). Changing them is a
+# policy change and should fail here first.
+PER_IP_RATE = "1r/s"
+BURST = "10"
+
+
+def test_per_ip_zone_rate_is_pinned(zones):
+    args = _directives(zones, "limit_req_zone")
+    assert len(args) == 1
+    assert re.search(rf"\brate={re.escape(PER_IP_RATE)}(\s|$)", args[0]), args[0]
+
+
+@pytest.mark.parametrize("mount", MAPPING_MOUNTS)
+def test_mount_limit_req_burst_and_nodelay_are_pinned(mount, locations):
+    (limit_req,) = _directives(locations[mount], "limit_req")
+    opts = limit_req.split()[1:]
+    assert f"burst={BURST}" in opts, limit_req
+    assert "nodelay" in opts, limit_req
+
+
+@pytest.mark.parametrize("mount", MAPPING_MOUNTS)
+def test_mount_holds_slot_until_upstream_finishes(mount, locations):
+    """Client disconnect must not free the limit_conn slot while the engine still maps."""
+    assert _directives(locations[mount], "proxy_ignore_client_abort") == ["on"]
+
+
 @pytest.mark.parametrize("mount", MAPPING_MOUNTS)
 def test_mount_has_global_limit_conn(mount, locations, zones):
     conn_zones = _conn_zones(zones)
