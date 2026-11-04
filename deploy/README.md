@@ -73,6 +73,142 @@ The API is deployed to the same Lightsail instance as kraken-backend:
    sudo certbot --nginx -d biomapper.expertintheloop.io
    ```
 
+## Rate limiting (nginx)
+
+The mapping routes (`/api/v1/map/*` and the `/map/*` alias, which reach the same router)
+are rate-limited in nginx, not in the app. The handlers block the event loop, and an in-app
+counter would be split across the two uvicorn workers. Discovery and health are not limited.
+
+| File | Context | Installed to |
+|------|---------|--------------|
+| `deploy/nginx/biomapper2-ratelimit-zones.conf` | `http` | `/etc/nginx/conf.d/` |
+| `deploy/nginx/biomapper2-ratelimit-locations.conf` | `server` (certbot block for `biomapper.expertintheloop.io`) | `/etc/nginx/snippets/` |
+
+Policy:
+
+- **Per IP:** `limit_req` at 1 r/s with `burst=10 nodelay`. Over the limit returns `429`.
+- **Global:** `limit_conn` of 2 concurrent mapping requests for the whole server block (matches
+  `--workers 2`). A third concurrent request gets an immediate `429`. It does not queue.
+- **Exempt from the per-IP limit:** `127.0.0.1`, `::1`, and the host's own public IP
+  `35.161.242.62`. biomapper-ui runs on this host and calls the public URL, so all UI users
+  arrive from one address. Exempt hosts still count against the global cap of 2.
+
+These are conservative starting values. Tune `rate`/`burst` through a PR to these files, not by
+hand-editing the host.
+
+### Apply (on the Lightsail host)
+
+```bash
+ssh -i ~/.ssh/lightsail-expert.pem ubuntu@35.161.242.62
+cd ~/biomapper2 && git fetch origin main && git reset --hard origin/main   # the merged commit
+
+# 0. Back up the current site config.
+sudo cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak.$(date +%F)
+
+# 1. Install the zones (http context) and the locations snippet.
+sudo cp deploy/nginx/biomapper2-ratelimit-zones.conf /etc/nginx/conf.d/
+sudo mkdir -p /etc/nginx/snippets
+sudo cp deploy/nginx/biomapper2-ratelimit-locations.conf /etc/nginx/snippets/
+
+# 2. Find the certbot-managed server block (listen 443 ssl; server_name biomapper.expertintheloop.io).
+grep -n "server_name biomapper.expertintheloop.io" /etc/nginx/sites-enabled/*
+sudoedit /etc/nginx/sites-available/default
+```
+
+Inside that `server { ... }` block, add this line just before the existing `location / {`:
+
+```nginx
+    include /etc/nginx/snippets/biomapper2-ratelimit-locations.conf;
+```
+
+Check the existing `location / {` for directives beyond `proxy_pass` and the four
+`proxy_set_header` lines (for example `client_max_body_size`, `proxy_buffering`,
+`proxy_send_timeout`). Directives set inside `location /` are not inherited by the new
+locations, so copy any such lines into both locations in the snippet. Directives set at
+`server` level are inherited and need nothing.
+
+```bash
+# 3. Validate, then reload (graceful: in-flight requests finish).
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Copy the snippet into `/etc/nginx/snippets/` rather than including it from `~/biomapper2`.
+`deploy-api.yml` runs `git reset --hard origin/main` on the host, which would otherwise change
+the live nginx config at the next reload without an `nginx -t`.
+
+### Verify
+
+Run these from a machine that is **not** the Lightsail host, since the host IP is exempt from
+the per-IP limit. The burst omits the API key on purpose: nginx applies the limit before the
+app sees the request, so the allowed requests return a fast `401` and never run a mapping.
+
+```bash
+URL=https://biomapper.expertintheloop.io
+
+# 25 back-to-back requests from one IP: expect about 11 x 401 (1 + burst 10), then 429s.
+for i in $(seq 1 25); do
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST "$URL/api/v1/map/entity" \
+    -H "Content-Type: application/json" -d '{"name":"glucose","entity_type":"metabolite"}'
+done | sort | uniq -c
+
+# The /map alias shares the same per-IP bucket: immediately after the burst, expect 429.
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$URL/map/entity" \
+  -H "Content-Type: application/json" -d '{"name":"glucose","entity_type":"metabolite"}'
+
+# Health is not limited and stays fast right after the burst: expect 200 well under a second.
+curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" "$URL/api/v1/health"
+```
+
+Then check the UI is not throttled as one IP: use biomapper-ui normally and confirm its
+requests are not answered `429` outside of the global cap. If they are, read the client address
+nginx logged for them (`sudo tail /var/log/nginx/access.log`). If it is the instance's private
+VPC address rather than `35.161.242.62`, add that address to the `geo` block in the zones file
+(through a PR), recopy the file, and reload.
+
+Reading 429s in the logs:
+
+```bash
+# Rejections are logged at warn level with the zone name and client IP.
+sudo grep -E "limiting (requests|connections)" /var/log/nginx/error.log | tail
+# Count 429 responses in the access log (combined format: status is field 9).
+sudo awk '$9 == 429' /var/log/nginx/access.log | wc -l
+```
+
+### Port 8001 must not be publicly reachable
+
+The limit only holds if clients cannot reach uvicorn directly. The service currently binds
+`0.0.0.0:8001`, so confirm the Lightsail firewall (instance > Networking > IPv4 and IPv6
+firewalls) does not open 8001, and check from outside:
+
+```bash
+# From a machine that is NOT the Lightsail host: expect a timeout or refusal, not a response.
+curl -m 5 http://35.161.242.62:8001/api/v1/health
+```
+
+Changing `deploy/biomapper2-api.service` to `--host 127.0.0.1` is a deliberate, **separate,
+later PR**. `.github/workflows/deploy-api.yml` copies the unit file to the host and restarts
+the service on every merge to `main` that touches `deploy/**`, so that change goes live on
+merge. Merge it only after this nginx config is live and nothing calls `:8001` from outside
+the host.
+
+Merging this PR to `main` also triggers `deploy-api.yml`, because it touches `deploy/**`.
+That redeploys the API with the unchanged unit file and does not touch nginx. The nginx steps
+above stay manual.
+
+### Roll back
+
+```bash
+# 1. Remove the include line from the server block (or restore the backup from step 0):
+#    sudo cp /etc/nginx/sites-available/default.bak.<date> /etc/nginx/sites-available/default
+# 2. Then remove the installed files and reload.
+sudo rm /etc/nginx/snippets/biomapper2-ratelimit-locations.conf
+sudo rm /etc/nginx/conf.d/biomapper2-ratelimit-zones.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Remove the include line first. A `limit_req zone=...` that names a missing zone fails
+`nginx -t`.
+
 ## GitHub Actions Secrets
 
 The deployment workflow requires these secrets:
