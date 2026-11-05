@@ -11,7 +11,7 @@ correctly from backup even when live is unreachable).
 
 Storage / concurrency choice
 -----------------------------
-A single SQLite database (WAL journal) with one table keyed on the normalized query name. Prod runs
+A single SQLite database (WAL journal) with one table keyed on the EXACT query string. Prod runs
 multiple worker PROCESSES; to stay consistent across them we do NOT hold a long-lived in-memory copy
 (D2). Every ``get``/``upsert``/``seed_from_tsv`` opens a SHORT-LIVED connection, does its one
 statement, and closes it. WAL lets readers and a single writer proceed concurrently; ``busy_timeout``
@@ -20,14 +20,27 @@ are idempotent last-writer-wins, so two workers writing the same name converge o
 same value. A per-process pooled connection would be a latency optimization; per-call is the simplest
 correct approach for the multi-process deployment and is what this module implements.
 
-Table ``refmet``::
+Table ``refmet_by_query``::
 
-    name_norm TEXT PRIMARY KEY   -- normalized query name (lower/strip/collapse-ws, shared with the freeze)
+    query TEXT PRIMARY KEY       -- the exact string sent to /match (no case or whitespace folding)
     refmet_id, refmet_name, inchi_key, formula, exactmass
     status                       -- voted | no_match | unavailable (mirrors the freeze statuses)
     source                       -- provenance of the WRITE (live_api for write-backs, local_snapshot for seeds)
     updated_at                   -- ISO-format UTC timestamp of the last write (D3 age surfacing)
     snapshot_version             -- freeze version when a seed populated the row, else None
+
+Why the key is the exact query (and what happened to table ``refmet``)
+----------------------------------------------------------------------
+RefMet ``/match`` is case-sensitive: ``acetylcarnitine (C2)`` votes CAR 2:0 and ``acetylcarnitine (c2)``
+is a no-match. The original table ``refmet`` was keyed on a case-folded ``name_norm`` with last-writer-
+wins upserts, so the two spellings shared one row, and during an outage a name could be served its
+case-twin's answer. Rows are now keyed on the exact query string, so case variants never cross-serve.
+
+The legacy ``refmet`` table is left in place and is NEVER read: its folded key cannot say which spelling
+wrote a row, so no legacy row can be served safely. It is not dropped either, so rolling back to the
+previous release finds its data intact. On first start the new table is empty and is seeded from the
+pinned freeze (exact ``query_name`` keys), then grows again from live write-backs; until a name is
+re-learned live its outage fallback is UNAVAILABLE, never a wrong answer.
 """
 
 from __future__ import annotations
@@ -41,15 +54,15 @@ from pathlib import Path
 
 from ... import config
 from .base import AVAILABILITY_VOTED, REFMET_SOURCE_LIVE, REFMET_SOURCE_LOCAL
-from .refmet_snapshot import _VALID_STATUSES, _normalize
+from .refmet_snapshot import _VALID_STATUSES
 
 logger = logging.getLogger(__name__)
 
 _BUSY_TIMEOUT_MS = 2000
 
 _CREATE_TABLE = """
-CREATE TABLE IF NOT EXISTS refmet (
-    name_norm TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS refmet_by_query (
+    query TEXT PRIMARY KEY,
     refmet_id TEXT,
     refmet_name TEXT,
     inchi_key TEXT,
@@ -68,7 +81,7 @@ _SEED_FIELDS = ("refmet_id", "refmet_name", "inchi_key", "formula", "exactmass")
 
 @dataclass(frozen=True)
 class StoreHit:
-    """One row of the write-through store: the last-known RefMet outcome for a normalized name."""
+    """One row of the write-through store: the last-known RefMet outcome for one exact query."""
 
     status: str
     refmet_id: str | None
@@ -109,19 +122,18 @@ def _connect(path: Path) -> sqlite3.Connection:
 
 
 def get(name: str, *, path: Path | None = None) -> StoreHit | None:
-    """Last-known store row for ``name`` (normalized key), or None on a miss / no store configured."""
+    """Last-known store row for the exact query ``name``, or None on a miss / no store configured."""
     if not name:
         return None
     resolved = _resolve_path(path)
     if resolved is None:
         return None
-    key = _normalize(name)
     conn = _connect(resolved)
     try:
         row = conn.execute(
             "SELECT status, refmet_id, refmet_name, inchi_key, formula, exactmass, source, "
-            "updated_at, snapshot_version FROM refmet WHERE name_norm = ?",
-            (key,),
+            "updated_at, snapshot_version FROM refmet_by_query WHERE query = ?",
+            (name,),
         ).fetchone()
     finally:
         conn.close()
@@ -153,9 +165,9 @@ def upsert(
     snapshot_version: str | None = None,
     path: Path | None = None,
 ) -> None:
-    """Insert or update the row for ``name`` (normalized key), stamping ``updated_at`` on write.
+    """Insert or update the row for the exact query ``name``, stamping ``updated_at`` on write.
 
-    Idempotent last-writer-wins: ``INSERT ... ON CONFLICT(name_norm) DO UPDATE``. No-op when no store
+    Idempotent last-writer-wins: ``INSERT ... ON CONFLICT(query) DO UPDATE``. No-op when no store
     is configured or the name is empty (the caller guards "different" before writing; this is a plain
     write primitive).
     """
@@ -164,16 +176,15 @@ def upsert(
     resolved = _resolve_path(path)
     if resolved is None:
         return
-    key = _normalize(name)
     conn = _connect(resolved)
     try:
         conn.execute(
             """
-            INSERT INTO refmet (
-                name_norm, refmet_id, refmet_name, inchi_key, formula, exactmass,
+            INSERT INTO refmet_by_query (
+                query, refmet_id, refmet_name, inchi_key, formula, exactmass,
                 status, source, updated_at, snapshot_version
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(name_norm) DO UPDATE SET
+            ON CONFLICT(query) DO UPDATE SET
                 refmet_id = excluded.refmet_id,
                 refmet_name = excluded.refmet_name,
                 inchi_key = excluded.inchi_key,
@@ -184,7 +195,7 @@ def upsert(
                 updated_at = excluded.updated_at,
                 snapshot_version = excluded.snapshot_version
             """,
-            (key, refmet_id, refmet_name, inchi_key, formula, exactmass, status, source, _now(), snapshot_version),
+            (name, refmet_id, refmet_name, inchi_key, formula, exactmass, status, source, _now(), snapshot_version),
         )
         conn.commit()
     finally:
@@ -192,7 +203,7 @@ def upsert(
 
 
 def _is_empty(conn: sqlite3.Connection) -> bool:
-    return conn.execute("SELECT 1 FROM refmet LIMIT 1").fetchone() is None
+    return conn.execute("SELECT 1 FROM refmet_by_query LIMIT 1").fetchone() is None
 
 
 def seed_from_tsv(tsv_path: Path, *, path: Path | None = None) -> int:
@@ -230,7 +241,7 @@ def seed_from_tsv(tsv_path: Path, *, path: Path | None = None) -> int:
                 status = (row.get("status") or "").strip()
                 if not query_name or not status:
                     continue
-                key = _normalize(query_name)
+                key = query_name  # exact query, like the freeze's exact table: case variants stay apart
                 if key in seen:
                     continue  # first occurrence wins, mirroring the freeze loader
                 values = {f: ((row.get(f) or "").strip() or None) for f in _SEED_FIELDS}
@@ -258,8 +269,8 @@ def seed_from_tsv(tsv_path: Path, *, path: Path | None = None) -> int:
                 )
             if rows:
                 conn.executemany(
-                    "INSERT OR IGNORE INTO refmet ("
-                    "name_norm, refmet_id, refmet_name, inchi_key, formula, exactmass, "
+                    "INSERT OR IGNORE INTO refmet_by_query ("
+                    "query, refmet_id, refmet_name, inchi_key, formula, exactmass, "
                     "status, source, updated_at, snapshot_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     rows,
                 )
