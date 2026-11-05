@@ -12,8 +12,12 @@ Two internal stages keep measurement honest:
 
 The effective query level follows the sn-position trust policy (config.LIPID_TRUST_SN_POSITION,
 default OFF): shorthand written with "/" claims a proven sn-position, but vendors use it loosely, so
-by default an sn-position input is DOWNGRADED to molecular-species FOR QUERYING. Both the asserted
-level (the input's real level) and the effective level (after the policy) are recorded.
+by default an sn-position input is DOWNGRADED to molecular-species FOR QUERYING. The policy applies
+only to a lipid whose parse makes a CHAIN-ORDER claim (two or more chain slots, see
+``_makes_chain_order_claim``): a single-chain species (a fatty acid, an oxylipin, an acylcarnitine) has
+no sn order to doubt, and its finer levels carry functional-group positions (5-HETE vs 12-HETE), so it
+keeps its asserted level. Both the asserted level (the input's real level) and the effective level
+(after the policy) are recorded.
 
 LIPID MAPS REST enrichment is an INJECTED, OFF-BY-DEFAULT seam (the circular path vs LMSD): only when
 a caller supplies ``enrichment`` are LM_ID/InChIKey filled from it, and the metadata records that it
@@ -107,7 +111,7 @@ class GoslinLipidAnnotator(BaseAnnotator):
             return {}
 
         asserted = self._asserted_level(parsed)
-        effective = self._effective_level(asserted)
+        effective = self._effective_level(asserted, parsed)
         cascade = self._cascade_levels(parsed, effective)
 
         # Source 1: RefMet /match via the injected name binder. First cascade level with a vote wins.
@@ -140,9 +144,15 @@ class GoslinLipidAnnotator(BaseAnnotator):
         kestrel_votes: _Votes = {}
         kestrel_level: str | None = None
         if self._kestrel is not None:
+            # Kestrel keeps the PRE-narrowing query ceiling (the level-only D1 cap). It is a fuzzy hybrid
+            # search, and a structure-level rendering ("FA 18:1(9Z);12OH,13OH") is never a KG node name,
+            # so a hit there is a semantic neighbour stamped with a level it did not match at, which the
+            # resolver's level-aware tie-break would then prefer. Only exact-name sources (RefMet /match,
+            # LIPID MAPS) are queried at the finer levels the narrowed policy now allows.
+            kestrel_cascade = self._cascade_levels(parsed, self._level_only_cap(asserted))
             try:
                 kestrel_votes, kestrel_level = self._cascade_source(
-                    cascade,
+                    kestrel_cascade,
                     lambda level_name: self._kestrel_query(
                         entity,
                         name_field,
@@ -332,13 +342,19 @@ class GoslinLipidAnnotator(BaseAnnotator):
                 return level
         return _SPECIES
 
-    def _effective_level(self, asserted: str) -> str:
-        """Apply the sn-position trust policy (D1): with trust OFF, an input asserted at sn-position OR
-        FINER is capped at molecular-species for querying (vendors use "/" loosely, and the finer levels
-        STRUCTURE_DEFINED / FULL_STRUCTURE / COMPLETE_STRUCTURE also carry the "/" sn claim). Capping,
-        not just an sn-position equality check, so a slash-bearing structurally-detailed name never
-        escapes the policy. MOLECULAR_SPECIES and SPECIES stay as-is. With trust ON, effective=asserted."""
-        if self._trust_sn:
+    def _effective_level(self, asserted: str, parsed: LipidParse) -> str:
+        """Apply the sn-position trust policy (D1): with trust OFF, an input that makes a chain-order
+        claim (``_makes_chain_order_claim``) and is asserted at sn-position OR FINER is capped at
+        molecular-species for querying (vendors use "/" loosely, and the finer levels STRUCTURE_DEFINED /
+        FULL_STRUCTURE / COMPLETE_STRUCTURE also carry the "/" sn claim). Capping, not just an
+        sn-position equality check, so a slash-bearing structurally-detailed name never escapes the
+        policy. MOLECULAR_SPECIES and SPECIES stay as-is. With trust ON, effective=asserted.
+
+        Narrowed 2026-11-05 (approved policy change): a single-chain parse makes no sn-order claim, so it
+        is never capped. pygoslin reports e.g. ``12-HETE`` at FULL_STRUCTURE because the hydroxyl
+        position and double-bond geometry are known, not because any chain order is asserted; capping it
+        rewrote ``12-HETE`` and ``5-HETE`` to the same ``FA 20:4;O`` query and coarsened both."""
+        if self._trust_sn or not self._makes_chain_order_claim(parsed):
             return asserted
         order = _LEVEL_ORDER_MOST_TO_LEAST
         try:
@@ -349,6 +365,31 @@ class GoslinLipidAnnotator(BaseAnnotator):
         if asserted_index <= order.index(_SN_POSITION):
             return _MOLECULAR_SPECIES
         return asserted
+
+    def _level_only_cap(self, asserted: str) -> str:
+        """The D1 cap applied by LEVEL ONLY (the policy before the 2026-11-05 narrowing): with trust OFF,
+        anything asserted at sn-position or finer is capped at molecular species, whatever its chain
+        count. Used solely as the Kestrel source's query ceiling (see ``get_annotations``)."""
+        if self._trust_sn:
+            return asserted
+        order = _LEVEL_ORDER_MOST_TO_LEAST
+        if asserted in order and order.index(asserted) <= order.index(_SN_POSITION):
+            return _MOLECULAR_SPECIES
+        return asserted
+
+    @staticmethod
+    def _makes_chain_order_claim(parsed: LipidParse) -> bool:
+        """Whether the parse asserts an ORDER over two or more chain slots, the claim D1 distrusts.
+
+        Read from the pygoslin parse's chain list (``LipidParse.chains``), never from the input string.
+        Empty ``0:0`` slots COUNT: a lyso species written with its placeholder (``LPC 18:3/0:0`` vs
+        ``LPC 0:0/18:3``) asserts which sn position carries the acyl chain, which is exactly the
+        regio-claim vendors make loosely (Metabolon's ``*`` marks that uncertainty), so the cap still
+        applies to it. A lyso name with no placeholder (``LPC 16:0``) parses at molecular species and is
+        untouched either way. Single-slot parses (fatty acids, oxylipins, acylcarnitines, single-chain
+        lyso without a placeholder) make no order claim. Multi-slot glycero(phospho)lipids and
+        sphingolipids (long-chain base + N-acyl) keep the cap, as before."""
+        return len(parsed.chains) >= 2
 
     @staticmethod
     def _cascade_levels(parsed: LipidParse, effective: str) -> list[tuple[str, str]]:
