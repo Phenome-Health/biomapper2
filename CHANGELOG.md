@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.2.0](https://github.com/Phenome-Health/biomapper2/compare/v1.1.1...v1.2.0) (2026-11-05)
+
+
+### Features
+
+* **deploy:** bind uvicorn to 127.0.0.1; correct rate-limit README to the live host ([d6e1a1a](https://github.com/Phenome-Health/biomapper2/commit/d6e1a1a1e3cc06850defb6426b2dcaa711fa3582))
+* **deploy:** nginx rate limit for the mapping endpoints ([d2f8b27](https://github.com/Phenome-Health/biomapper2/commit/d2f8b27d6bd094d5bf7f9df123d56c25625409f3))
+
+
+### Bug Fixes
+
+* **deploy:** hold limit_conn slot until upstream finishes; pin rate policy in tests ([8e83e38](https://github.com/Phenome-Health/biomapper2/commit/8e83e38b7d519932477dbf49c20b11bee6d7bbc1))
+* **resolution:** a raw-spelling outage after a canonical miss is UNAVAILABLE, not NO_MATCH ([e5ed99a](https://github.com/Phenome-Health/biomapper2/commit/e5ed99a8a24c4a04c2860e61fe188b901089b499))
+* **resolution:** case-robust RefMet/Goslin name lookup; key the RefMet backup store by exact query ([5cc14fb](https://github.com/Phenome-Health/biomapper2/commit/5cc14fbf05447e1e858a557cdfc0080f20ffb187))
+
+## [1.1.1](https://github.com/Phenome-Health/biomapper2/compare/v1.1.0...v1.1.1) (2026-10-29)
+
+
+### Features
+
+* **annotators:** keep only chain-spec slashes literal; encode mixture slashes (port of fork [#93](https://github.com/Phenome-Health/biomapper2/issues/93)) ([ee5d5f8](https://github.com/Phenome-Health/biomapper2/commit/ee5d5f83199d84b8ae6619b334c7f20ca6187e96))
+* **annotators:** send slash-bearing names to the Workbench and LIPID MAPS with a literal slash (port of fork [#92](https://github.com/Phenome-Health/biomapper2/issues/92)) ([33e2456](https://github.com/Phenome-Health/biomapper2/commit/33e245685c4d801a1d8749d562ff60f608a1de04))
+* **docs,chore:** pin the build from Kestrel /health; stop tracking .memdb/ (port of fork [#91](https://github.com/Phenome-Health/biomapper2/issues/91)) ([09b9f32](https://github.com/Phenome-Health/biomapper2/commit/09b9f32ba985af42f3f70c4ebe92742e23b22a29))
+* **docs:** REST API tutorial notebook (port of fork [#90](https://github.com/Phenome-Health/biomapper2/issues/90)) ([679478e](https://github.com/Phenome-Health/biomapper2/commit/679478e8d8a9fc4c8cf1ed7459ffa1ebf6a1a69b))
+* **structure:** treat a PubChem Not-Found as a clean miss so the lipid hop still runs (port of fork [#94](https://github.com/Phenome-Health/biomapper2/issues/94)) ([bb74fdf](https://github.com/Phenome-Health/biomapper2/commit/bb74fdf43a06da19de0fb3f20d474fbace7d228b))
+
 ## [1.1.0](https://github.com/Phenome-Health/biomapper2/compare/v1.0.1...v1.1.0) (2026-09-23)
 
 
