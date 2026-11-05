@@ -334,7 +334,9 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         if result.status != AVAILABILITY_NO_MATCH:
             return result
         fallback = self._memo_dispatch(metabolite_name, memo)
-        return fallback if fallback.status == AVAILABILITY_VOTED else result
+        # The canonical miss stands only if the raw spelling is also a definitive miss: a raw-spelling
+        # outage stays UNAVAILABLE (the raw spelling might have matched), never a confirmed NO_MATCH.
+        return fallback if fallback.status != AVAILABILITY_NO_MATCH else result
 
     def _memo_dispatch(self, query: str, memo: dict[str, RefMetResult] | None) -> RefMetResult:
         """Dispatch one exact query, reusing an answer already fetched for it in this batch."""

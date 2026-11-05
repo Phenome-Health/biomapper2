@@ -242,6 +242,23 @@ def test_raw_spelling_is_the_fallback_on_a_no_match(monkeypatch: pytest.MonkeyPa
     assert session.queries == ["weirdname (C2)", "weirdname (c2)"]
 
 
+def test_a_raw_spelling_outage_after_a_canonical_miss_is_unavailable(monkeypatch: pytest.MonkeyPatch):
+    # Canonical query answered "no match", then the raw-spelling fallback could not be asked: the lookup
+    # failed, so it must not be reported as a confirmed no-match.
+    ann = _mw(_ReplaySession({}), monkeypatch)
+    queries: list[str] = []
+
+    def _request(name: str):
+        queries.append(name)
+        if name == "weirdname (C2)":
+            return None  # RefMet answered: no match
+        raise CircuitBreakerError("simulated open breaker")
+
+    monkeypatch.setattr(ann, "_do_refmet_request", _request)
+    assert ann._fetch_refmet_data("weirdname (c2)").status == AVAILABILITY_UNAVAILABLE
+    assert queries == ["weirdname (C2)", "weirdname (c2)"]
+
+
 def test_an_outage_is_not_retried_with_the_raw_spelling(monkeypatch: pytest.MonkeyPatch):
     session = _ReplaySession({}, status=503)
     ann = _mw(session, monkeypatch)
