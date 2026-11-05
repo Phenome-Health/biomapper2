@@ -4,7 +4,7 @@ No live services. The goslin metadata and the committed node's matched level are
 fixtures shaped like the real pipeline output (``assigned_ids`` for the goslin votes,
 ``kg_ids_assigned`` for the linked nodes joined on the raw id, ``chosen_kg_id`` for the committed
 node). Every field is derived from that metadata, so the object is null off the lipid path and
-exposes the SKOS mapping relation between the committed node and the effective query level.
+exposes the SKOS mapping relation between the committed node and the ASSERTED query level.
 """
 
 from __future__ import annotations
@@ -67,23 +67,32 @@ def test_non_lipid_row_has_null_lipid_resolution() -> None:
     assert result.lipid_resolution is None
 
 
-def test_exact_match_lipid_row_exposes_every_field() -> None:
-    # The committed node matched at the effective level, so the relation is an exact SKOS match and,
-    # because the asserted level was finer than the effective one, the query was slash-downgraded.
+def test_capped_lipid_row_exposes_every_field_and_reads_broad() -> None:
+    # The committed node matched at the EFFECTIVE (trust-policy-capped) level, which is coarser than the
+    # sn-position level the name asserted: the relation is measured against the asserted level, so the
+    # capped match reads broad (it read exact before 2026-11-05). The query was slash-downgraded.
     result = extract_mapping_result(_lipid_item(_EFFECTIVE), "PC 16:0/18:1")
     lr = result.lipid_resolution
     assert lr is not None
     assert lr.matched_lipid_level == _EFFECTIVE
-    assert lr.mapping_relation == "exact"
-    assert lr.mapping_predicate == "skos:exactMatch"
+    assert lr.mapping_relation == "broad"
+    assert lr.mapping_predicate == "skos:broadMatch"
     assert lr.query_transformed == "slash_to_underscore"
     assert lr.query_lipid_level_asserted == "sn_position"
     assert lr.goslin_dialect == "GOSLIN"
     assert lr.goslin_formula == "C42H82NO8P"
 
 
+def test_match_at_asserted_level_reads_exact() -> None:
+    result = extract_mapping_result(_lipid_item("sn_position"), "PC 16:0/18:1")
+    lr = result.lipid_resolution
+    assert lr is not None
+    assert lr.mapping_relation == "exact"
+    assert lr.mapping_predicate == "skos:exactMatch"
+
+
 def test_broad_match_lipid_row_sets_broad_relation_and_predicate() -> None:
-    # The committed node matched only at species, broader than the effective molecular-species query:
+    # The committed node matched only at species, broader than the asserted sn-position query:
     # the generalized case the flat lipid hint marks, now carried as a broad SKOS relation.
     result = extract_mapping_result(_lipid_item("species"), "PC 16:0/18:1")
     lr = result.lipid_resolution

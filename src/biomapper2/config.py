@@ -299,7 +299,9 @@ def derive_refmet_snapshot_version(path: Path | None) -> str | None:
 # frequently emit "/" loosely for data that only supports the molecular-species level. Default OFF: an
 # input asserted at sn-position is DOWNGRADED to molecular-species for querying (its EFFECTIVE level),
 # so a match is never over-claimed as sn-proven. Set truthy only when the input source is trusted to use
-# "/" strictly. Read by GoslinLipidAnnotator's level cascade.
+# "/" strictly. Read by GoslinLipidAnnotator's level cascade. Since 2026-11-05 the downgrade applies only
+# to a parse with two or more chain slots (an actual chain-order claim): single-chain fatty acids,
+# oxylipins and acylcarnitines keep their asserted level (see GoslinLipidAnnotator._makes_chain_order_claim).
 LIPID_TRUST_SN_POSITION = os.getenv("BIOMAPPER2_LIPID_TRUST_SN_POSITION", "").strip().lower() in {"1", "true", "yes"}
 
 # Structure (InChIKey) fallback services for the resolver's connectivity test. Used only on the

@@ -103,7 +103,11 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
 
     # Additive lipid_resolution object, assembled from the goslin metadata + committed node's matched
     # level the earlier units already put on the mapped item. None (serialized as null) off the lipid path.
-    lipid_fields = build_lipid_resolution(mapped_item)
+    # Prefer the mapper's own object: it was built against the node the certificate commits AND with that
+    # node's parsed level, so the API cannot disagree with the certificate provenance mirror. Rebuild
+    # from the votes only when the mapper supplied none (callers that hand-assemble a mapped item).
+    emitted = mapped_item.get("lipid_resolution")
+    lipid_fields = emitted if isinstance(emitted, dict) else build_lipid_resolution(mapped_item)
     lipid_resolution = LipidResolution(**lipid_fields) if lipid_fields is not None else None
 
     return EntityMappingResult(

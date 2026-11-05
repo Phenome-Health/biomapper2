@@ -27,7 +27,7 @@ REFMET_ANNOTATOR = "metabolomics-workbench"
 # metadata the Unit 4 level-aware tie-break reads.
 GOSLIN_LIPID_ANNOTATOR = "goslin-lipid"
 
-# Review hint set when a lipid tie could only be resolved to a node BROADER than the effective query
+# Review hint set when a lipid tie could only be resolved to a node BROADER than the asserted query
 # level. Deliberately a NEW, additive resolver-output field, NOT a ``selection_conflict`` value: that
 # channel is a closed, small-molecule-only whitelist enforced by the certificate, so widening it would
 # be a certificate-contract change. This hint rides its own field and never touches selection_conflict.
@@ -115,24 +115,30 @@ def _lipid_level_context(entity: "pd.Series | dict[str, Any]") -> tuple[dict[str
 
 
 def _lipid_generalized_hint(
-    chosen_kg_id: str | None, lipid_levels: dict[str, str], effective_level: str | None
+    chosen_kg_id: str | None, lipid_levels: dict[str, str], query_level: str | None
 ) -> str | None:
-    """``lipid_generalized`` when the committed lipid node is BROADER than the effective query level -- a
-    generalization the resolver could not avoid (R8). None for non-lipid rows and exact/finer matches."""
-    if not chosen_kg_id or not lipid_levels or not effective_level:
+    """``lipid_generalized`` when the committed lipid node is BROADER than the query level -- a
+    generalization the resolver could not avoid (R8). None for non-lipid rows and exact/finer matches.
+
+    ``query_level`` is the ASSERTED level (what the name claims), not the policy-capped effective level,
+    so a node the trust policy or the cascade generalized is still hinted (kept equal to
+    ``mapping_relation == "broad"``)."""
+    if not chosen_kg_id or not lipid_levels or not query_level:
         return None
     chosen_level = lipid_levels.get(chosen_kg_id)
     if chosen_level is None:
         return None
-    if _lipid_level_rank(chosen_level) > _lipid_level_rank(effective_level):
+    if _lipid_level_rank(chosen_level) > _lipid_level_rank(query_level):
         return LIPID_GENERALIZED_HINT
     return None
 
 
-# SKOS mapping relation between the COMMITTED lipid node's matched level and the effective query level.
-# ``exact`` when they coincide, ``broad`` when the node is coarser (the ``lipid_generalized`` case),
-# ``narrow`` when it is finer (should not happen under Decision 2's at-or-above policy, but is
-# represented honestly if seen), ``unknown`` when either level is missing.
+# SKOS mapping relation between the COMMITTED lipid node's matched level and the ASSERTED query level
+# (the level the input name claims, before the sn-position trust policy). ``exact`` when they coincide,
+# ``broad`` when the node is coarser (the ``lipid_generalized`` case, including every node the trust
+# policy capped), ``narrow`` when it is finer (should not happen under Decision 2's at-or-above policy,
+# but is represented honestly if seen), ``unknown`` when either level is missing. Until 2026-11-05 this
+# compared against the EFFECTIVE level, so a policy-capped match read as ``exact``.
 LIPID_RELATION_EXACT = "exact"
 LIPID_RELATION_BROAD = "broad"
 LIPID_RELATION_NARROW = "narrow"
@@ -167,20 +173,22 @@ LIPID_RESOLUTION_FIELDS: tuple[str, ...] = (
 )
 
 
-def lipid_mapping_relation(matched_level: str | None, effective_level: str | None) -> tuple[str, str | None]:
-    """The (relation, SKOS predicate) for a committed lipid node's matched level vs the effective level.
+def lipid_mapping_relation(matched_level: str | None, query_level: str | None) -> tuple[str, str | None]:
+    """The (relation, SKOS predicate) for a committed lipid node's matched level vs the query level.
 
-    Compared by specificity RANK, not name equality, so the relation survives any level whose name the
-    two sources spell differently. ``unknown`` (predicate None) when either level is missing.
+    Callers pass the ASSERTED query level, so any committed node coarser than what the name asserted is
+    ``broad`` (``skos:broadMatch``). Compared by specificity RANK, not name equality, so the relation
+    survives any level whose name the two sources spell differently. ``unknown`` (predicate None) when
+    either level is missing.
     """
-    if matched_level is None or effective_level is None:
+    if matched_level is None or query_level is None:
         return LIPID_RELATION_UNKNOWN, None
     rank_matched = _lipid_level_rank(matched_level)
-    rank_effective = _lipid_level_rank(effective_level)
-    if rank_matched == rank_effective:
+    rank_query = _lipid_level_rank(query_level)
+    if rank_matched == rank_query:
         relation = LIPID_RELATION_EXACT
-    elif rank_matched > rank_effective:
-        # Higher rank == LESS specific == the committed node is broader than the query asked for.
+    elif rank_matched > rank_query:
+        # Higher rank == LESS specific == the committed node is broader than the name asserted.
         relation = LIPID_RELATION_BROAD
     else:
         relation = LIPID_RELATION_NARROW
@@ -213,6 +221,14 @@ def _goslin_base_metadata(entity: "pd.Series | dict[str, Any]") -> dict[str, Any
     return None
 
 
+def _query_lipid_class(meta: dict[str, Any] | None) -> str | None:
+    """The query's lipid class (head group) from its goslin metadata, or None off the lipid path."""
+    if not meta:
+        return None
+    level_names = meta.get("goslin_level_names") or {}
+    return level_names.get("CLASS") or _lipid_head_group(meta.get("goslin_canonical"))
+
+
 class _UseEntityChosen:
     """Sentinel: ``build_lipid_resolution`` reads ``chosen_kg_id`` from the entity itself.
 
@@ -224,17 +240,31 @@ class _UseEntityChosen:
 _USE_ENTITY_CHOSEN = _UseEntityChosen()
 
 
+def committed_lipid_level(matched_level: str | None, node_level: str | None) -> str | None:
+    """The level the COMMITTED node expresses: the MORE specific of its goslin matched level (the query
+    rendering that hit it) and its own KG name's Goslin parse level.
+
+    Each is only a lower bound on the node. RefMet answers the species rendering ``SPB 18:0;O2`` with its
+    ``sphinganine`` record, a full structure, so the matched level alone under-states it; a name Goslin
+    reads coarsely (``5-Oxo-ETE``) or not at all (``FA 18:1;O2``) leaves the matched level standing."""
+    levels = [level for level in (matched_level, node_level) if level is not None]
+    return min(levels, key=_lipid_level_rank) if levels else None
+
+
 def build_lipid_resolution(
     entity: "pd.Series | dict[str, Any]",
     chosen_kg_id: "str | None | _UseEntityChosen" = _USE_ENTITY_CHOSEN,
+    node_level: str | None = None,
 ) -> dict[str, Any] | None:
     """Assemble the additive ``lipid_resolution`` object for a mapped row, or ``None`` for a non-lipid.
 
     Pulls together what the earlier units already produced: the goslin metadata on the goslin-lipid
     votes (Unit 2/3) and the committed node's matched level joined via ``_lipid_level_context`` (the
     same raw-id vs curie reconciliation Unit 4's tie-break uses). The relation between that matched
-    level and the effective query level is computed here and SUBSUMES the ``chosen_kg_id_lipid_hint``
-    flag: ``mapping_relation == "broad"`` is exactly the ``lipid_generalized`` case.
+    level and the ASSERTED query level is computed here and SUBSUMES the ``chosen_kg_id_lipid_hint``
+    flag: ``mapping_relation == "broad"`` is exactly the ``lipid_generalized`` case. A committed node no
+    goslin vote backs (e.g. RefMet's raw-name record) has no matched level; its relation then rests on
+    ``node_level`` (the node's own KG name parse) and is ``unknown`` only when that is absent too.
 
     ``chosen_kg_id`` defaults to the value on ``entity``; a caller may pass it explicitly to describe a
     DIFFERENT committed node than the one on the row. Re-resolution relies on this so the object always
@@ -252,7 +282,12 @@ def build_lipid_resolution(
     matched_level = levels.get(node) if isinstance(node, str) else None
     asserted_level = meta.get("query_lipid_level_asserted")
     effective_level = meta.get("query_lipid_level_effective") or effective_from_context
-    relation, predicate = lipid_mapping_relation(matched_level, effective_level)
+    # Against the ASSERTED level: a node the trust policy (or the cascade) generalized is ``broad``. The
+    # committed node's own parsed level (``node_level``, supplied by the mapper) wins over the matched
+    # level when its name parses (see ``committed_lipid_level``).
+    relation, predicate = lipid_mapping_relation(
+        committed_lipid_level(matched_level, node_level), asserted_level or effective_level
+    )
     return {
         "query_lipid_level_asserted": asserted_level,
         "query_lipid_level_effective": effective_level,
@@ -347,6 +382,11 @@ class Resolver:
         self.structure_resolver = (
             StructureResolver(linker, lipid_resolver=lipid_resolver) if linker is not None else None
         )
+        # Offline Goslin parser for candidate NODE names (class guard + RefMet-level precedence). The
+        # shared lipid resolver's parser when one is wired; otherwise a grammar is built lazily on the
+        # first multi-candidate small-molecule row, so a run that never reaches that path pays nothing.
+        self._lipid_resolver = lipid_resolver
+        self._node_grammar: Any = None
 
     def resolve(
         self, item: pd.Series | dict[str, Any] | pd.DataFrame, category: str | None = None
@@ -386,6 +426,10 @@ class Resolver:
         # provided- and assigned-combined resolutions below deliberately stay level-blind (today's
         # behavior); only the primary ``kg_ids`` choice is made level-aware.
         lipid_levels, effective_level = _lipid_level_context(entity)
+        query_meta = _goslin_base_metadata(entity)
+        # The level the NAME asserts (before the sn-position trust policy). The relation/hint and the
+        # RefMet-precedence rule compare against it; the tie-break keeps reading the effective level.
+        asserted_level = (query_meta or {}).get("query_lipid_level_asserted") or effective_level
 
         chosen_kg_id_provided, _ = self._choose_best_kg_id(entity["kg_ids_provided"])
         chosen_kg_id, chosen_kg_id_review = self._choose_best_kg_id(
@@ -394,7 +438,18 @@ class Resolver:
             category=category,
             lipid_levels=lipid_levels,
             effective_level=effective_level,
+            asserted_level=asserted_level,
+            query_lipid_class=_query_lipid_class(query_meta),
         )
+
+        # The committed lipid node's own level (its KG name's parse) for the hint, so the hint stays equal
+        # to the emitted ``mapping_relation == "broad"``. One cached /get-nodes read, lipid rows only.
+        hint_levels = lipid_levels
+        if query_meta is not None and chosen_kg_id is not None:
+            node_level = self.node_lipid_readings([chosen_kg_id]).get(chosen_kg_id, (None, None))[1]
+            level = committed_lipid_level(lipid_levels.get(chosen_kg_id), node_level)
+            if level is not None:
+                hint_levels = {**lipid_levels, chosen_kg_id: level}
 
         # Combine all annotators' KG IDs dict into one to choose preferred 'assigned' KG ID
         kg_ids_assigned_combined = defaultdict(list)
@@ -410,7 +465,7 @@ class Resolver:
                 "chosen_kg_id_assigned": chosen_kg_id_assigned,
                 "chosen_kg_id_review": chosen_kg_id_review,
                 # New, additive channel (separate from the closed selection_conflict whitelist).
-                "chosen_kg_id_lipid_hint": _lipid_generalized_hint(chosen_kg_id, lipid_levels, effective_level),
+                "chosen_kg_id_lipid_hint": _lipid_generalized_hint(chosen_kg_id, hint_levels, asserted_level),
             }
         )
 
@@ -471,6 +526,8 @@ class Resolver:
         category: str | None = None,
         lipid_levels: dict[str, str] | None = None,
         effective_level: str | None = None,
+        asserted_level: str | None = None,
+        query_lipid_class: str | None = None,
     ) -> tuple[str | None, str | None]:
         """
         Select a single KG ID from multiple candidates.
@@ -483,6 +540,19 @@ class Resolver:
         - InChIKey unavailable -> majority, flag 'conflict_no_structure'
         Non-metabolite, no-RefMet-vote, and no-conflict cases fall through to today's behavior.
 
+        Two lipid rules run before that connectivity test (2026-11-05):
+        - Class guard: a candidate whose node name parses (Goslin) to a lipid class different from the
+          reference class is never committed. The reference class is the query's own Goslin class, or,
+          when the query name does not parse (vendor prose such as ``...-GPE (P-16:0/18:1)*``), the
+          class of RefMet's raw-name node. A guarded-out majority is re-voted among the compatible
+          candidates; when that lands on RefMet's node it is flagged 'divergent_refmet' (a different
+          molecule lost). No compatible candidate at all -> no commit. Unparseable node names are
+          unknown, never excluded.
+        - RefMet precedence over a generalized Goslin vote: when the majority node is backed only as a
+          Goslin match COARSER than the asserted query level, and RefMet's raw-name node parses, in the
+          same class, to a FINER level than that match, RefMet's node is committed (no flag: the
+          disagreement is a known generalization, not a conflict between molecules).
+
         Args:
             kg_ids_dict: Dictionary mapping KG IDs to supporting curies
             kg_ids_assigned: Per-annotator {kg_id: [curies]}, used to find the RefMet node
@@ -490,6 +560,8 @@ class Resolver:
             lipid_levels: Optional {kg_id: matched_level} for lipid candidates; enables the Unit 4
                 level-aware tie-break. Omitted (empty) off the lipid path, leaving the tie-break unchanged.
             effective_level: The effective lipid query level the tie-break prefers a candidate to match.
+            asserted_level: The level the query name asserts (pre trust policy); rule (c) reads it.
+            query_lipid_class: The query's Goslin lipid class, the class guard's reference when known.
 
         Returns:
             (chosen_kg_id, review_flag) — review_flag is None unless the choice should be
@@ -526,16 +598,132 @@ class Resolver:
         # override the majority with a different RefMet node, and emit a spurious 'divergent_refmet'.
         # Unreachable on current data (see refmet_multi_node_rate), but the deterministic sort above
         # exists precisely to make that case well-defined, so it must be correct.
+        # Lipid class guard (d). Runs only with 2+ candidates and either a parsed lipid query or a RefMet
+        # disagreement, so a single-candidate or RefMet-agreeing row spends no node-name lookup.
+        guard_fired = False
+        node_lipid: dict[str, tuple[str | None, str | None]] = {}
+        if len(kg_ids_dict) > 1 and (query_lipid_class or (refmet_nodes and majority not in refmet_nodes)):
+            node_lipid = self.node_lipid_readings(list(kg_ids_dict))
+            reference_class = query_lipid_class or (
+                node_lipid.get(refmet_nodes[0], (None, None))[0] if refmet_nodes else None
+            )
+            if reference_class:
+                compatible = {
+                    kg_id: curies
+                    for kg_id, curies in kg_ids_dict.items()
+                    if node_lipid.get(kg_id, (None, None))[0] in (None, reference_class)
+                }
+                refmet_nodes = [n for n in refmet_nodes if n in compatible]
+                if majority not in compatible:
+                    logging.warning(
+                        "lipid class guard: majority %s is class %s, query class %s; not committed",
+                        majority,
+                        node_lipid.get(majority, (None, None))[0],
+                        reference_class,
+                    )
+                    if not compatible:
+                        return None, None
+                    majority = self._stable_majority(compatible, category, lipid_levels, effective_level)
+                    guard_fired = True
+
         if not refmet_nodes or majority in refmet_nodes:
-            return majority, None  # RefMet had no say, or already agrees
+            # RefMet had no say, or agrees. A guard-forced switch onto RefMet's node is still a conflict
+            # between different molecules in the vote, so it is surfaced.
+            return majority, ("divergent_refmet" if guard_fired and majority in refmet_nodes else None)
 
         refmet_node = refmet_nodes[0]
+        if self._refmet_finer_than_generalized_goslin(
+            majority, refmet_node, lipid_levels or {}, asserted_level, node_lipid, kg_ids_assigned
+        ):
+            return refmet_node, None  # (c): a capped/generalized Goslin vote never overrides RefMet
         same = self._connectivity_match(refmet_node, majority)
         if same is True:
             return refmet_node, None  # same molecule -> RefMet, silent
         if same is False:
             return refmet_node, "divergent_refmet"  # different molecule -> RefMet, FLAG
         return majority, "conflict_no_structure"  # no InChIKey -> majority, FLAG
+
+    def node_lipid_readings(self, node_ids: list[str]) -> dict[str, tuple[str | None, str | None]]:
+        """``{node: (lipid_class, lipid_level)}`` from a Goslin parse of each candidate's KG NAME.
+
+        Only nodes whose name parses appear; a non-lipid or unparseable name is simply absent (unknown,
+        never excluded by the guard). One /get-nodes read for all candidates. Best-effort: any failure
+        degrades to ``{}`` so the guard and the precedence rule become no-ops, never an error.
+        """
+        if self.linker is None:
+            return {}
+        try:
+            records = self.linker.get_node_records(node_ids)
+            if not isinstance(records, dict):
+                return {}
+            readings: dict[str, tuple[str | None, str | None]] = {}
+            for node_id in node_ids:
+                record = records.get(node_id)
+                name = record.get("name") if isinstance(record, dict) else None
+                if not isinstance(name, str) or not name.strip():
+                    continue
+                parse = self._parse_node_name(name)
+                if parse is None:
+                    continue
+                level_names = getattr(parse, "level_names", {}) or {}
+                lipid_class = level_names.get("CLASS") or _lipid_head_group(getattr(parse, "canonical_name", None))
+                raw_level = getattr(parse, "level", None)
+                level = str(raw_level).rsplit(".", 1)[-1].strip().lower() if raw_level else None
+                readings[node_id] = (lipid_class, level)
+            return readings
+        except Exception:  # noqa: BLE001 -- enrichment for a guard; never fail resolution on it
+            logging.warning("lipid node-name readings failed for %s (guard skipped)", node_ids, exc_info=True)
+            return {}
+
+    def _parse_node_name(self, name: str) -> Any | None:
+        """Offline Goslin parse of a KG node name, via the shared lipid resolver when wired."""
+        if self._lipid_resolver is not None:
+            return self._lipid_resolver.parse(name)
+        if self._node_grammar is None:
+            from .annotators.goslin_grammar import LipidGrammar
+
+            self._node_grammar = LipidGrammar()
+        return self._node_grammar.parse(name)
+
+    @staticmethod
+    def _refmet_finer_than_generalized_goslin(
+        majority: str,
+        refmet_node: str,
+        lipid_levels: dict[str, str],
+        asserted_level: str | None,
+        node_lipid: dict[str, tuple[str | None, str | None]],
+        kg_ids_assigned: dict[str, dict[str, list[str]]],
+    ) -> bool:
+        """Rule (c): the majority is a Goslin generalization and RefMet's raw-name node is finer.
+
+        True only when ALL hold: the majority node's level (the more specific of its Goslin matched level
+        and its own KG name's parse level) is COARSER than the level the query name asserted (a capped
+        or cascade-generalized vote); no annotator other than
+        goslin-lipid voted for the majority node (it is not independently supported); and RefMet's
+        node name parses, in the same lipid class as the majority (when the majority's class is known),
+        at a level FINER than that Goslin match. Anything unknown -> False (existing behavior).
+        """
+        # The majority node's level is the more specific of its goslin search level and its own KG
+        # name's parse: a fuzzy hit at a coarse search level can still be a different SPECIFIC molecule
+        # (9-HETE for 5-HETE). That is a real conflict and must reach the connectivity test and its flag.
+        majority_level = committed_lipid_level(
+            lipid_levels.get(majority),
+            node_lipid.get(majority, (None, None))[1] if lipid_levels.get(majority) else None,
+        )
+        if majority_level is None or asserted_level is None:
+            return False
+        if _lipid_level_rank(majority_level) <= _lipid_level_rank(asserted_level):
+            return False  # the Goslin vote is at (or finer than) what the name asserted: not generalized
+        backers = {slug for slug, nodes in kg_ids_assigned.items() if majority in nodes}
+        if backers - {GOSLIN_LIPID_ANNOTATOR}:
+            return False
+        refmet_class, refmet_level = node_lipid.get(refmet_node, (None, None))
+        if refmet_level is None:
+            return False
+        majority_class = node_lipid.get(majority, (None, None))[0]
+        if majority_class is not None and refmet_class != majority_class:
+            return False
+        return _lipid_level_rank(refmet_level) < _lipid_level_rank(majority_level)
 
     def is_small_molecule(self, category: str | None) -> bool:
         """Public form of the small-molecule subtree test, for callers outside resolution.

@@ -130,10 +130,13 @@ class LipidResolution(BaseModel):
     )
     mapping_relation: str = Field(
         default="unknown",
-        description="Relation of the committed node's matched level to the effective query level: "
+        description="Relation of the committed node's matched level to the ASSERTED query level "
+        "('query_lipid_level_asserted', the level the name claims, before the trust policy): "
         "'exact' | 'broad' | 'narrow' | 'unknown'. 'broad' means the committed node is coarser than the "
-        "query asked for (a generalization); 'narrow' should not occur under Decision 2 but is represented "
-        "honestly if seen; 'unknown' when a level is missing",
+        "name asserted (a generalization, including every match the sn-position trust policy capped); "
+        "'narrow' should not occur under Decision 2 but is represented honestly if seen; 'unknown' when a "
+        "level is missing (e.g. the committed node is RefMet's raw-name record, which no goslin vote backs). "
+        "Before 2026-11-05 this compared against the effective level, so a capped match read 'exact'",
     )
     mapping_predicate: str | None = Field(
         default=None,
@@ -241,7 +244,7 @@ class EntityMappingResult(BaseModel):
         default=None,
         description="Additive lipid review hint for chosen_kg_id, on its own axis from the closed "
         "selection_conflict whitelist: 'lipid_generalized' when the committed lipid node is BROADER "
-        "than the effective lipid query level (a generalization the resolver could not avoid); None "
+        "than the asserted lipid query level (a generalization the resolver could not avoid); None "
         "otherwise and for non-lipid rows. Now folded into lipid_resolution.mapping_relation "
         "('broad' == this hint's 'lipid_generalized'); kept for one release for backward compatibility.",
     )

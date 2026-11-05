@@ -20,18 +20,20 @@ ANCHOR_KEY = "KILNVBDSWZSGLL-KXQOOQHDSA-N"  # the query's independent structure 
 # Goslin lipid metadata for a swap: the committed node matched at the BROAD species level, the correct
 # distinct candidate at the exact molecular_species level. Shaped like the goslin-lipid annotator's
 # output so build_lipid_resolution reconciles each node to its own level.
+# A molecular-species query (asserted == effective), so the swapped node's level reads exact and the
+# replaced node's species level reads broad: the relation is measured against the ASSERTED level.
 _LIPID_ROW = {
     "assigned_ids": {
         "goslin-lipid": {
             "REFMET": {
                 "committed": {
                     "matched_level": "species",
-                    "query_lipid_level_asserted": "sn_position",
+                    "query_lipid_level_asserted": "molecular_species",
                     "query_lipid_level_effective": "molecular_species",
                 },
                 "correct": {
                     "matched_level": "molecular_species",
-                    "query_lipid_level_asserted": "sn_position",
+                    "query_lipid_level_asserted": "molecular_species",
                     "query_lipid_level_effective": "molecular_species",
                 },
             }
@@ -87,6 +89,7 @@ class _Mapper:
         self._enrich_equivalent_ids = Mapper._enrich_equivalent_ids.__get__(self, _Mapper)
         self._lipid_structure_evidence = Mapper._lipid_structure_evidence.__get__(self, _Mapper)
         self._certify_and_reresolve = Mapper._certify_and_reresolve.__get__(self, _Mapper)
+        self._committed_node_lipid_level = Mapper._committed_node_lipid_level.__get__(self, _Mapper)
 
 
 def _call(mapper, chosen="CHEBI:committed", kg_ids=None):
