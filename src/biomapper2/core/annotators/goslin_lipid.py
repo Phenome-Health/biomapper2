@@ -32,6 +32,7 @@ import pandas as pd
 
 from ... import config
 from ...utils import AssignedIDsDict
+from ..name_case import parse_case_robust
 from .base import BaseAnnotator
 from .goslin_grammar import LipidGrammar, LipidParse
 from .lipidmaps_rest import LipidEnricher
@@ -98,7 +99,9 @@ class GoslinLipidAnnotator(BaseAnnotator):
         if not name:
             return {}
 
-        parsed = self._grammar.parse(str(name))
+        # Goslin is case-sensitive ("12,13-DiHOME" parses, "12,13-dihome" does not): parse the
+        # canonical-case spelling first (see core/name_case.py), then the name as given.
+        parsed = parse_case_robust(self._grammar, str(name))
         if parsed is None:
             # Not lipid shorthand — fall through unchanged (the parse-success lipid detector).
             return {}

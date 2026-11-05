@@ -33,6 +33,7 @@ import logging
 from typing import Any
 
 from .certificate import TIER_B_SOURCE_LIPIDMAPS, TierBOutcome, TierBResult
+from .name_case import parse_case_robust
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +95,9 @@ class LipidStructureResolver:
         return result
 
     def _resolve(self, name: str) -> TierBResult:
-        parsed = self._grammar.parse(name)
+        # Same case-robust order as the Goslin annotator, so the independent structure (and so the
+        # certificate) does not depend on how a cohort cased the name.
+        parsed = parse_case_robust(self._grammar, name)
         if parsed is None:
             return _UNRESOLVED  # not a lipid; a clean "unknown", never a failure
         candidates, ok = self._enricher.candidates_checked(parsed.canonical_name)
