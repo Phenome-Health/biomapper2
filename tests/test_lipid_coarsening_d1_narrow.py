@@ -308,11 +308,18 @@ def test_oxylipins_keep_their_specific_refmet_entry(
             goslin_kestrel: _goslin_meta(asserted, effective, "species", level_names),
         },
     )
-    r, _, connectivity_calls = _resolver(connectivity=None)
+    # Recorded: the goslin-Kestrel competitor is a DIFFERENT specific isomer (9-HETE, 9-HpOME, 11-HEPE)
+    # whose InChIKey first block differs from RefMet's node, so the real connectivity answer is False.
+    r, _, connectivity_calls = _resolver(connectivity=False)
     out = _resolve(r, row)
     assert out["chosen_kg_id"] == refmet
-    assert out["chosen_kg_id_review"] is None
-    assert connectivity_calls == []  # decided by rule (c), never by the InChIKey test or a numeric coin
+    if connectivity_calls:
+        # The tie-break landed on the specific isomer: a real molecule conflict, surfaced (Greptile #99).
+        assert connectivity_calls == [(refmet, goslin_kestrel)]
+        assert out["chosen_kg_id_review"] == "divergent_refmet"
+    else:
+        # The tie-break landed on the class record: rule (c), a known generalization, unflagged.
+        assert out["chosen_kg_id_review"] is None
     row["chosen_kg_id"] = out["chosen_kg_id"]
     lipid = build_lipid_resolution(row)
     assert lipid is not None and lipid["mapping_relation"] == "unknown"  # no goslin vote backs RefMet's node
@@ -541,3 +548,41 @@ def test_committed_level_is_the_more_specific_of_match_and_node_name() -> None:
     assert committed_lipid_level("full_structure", "structure_defined") == "full_structure"  # 5-KETE
     assert committed_lipid_level("sn_position", None) == "sn_position"  # FA 18:1;O2 (name does not parse)
     assert committed_lipid_level(None, None) is None
+
+
+def test_rule_c_does_not_hide_a_specific_isomer_conflict() -> None:
+    # Greptile #99: a goslin-Kestrel hit stamped "species" whose node is the specific 9-HETE must not be
+    # treated as a generalization of 5-HETE; it goes to the connectivity test and is flagged.
+    names = {"SPECIES": "FA 20:4;O", "CLASS": "FA"}
+    row = _entity(
+        refmet="RM:0158210",
+        kestrel_raw=None,
+        goslin={"RM:0153066": _goslin_meta("structure_defined", "structure_defined", "species", names)},
+    )
+    r, _, connectivity_calls = _resolver(connectivity=False)
+    out = _resolve(r, row)
+    assert connectivity_calls == [("RM:0158210", "RM:0153066")]
+    assert (out["chosen_kg_id"], out["chosen_kg_id_review"]) == ("RM:0158210", "divergent_refmet")
+
+
+def test_api_reuses_the_mappers_lipid_resolution() -> None:
+    # Greptile #99: /entity and /batch must not rebuild the object without the committed node's level.
+    from biomapper2.api.routes.mapping import extract_mapping_result
+
+    names = {"SPECIES": "SPB 18:0;O2", "CLASS": "SPB"}
+    row = _entity(
+        refmet=None,
+        kestrel_raw=None,
+        goslin={"RM:0135445": _goslin_meta("full_structure", "full_structure", "sn_position", names)},
+    ).to_dict()
+    row["chosen_kg_id"] = "RM:0135445"
+    emitted = build_lipid_resolution(row, node_level="full_structure")
+    assert emitted is not None and emitted["mapping_relation"] == "exact"
+    row["lipid_resolution"] = emitted
+    result = extract_mapping_result(row, "sphinganine")
+    assert result.lipid_resolution is not None
+    assert result.lipid_resolution.mapping_relation == "exact"
+    # Fallback when the mapper supplied none: rebuilt from the votes (matched level only -> broad).
+    row["lipid_resolution"] = None
+    fallback = extract_mapping_result(row, "sphinganine")
+    assert fallback.lipid_resolution is not None and fallback.lipid_resolution.mapping_relation == "broad"

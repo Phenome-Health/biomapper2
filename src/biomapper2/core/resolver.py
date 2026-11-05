@@ -696,13 +696,20 @@ class Resolver:
     ) -> bool:
         """Rule (c): the majority is a Goslin generalization and RefMet's raw-name node is finer.
 
-        True only when ALL hold: the majority node carries a Goslin matched level COARSER than the level
-        the query name asserted (so it is a capped or cascade-generalized vote); no annotator other than
+        True only when ALL hold: the majority node's level (the more specific of its Goslin matched level
+        and its own KG name's parse level) is COARSER than the level the query name asserted (a capped
+        or cascade-generalized vote); no annotator other than
         goslin-lipid voted for the majority node (it is not independently supported); and RefMet's
         node name parses, in the same lipid class as the majority (when the majority's class is known),
         at a level FINER than that Goslin match. Anything unknown -> False (existing behavior).
         """
-        majority_level = lipid_levels.get(majority)
+        # The majority node's level is the more specific of its goslin search level and its own KG
+        # name's parse: a fuzzy hit at a coarse search level can still be a different SPECIFIC molecule
+        # (9-HETE for 5-HETE). That is a real conflict and must reach the connectivity test and its flag.
+        majority_level = committed_lipid_level(
+            lipid_levels.get(majority),
+            node_lipid.get(majority, (None, None))[1] if lipid_levels.get(majority) else None,
+        )
         if majority_level is None or asserted_level is None:
             return False
         if _lipid_level_rank(majority_level) <= _lipid_level_rank(asserted_level):
