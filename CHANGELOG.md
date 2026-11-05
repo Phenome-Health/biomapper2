@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/Phenome-Health/biomapper2/compare/v1.2.0...v1.2.1) (2026-11-05)
+
+
+### Bug Fixes
+
+* **lipids:** API reuses the mapper's lipid_resolution; rule (c) defers to connectivity for a specific isomer ([00e792e](https://github.com/Phenome-Health/biomapper2/commit/00e792e22b6b7ea0e8ea5e7fa3458d9c6b800eea))
+* **lipids:** stop coarsening single-chain lipids; class-guard and RefMet precedence in resolution ([1c02964](https://github.com/Phenome-Health/biomapper2/commit/1c02964be0a8a3e1a93a9146d13fc5e7893bfe78))
+
 ## [1.2.0](https://github.com/Phenome-Health/biomapper2/compare/v1.1.1...v1.2.0) (2026-11-05)
 
 
