@@ -299,6 +299,23 @@ class Mapper:
         node_parse = lipid_resolver.parse(node_name)
         return build_lipid_structure_evidence(query_meta, node_parse)
 
+    def _committed_node_lipid_level(self, lipid_row: "pd.Series | dict[str, Any]", node: str | None) -> str | None:
+        """The committed node's own lipid level (Goslin parse of its KG name), lipid rows only.
+
+        Feeds ``build_lipid_resolution`` so ``mapping_relation`` describes the node, not just the query
+        rendering that hit it. None off the lipid path, for no node, or when the resolver cannot read
+        node names (a test double); the relation then falls back to the goslin matched level.
+        """
+        if node is None or _goslin_base_metadata(lipid_row) is None:
+            return None
+        readings = getattr(self.resolver, "node_lipid_readings", None)
+        if readings is None:
+            return None
+        result = readings([node])
+        reading = result.get(node) if isinstance(result, dict) else None
+        level = reading[1] if isinstance(reading, tuple) and len(reading) == 2 else None
+        return level if isinstance(level, str) else None
+
     def _enrich_equivalent_ids(self, chosen_kg_id: str | None) -> tuple[dict[str, list[str]], bool]:
         """Step 5 for one node: the graph's equivalent ids, and whether the lookup succeeded.
 
@@ -351,7 +368,7 @@ class Mapper:
             # on either the emitted object or the certificate provenance mirror.
             if lipid_row is None:
                 return None
-            return build_lipid_resolution(lipid_row, node)
+            return build_lipid_resolution(lipid_row, node, node_level=self._committed_node_lipid_level(lipid_row, node))
 
         def _structure_for(node: str | None, equiv: dict[str, list[str]] | None, lookup_ok: bool) -> "Any | None":
             # The structure-free lipid verdict, recomputed against whichever node a certificate commits
