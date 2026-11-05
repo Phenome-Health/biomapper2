@@ -52,7 +52,7 @@ The API is deployed to the same Lightsail instance as kraken-backend:
    ```
 
 5. **Configure nginx:**
-   Add to `/etc/nginx/sites-available/default`:
+   Add to `/etc/nginx/sites-available/biomapper`:
    ```nginx
    server {
        listen 80;
@@ -66,6 +66,12 @@ The API is deployed to the same Lightsail instance as kraken-backend:
            proxy_set_header X-Forwarded-Proto $scheme;
        }
    }
+   ```
+
+   A new file under `sites-available/` is not loaded until it is linked into `sites-enabled/`:
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/biomapper /etc/nginx/sites-enabled/biomapper
+   sudo nginx -t && sudo systemctl reload nginx
    ```
 
 6. **Get SSL certificate:**
@@ -90,8 +96,12 @@ Policy:
 - **Global:** `limit_conn` of 2 concurrent mapping requests for the whole server block (matches
   `--workers 2`). A third concurrent request gets an immediate `429`. It does not queue.
 - **Exempt from the per-IP limit:** `127.0.0.1`, `::1`, and the host's own public IP
-  `35.161.242.62`. biomapper-ui runs on this host and calls the public URL, so all UI users
-  arrive from one address. Exempt hosts still count against the global cap of 2.
+  `35.161.242.62`. Exempt hosts still count against the global cap of 2.
+- **What the limits cover:** only traffic that passes through nginx, i.e. external callers (MCP
+  users, scripts, the public API). biomapper-ui on this host calls `http://localhost:8001`
+  directly, so its requests bypass nginx and neither limit applies to them. The `geo` exemption
+  is there in case the UI is ever pointed at the public URL, where all UI users would otherwise
+  arrive from one address.
 
 These are conservative starting values. Tune `rate`/`burst` through a PR to these files, not by
 hand-editing the host.
@@ -103,7 +113,7 @@ ssh -i ~/.ssh/lightsail-expert.pem ubuntu@35.161.242.62
 cd ~/biomapper2 && git fetch origin main && git reset --hard origin/main   # the merged commit
 
 # 0. Back up the current site config.
-sudo cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak.$(date +%F)
+sudo cp /etc/nginx/sites-available/biomapper /etc/nginx/sites-available/biomapper.bak.$(date +%F)
 
 # 1. Install the zones (http context) and the locations snippet.
 sudo cp deploy/nginx/biomapper2-ratelimit-zones.conf /etc/nginx/conf.d/
@@ -112,7 +122,7 @@ sudo cp deploy/nginx/biomapper2-ratelimit-locations.conf /etc/nginx/snippets/
 
 # 2. Find the certbot-managed server block (listen 443 ssl; server_name biomapper.expertintheloop.io).
 grep -n "server_name biomapper.expertintheloop.io" /etc/nginx/sites-enabled/*
-sudoedit /etc/nginx/sites-available/default
+sudoedit /etc/nginx/sites-available/biomapper
 ```
 
 Inside that `server { ... }` block, add this line just before the existing `location / {`:
@@ -159,47 +169,46 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST "$URL/map/entity" \
 curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" "$URL/api/v1/health"
 ```
 
-Then check the UI is not throttled as one IP: use biomapper-ui normally and confirm its
-requests are not answered `429` outside of the global cap. If they are, read the client address
-nginx logged for them (`sudo tail /var/log/nginx/access.log`). If it is the instance's private
-VPC address rather than `35.161.242.62`, add that address to the `geo` block in the zones file
-(through a PR), recopy the file, and reload.
+biomapper-ui on this host calls the engine at `http://localhost:8001` directly (its
+`BIOMAPPER_BASE_URL`), so its traffic never passes through nginx and is not rate limited. The
+`geo` exemption only matters if it is ever pointed at the public URL instead.
 
 Reading 429s in the logs:
 
 ```bash
-# Rejections are logged at warn level with the zone name and client IP.
-sudo grep -E "limiting (requests|connections)" /var/log/nginx/error.log | tail
-# Count 429 responses in the access log (combined format: status is field 9).
-sudo awk '$9 == 429' /var/log/nginx/access.log | wc -l
+# This site logs with the `bm2` format (conf.d/biomapper2-keymap.conf) to its own file, which
+# records status and consumer. Count and inspect rejections there:
+grep -c 'status=429' /var/log/nginx/biomapper2.access.log
+grep 'status=429' /var/log/nginx/biomapper2.access.log | tail
 ```
+
+The rejections are logged at `warn`, but the host's `error_log` uses nginx's default `error`
+level, so they do **not** appear in `/var/log/nginx/error.log`.
 
 ### Port 8001 must not be publicly reachable
 
-The limit only holds if clients cannot reach uvicorn directly. The service currently binds
-`0.0.0.0:8001`, so confirm the Lightsail firewall (instance > Networking > IPv4 and IPv6
-firewalls) does not open 8001, and check from outside:
+The limit only holds if clients cannot reach uvicorn directly. The service binds
+`127.0.0.1:8001` (`deploy/biomapper2-api.service`). Keep the Lightsail firewall (instance >
+Networking > IPv4 and IPv6 firewalls) closed on 8001 as a second layer, and check from outside:
 
 ```bash
 # From a machine that is NOT the Lightsail host: expect a timeout or refusal, not a response.
 curl -m 5 http://35.161.242.62:8001/api/v1/health
 ```
 
-Changing `deploy/biomapper2-api.service` to `--host 127.0.0.1` is a deliberate, **separate,
-later PR**. `.github/workflows/deploy-api.yml` copies the unit file to the host and restarts
-the service on every merge to `main` that touches `deploy/**`, so that change goes live on
-merge. Merge it only after this nginx config is live and nothing calls `:8001` from outside
-the host.
+Every local caller (nginx, biomapper-ui, the `deploy-api.yml` health check) uses `localhost`,
+which resolves to `127.0.0.1` only on this host (`/etc/hosts` maps `::1` to `ip6-localhost`).
+If that ever changes, a loopback-v4 bind would refuse `::1` callers.
 
-Merging this PR to `main` also triggers `deploy-api.yml`, because it touches `deploy/**`.
-That redeploys the API with the unchanged unit file and does not touch nginx. The nginx steps
-above stay manual.
+`.github/workflows/deploy-api.yml` copies the unit file to the host and restarts the service on
+every merge to `main` that touches `deploy/**`, so unit-file changes go live on merge. The nginx
+steps above stay manual.
 
 ### Roll back
 
 ```bash
 # 1. Remove the include line from the server block (or restore the backup from step 0):
-#    sudo cp /etc/nginx/sites-available/default.bak.<date> /etc/nginx/sites-available/default
+#    sudo cp /etc/nginx/sites-available/biomapper.bak.<date> /etc/nginx/sites-available/biomapper
 # 2. Then remove the installed files and reload.
 sudo rm /etc/nginx/snippets/biomapper2-ratelimit-locations.conf
 sudo rm /etc/nginx/conf.d/biomapper2-ratelimit-zones.conf
