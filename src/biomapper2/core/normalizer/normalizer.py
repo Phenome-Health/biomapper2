@@ -158,7 +158,9 @@ class Normalizer:
         # Return a named Series
         return pd.Series(
             {
-                "curies": list(curies),
+                # Sorted, not set order: set iteration order varies across processes (string hash
+                # randomization), which made the curies list, and anything reading its first element, unstable.
+                "curies": sorted(curies),
                 "curies_provided": list(curies_provided),
                 "curies_assigned": curies_assigned,
                 "invalid_ids_provided": invalid_ids_provided,

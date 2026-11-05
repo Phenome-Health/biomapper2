@@ -126,6 +126,21 @@ class TestNormalizeIntegration:
         assert "HMDB:HMDB0000122" in result["curies_provided"]
         assert "HMDB:HMDB0000190" in result["curies_provided"]
 
+    def test_combined_curies_are_sorted(self, normalizer):
+        """The combined ``curies`` list is in sorted order, not set-iteration order (which varies by
+        process under string-hash randomization), so its order is reproducible across runs."""
+        entity = pd.Series(
+            {
+                "name": "Test Entity",
+                "HMDB": "HMDB0000190,HMDB0000122",
+                "UniProt": "Q8NEV9",
+                "assigned_ids": {"some-annotator": {"chebi": {"17234": 1.0}, "kegg.compound": {"C00031": 1.0}}},
+            }
+        )
+        result = normalizer.normalize(item=entity, provided_id_fields=["HMDB", "UniProt"], array_delimiters=[","])
+        assert len(result["curies"]) == 5
+        assert result["curies"] == sorted(result["curies"])
+
     def test_normalize_entity_mixed_formats(self, normalizer):
         """Handles mix of list-in-string and delimited formats."""
         entity = pd.Series(
