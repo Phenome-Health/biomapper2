@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0](https://github.com/Phenome-Health/biomapper2/compare/v1.1.1...v1.2.0) (2026-11-05)
+
+
+### Features
+
+* **deploy:** bind uvicorn to 127.0.0.1; correct rate-limit README to the live host ([d6e1a1a](https://github.com/Phenome-Health/biomapper2/commit/d6e1a1a1e3cc06850defb6426b2dcaa711fa3582))
+* **deploy:** nginx rate limit for the mapping endpoints ([d2f8b27](https://github.com/Phenome-Health/biomapper2/commit/d2f8b27d6bd094d5bf7f9df123d56c25625409f3))
+
+
+### Bug Fixes
+
+* **deploy:** hold limit_conn slot until upstream finishes; pin rate policy in tests ([8e83e38](https://github.com/Phenome-Health/biomapper2/commit/8e83e38b7d519932477dbf49c20b11bee6d7bbc1))
+* **resolution:** a raw-spelling outage after a canonical miss is UNAVAILABLE, not NO_MATCH ([e5ed99a](https://github.com/Phenome-Health/biomapper2/commit/e5ed99a8a24c4a04c2860e61fe188b901089b499))
+* **resolution:** case-robust RefMet/Goslin name lookup; key the RefMet backup store by exact query ([5cc14fb](https://github.com/Phenome-Health/biomapper2/commit/5cc14fbf05447e1e858a557cdfc0080f20ffb187))
+
 ## [1.1.1](https://github.com/Phenome-Health/biomapper2/compare/v1.1.0...v1.1.1) (2026-10-29)
 
 
