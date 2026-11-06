@@ -167,6 +167,18 @@ class LipidResolution(BaseModel):
     goslin_dialect: str | None = Field(default=None, description="Goslin grammar dialect that parsed the input name")
     goslin_formula: str | None = Field(default=None, description="Sum formula from the goslin parse")
     goslin_mass: float | None = Field(default=None, description="Monoisotopic mass from the goslin parse")
+    name_is_mixture: bool = Field(
+        default=False,
+        description="Whether the query name lists alternative structures or analytes ('or', '+', a '/' between "
+        "names such as 'oleate/vaccenate', or comma-separated chain lists such as '(d18:1/14:0, d16:1/16:0)'). "
+        "A review signal: the committed node stands for what the alternatives share, not one of them",
+    )
+    query_species_from_parenthetical: bool = Field(
+        default=False,
+        description="Whether the lipid query was built from the name's chain parenthetical (a vendor name such "
+        "as 'sphingomyelin (d18:1/17:0, d17:1/18:0)') rather than parsed from the whole name. When the "
+        "parenthetical lists several isomers with one sum composition, the query is that species",
+    )
 
 
 # Passthrough rows are carried as VERBATIM dicts (see KestrelSearchResult.rows), not a typed model.

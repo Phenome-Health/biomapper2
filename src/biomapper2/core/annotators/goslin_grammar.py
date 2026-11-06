@@ -35,6 +35,11 @@ class LipidParse:
     chains: tuple[str, ...] = ()
 
 
+# Names pygoslin reads as lipid shorthand that, in a metabolite panel, are not lipids. Compared exactly,
+# case-insensitively, after stripping whitespace, so only the bare token is refused. ``EDTA`` (the
+# chelator, an anticoagulant in plasma panels) parses as an epoxy fatty acid (``FA 22:5;O``).
+_NOT_LIPID_NAMES: frozenset[str] = frozenset({"edta"})
+
 # (dialect label, parser class path). Ordered: Liebisch/Goslin shorthand first (the common metabolomics
 # form), then the database dialects. First parser that succeeds without raising wins.
 _DIALECTS: tuple[tuple[str, str], ...] = (
@@ -70,6 +75,8 @@ class LipidGrammar:
         if not name or not str(name).strip():
             return None
         text = str(name).strip()
+        if text.lower() in _NOT_LIPID_NAMES:
+            return None
         for dialect, parser in self._parsers:
             adduct = self._try_parse(parser, text)
             if adduct is None:

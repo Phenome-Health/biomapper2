@@ -24,6 +24,14 @@ a caller supplies ``enrichment`` are LM_ID/InChIKey filled from it, and the meta
 fired so any number it touched is flagged as coverage, not independent accuracy. The Kestrel source is
 likewise injected: when present it is queried only for cascade levels no other source already hit
 (D3), staying within the caller's ``candidate_limit``.
+
+Vendor-name route (2026-11-06): when the WHOLE name does not parse, a Metabolon-style name that lists
+alternative structures (``sphingomyelin (d18:1/17:0, d17:1/18:0, d19:1/16:0)``, ``dihomo-linolenate
+(20:3n3 or n6)``) is parsed from its chain parenthetical at the level the alternatives share, and the
+same cascade runs on that parse (rules in ``metabolon_lipid_name``). A name that parses whole never takes
+this route, and a single-isomer prose name is not routed, so neither changes. Two additive metadata
+fields record the route for review: ``name_is_mixture`` (the name lists alternatives) and
+``query_species_from_parenthetical`` (the query was built from the parenthetical, not the whole name).
 """
 
 from __future__ import annotations
@@ -36,11 +44,12 @@ import pandas as pd
 
 from ... import config
 from ...utils import AssignedIDsDict
-from ..name_case import parse_case_robust
+from ..name_case import canonical_case_variant, parse_case_robust
 from .base import BaseAnnotator
 from .goslin_grammar import LipidGrammar, LipidParse
 from .lipidmaps_rest import LipidEnricher
 from .metabolomics_workbench import MetabolomicsWorkbenchAnnotator
+from .metabolon_lipid_name import name_is_mixture, parenthetical_lipid_query
 
 # A single inner vote block: ``{vocab: {local_or_curie_id: metadata_dict}}``.
 _Votes = dict[str, dict[str, dict[str, Any]]]
@@ -106,9 +115,16 @@ class GoslinLipidAnnotator(BaseAnnotator):
         # Goslin is case-sensitive ("12,13-DiHOME" parses, "12,13-dihome" does not): parse the
         # canonical-case spelling first (see core/name_case.py), then the name as given.
         parsed = parse_case_robust(self._grammar, str(name))
+        from_parenthetical = False
         if parsed is None:
-            # Not lipid shorthand — fall through unchanged (the parse-success lipid detector).
-            return {}
+            # Not lipid shorthand. A vendor name listing alternative structures is parsed from its chain
+            # parenthetical at the level they share (case-canonical spelling, see name_case); anything
+            # else falls through unchanged (the parse-success lipid detector).
+            route = parenthetical_lipid_query(canonical_case_variant(str(name)), self._grammar)
+            if route is None:
+                return {}
+            parsed = route.parse
+            from_parenthetical = True
 
         asserted = self._asserted_level(parsed)
         effective = self._effective_level(asserted, parsed)
@@ -171,6 +187,8 @@ class GoslinLipidAnnotator(BaseAnnotator):
                 kestrel_votes, kestrel_level = {}, None
 
         base_meta = self._base_metadata(parsed, asserted, effective, enrichment_fired=bool(enrich_votes))
+        base_meta["name_is_mixture"] = name_is_mixture(str(name))
+        base_meta["query_species_from_parenthetical"] = from_parenthetical
 
         inner: _Votes = {}
         self._merge_votes(inner, refmet_votes, refmet_level, base_meta)

@@ -170,6 +170,8 @@ LIPID_RESOLUTION_FIELDS: tuple[str, ...] = (
     "goslin_dialect",
     "goslin_formula",
     "goslin_mass",
+    "name_is_mixture",
+    "query_species_from_parenthetical",
 )
 
 
@@ -301,6 +303,10 @@ def build_lipid_resolution(
         "goslin_dialect": meta.get("goslin_dialect"),
         "goslin_formula": meta.get("goslin_formula"),
         "goslin_mass": meta.get("goslin_mass"),
+        # Additive review signals from the goslin annotator (2026-11-06). Votes stamped before these keys
+        # existed read False, the behavior they had.
+        "name_is_mixture": bool(meta.get("name_is_mixture", False)),
+        "query_species_from_parenthetical": bool(meta.get("query_species_from_parenthetical", False)),
     }
 
 
