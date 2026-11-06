@@ -414,7 +414,7 @@ class Normalizer:
         Blind stripping would leave a meaningless fragment, so the id AS GIVEN is always tried
         first: if it validates for the target vocabulary, that is what it is.
 
-        A REPEATED colon ("DOID::12386") is a typo rather than structure, so a colon-collapsed form
+        A REPEATED colon (``DOID::12386``) is a typo rather than structure, so a colon-collapsed form
         is offered too. It is an extra candidate, not a rewrite, so an id that legitimately contains
         a colon is still tried untouched first. (Note the obvious one-line fix for this -- taking the
         LAST colon-separated segment -- would quietly destroy those ids: HGVS's
@@ -468,8 +468,8 @@ class Normalizer:
 
         The '.0' is stripped ONLY for an actual float input, never for a string. A float is the
         spreadsheet artifact we mean to undo (pandas types an integer column containing blanks as
-        float64, so the code 12345 arrives as 12345.0), whereas in a string the '.0' is part of the
-        identifier -- ICD9 '250.0' (diabetes with coma) is a DIFFERENT code from '250' (diabetes
+        float64, so the code ``12345`` arrives as ``12345.0``), whereas in a string the '.0' is part of the
+        identifier -- ICD9 ``250.0`` (diabetes with coma) is a DIFFERENT code from ``250`` (diabetes
         mellitus), so stripping it silently changes the entity being referenced. Anything that can
         reach us as text (an ICD/OMOP/HCPCS-style dotted code) is therefore left intact.
         """

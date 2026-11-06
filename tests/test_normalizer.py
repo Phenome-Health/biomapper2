@@ -234,7 +234,7 @@ class TestCleanId:
     def test_string_keeps_its_dot_zero(self, normalizer):
         """A '.0' inside a STRING is part of the identifier, not a float artifact.
 
-        ICD9 '250.0' (diabetes with coma) is a different code from '250' (diabetes mellitus),
+        ICD9 ``250.0`` (diabetes with coma) is a different code from ``250`` (diabetes mellitus),
         so stripping it would silently change which entity is referenced.
         """
         assert normalizer.clean_id("250.0") == "250.0"
@@ -333,7 +333,7 @@ class TestVocabMatchingSafety:
         """The cache is keyed by the fuzzy flag, so the answer can't depend on lookup order.
 
         Regression: a fuzzy lookup of 'hgnc.family' cached a substring match on 'mi' (inside
-        "hgncfaMIly"), and a later non-fuzzy call read that cache and resolved 1561 to MI:1561.
+        "hgncfaMIly"), and a later non-fuzzy call read that cache and resolved ``1561`` to MI:1561.
         """
         n = Normalizer()
         n.determine_vocab("some_unknown_family_field")  # fuzzy (the default), populates the cache
@@ -454,7 +454,7 @@ class TestDbsnpIds:
 
 
 class TestRepeatedColons:
-    """Accidental doubled colons in an input curie (issue #59): 'DOID::12386' -> 'DOID:12386'."""
+    """Accidental doubled colons in an input curie (issue #59): ``DOID::12386`` -> ``DOID:12386``."""
 
     @pytest.fixture
     def normalizer(self):
