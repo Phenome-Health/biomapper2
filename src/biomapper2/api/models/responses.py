@@ -167,6 +167,18 @@ class LipidResolution(BaseModel):
     goslin_dialect: str | None = Field(default=None, description="Goslin grammar dialect that parsed the input name")
     goslin_formula: str | None = Field(default=None, description="Sum formula from the goslin parse")
     goslin_mass: float | None = Field(default=None, description="Monoisotopic mass from the goslin parse")
+    name_is_mixture: bool = Field(
+        default=False,
+        description="Whether the query name lists alternative structures or analytes ('or', '+', a '/' between "
+        "names such as 'oleate/vaccenate', or comma-separated chain lists such as '(d18:1/14:0, d16:1/16:0)'). "
+        "A review signal: the committed node stands for what the alternatives share, not one of them",
+    )
+    query_species_from_parenthetical: bool = Field(
+        default=False,
+        description="Whether the lipid query was built from the name's chain parenthetical (a vendor name such "
+        "as 'sphingomyelin (d18:1/17:0, d17:1/18:0)') rather than parsed from the whole name. When the "
+        "parenthetical lists several isomers with one sum composition, the query is that species",
+    )
 
 
 # Passthrough rows are carried as VERBATIM dicts (see KestrelSearchResult.rows), not a typed model.
@@ -227,7 +239,28 @@ class EntityMappingResult(BaseModel):
     """Result of mapping a single entity to knowledge graph nodes."""
 
     name: str = Field(..., description="Entity name")
-    curies: list[str] = Field(default_factory=list, description="Normalized CURIEs for the entity")
+    curies: list[str] = Field(
+        default_factory=list,
+        description="Normalized CURIEs for the entity: the sorted union of every source's CURIEs. The order "
+        "is alphabetical, so curies[0] is NOT the answer; read primary_curie (or chosen_kg_id) instead.",
+    )
+    primary_curie: str | None = Field(
+        default=None,
+        description="The one CURIE to report for the entity, guaranteed to identify chosen_kg_id's node: the "
+        "first CURIE in 'curies' order that is chosen_kg_id, links to it (kg_ids[chosen_kg_id]), or is in its "
+        "kg_equivalent_ids; chosen_kg_id itself if none is; curies[0] (or null) when nothing was chosen. "
+        "Equal to curies[0] whenever curies[0] already identifies the chosen node.",
+    )
+    curies_provided: list[str] = Field(
+        default_factory=list,
+        description="Provenance: the CURIEs (sorted) normalized from the identifiers supplied in the request.",
+    )
+    curies_assigned: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Provenance: {annotator_slug: [CURIEs]}, i.e. which annotator produced each assigned "
+        "CURIE (sorted). 'curies' is the union of this and curies_provided; a CURIE two annotators both "
+        "returned appears under both. The raw per-annotator local IDs remain in assigned_ids.",
+    )
     chosen_kg_id: str | None = Field(default=None, description="Best knowledge graph node ID chosen by resolution")
     chosen_kg_id_review: str | None = Field(
         default=None,

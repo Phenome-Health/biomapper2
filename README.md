@@ -125,6 +125,20 @@ For a local server, the API docs are available at:
 | POST | `/api/v1/map/dataset` | Map an uploaded TSV/CSV file |
 | POST | `/api/v1/map/dataset/stream` | Stream mapping results as NDJSON |
 
+### Reading a mapping result
+
+- **`chosen_kg_id`** is the answer: the knowledge-graph node the resolver committed. `kg_equivalent_ids`
+  lists that node's identifiers by prefix.
+- **`primary_curie`** is the one CURIE to report for the entity, and it always identifies the
+  `chosen_kg_id` node: the first CURIE in `curies` that is the chosen node, links to it
+  (`kg_ids[chosen_kg_id]`), or is among its `kg_equivalent_ids`; `chosen_kg_id` itself if none is.
+  When nothing was chosen it is `curies[0]` (or null).
+- **`curies`** is the alphabetically sorted union of every source's CURIEs, including hits for nodes
+  that lost the vote. Do not read `curies[0]` as the answer.
+- **Provenance:** `curies_provided` holds the CURIEs from identifiers you supplied, and
+  `curies_assigned` maps each annotator slug to the CURIEs it produced (`assigned_ids` keeps the raw
+  per-annotator local IDs and scores).
+
 ### Raw Kestrel passthrough (`kestrel_top_n`)
 
 `kestrel_top_n` is an opt-in request option that returns the top-N **raw** rows Kestrel returned for
