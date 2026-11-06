@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/Phenome-Health/biomapper2/compare/v1.2.1...v1.3.0) (2026-11-06)
+
+
+### Features
+
+* **normalizer:** add ICD10CM as its own vocabulary ([fe93ef6](https://github.com/Phenome-Health/biomapper2/commit/fe93ef6203884226ae126185c50a812f00f799c6))
+* **normalizer:** add ICD10CM as its own vocabulary ([c2360ee](https://github.com/Phenome-Health/biomapper2/commit/c2360ee75d957c3f4380d095bbecee2e743a8446))
+
+
+### Bug Fixes
+
+* **normalizer:** fuzzy tier prefers the more specific vocab ([6fad77f](https://github.com/Phenome-Health/biomapper2/commit/6fad77f7da0e5fb3ce3a921f8c1b9135cc244c75))
+
 ## [1.2.1](https://github.com/Phenome-Health/biomapper2/compare/v1.2.0...v1.2.1) (2026-11-05)
 
 
