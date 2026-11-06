@@ -31,7 +31,7 @@ R3  The lipid class comes from the common-name head (the text before the parenth
         straight-chain acid).
     Any other head is refused (glycerol esters named by position, e.g. ``1-linoleoylglycerol``, included).
 R4  Chain tokens: ``[dtm]?`` long-chain-base prefix (sphingolipids only, required there), optional
-    ``P-``/``O-`` ether prefix (glycerophospholipids only), ``C:D``, optional omega locant ``n3``, optional
+    ``P-``/``O-`` ether prefix, either case (glycerophospholipids only), ``C:D``, optional omega locant ``n3``, optional
     omega alternative `` or n6`` / `` or 3n6`` / `` or 6``. Branch prefixes (``a15:0``/``i15:0``), functional
     groups (``16:0-OH``) and anything else are refused.
 R5  Every alternative must parse with Goslin and all must render the SAME species (sum composition) and
@@ -72,7 +72,7 @@ _PEAK_MARKER = re.compile(r"\s*\[\d+\]")
 _LAST_PAREN = re.compile(r"\(([^()]*)\)(?=[^()]*$)")
 _OMEGA_ALT = r"(?:\s+or\s+(?:\d+n|n)?\d+)"
 _CHAIN = re.compile(
-    r"^(?P<carn>[Cc])?(?P<lcb>[dtm])?(?P<ether>[PO]-)?(?P<c>\d+):(?P<d>\d+)(?P<omega>n\d+)?(?P<alt>"
+    r"^(?P<carn>[Cc])?(?P<lcb>[dtm])?(?P<ether>[PpOo]-)?(?P<c>\d+):(?P<d>\d+)(?P<omega>n\d+)?(?P<alt>"
     + _OMEGA_ALT
     + r")?$"
 )
@@ -177,7 +177,9 @@ def _alternative_shorthand(cls: str, chains: list[re.Match[str]], head: str = ""
             return None
         if ether and cls.lstrip("L") not in ("PC", "PE"):
             return None
-        rendered.append(f"{lcb or ''}{ether or ''}{chain.group('c')}:{chain.group('d')}")
+        # The ether letter is upper-cased on EVERY chain: the case fix (name_case) only restores the one
+        # that opens the parenthetical, and NECS lower-cases them all.
+        rendered.append(f"{lcb or ''}{(ether or '').upper()}{chain.group('c')}:{chain.group('d')}")
     if cls.startswith("L") and len(rendered) == 1:
         position = re.match(r"([12])-", head.strip())
         if position:

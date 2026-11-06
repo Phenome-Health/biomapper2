@@ -126,6 +126,15 @@ def test_mixture_labels_resolve_at_the_level_their_alternatives_share(grammar, n
     assert route.species_level is species_level
 
 
+def test_lower_case_ether_alternatives_route_like_the_metabolon_spelling(grammar):
+    # The case fix restores only the ether letter that opens the parenthetical; every later alternative
+    # stays lower-case in NECS spellings and must still be read.
+    lower = _route("phosphatidylethanolamine (p-18:1/20:4, p-16:0/22:5n3)*", grammar)
+    upper = _route("phosphatidylethanolamine (P-18:1/20:4, P-16:0/22:5n3)*", grammar)
+    assert lower.alternatives == upper.alternatives == ("PE P-18:1/20:4", "PE P-16:0/22:5")
+    assert lower.parse.level_names["SPECIES"] == upper.parse.level_names["SPECIES"] == "PE O-38:6"
+
+
 def test_lyso_acyl_position_is_kept_as_an_empty_slot(grammar):
     # "1-" names the sn-1 acyl: kept as LPC 20:3/0:0 (RefMet's record for the vendor name), so the
     # sn-position trust policy and RefMet precedence see the same claim as for written-out shorthand.
