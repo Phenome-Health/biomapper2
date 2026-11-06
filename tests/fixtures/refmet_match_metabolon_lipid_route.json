@@ -1,0 +1,221 @@
+{
+ "_recorded": "RefMet /match (https://www.metabolomicsworkbench.org/rest/refmet/match/<name>), recorded live 2026-11-06 for the queries the Metabolon lipid route builds from the NECS / Xu / Arivale panels (one retry for a dropped connection on 'SM 32:1;O2'). Probe artifact: ~/external_benchmark_runs/lipid_route_probe_20261106/.",
+ "answers": {
+  "CAR 20:3": {
+   "refmet_id": "RM0154160",
+   "refmet_name": "CAR 20:3"
+  },
+  "Cer 32:1;O2": {
+   "refmet_id": "RM0122205",
+   "refmet_name": "Cer 32:1;O2"
+  },
+  "Cer 35:1;O2": {
+   "refmet_id": "RM0122950",
+   "refmet_name": "Cer 35:1;O2"
+  },
+  "Cer 38:1;O2": {
+   "refmet_id": "RM0134195",
+   "refmet_name": "Cer 38:1;O2"
+  },
+  "Cer 40:2;O2": {
+   "refmet_id": "RM0035369",
+   "refmet_name": "Cer 40:2;O2"
+  },
+  "Cer 42:3;O2": {
+   "refmet_id": "RM0012730",
+   "refmet_name": "Cer 42:3;O2"
+  },
+  "DG 32:1": {
+   "refmet_id": "RM0134364",
+   "refmet_name": "DG 32:1"
+  },
+  "DG 34:3": {
+   "refmet_id": "RM0035412",
+   "refmet_name": "DG 34:3"
+  },
+  "FA 10:1": {
+   "refmet_id": "RM0073673",
+   "refmet_name": "Decenoic acid"
+  },
+  "FA 18:1": {
+   "refmet_id": "RM0140004",
+   "refmet_name": "Octadecenoic acid"
+  },
+  "FA 18:3": {
+   "refmet_id": "RM0139661",
+   "refmet_name": "Octadecatrienoic acid"
+  },
+  "FA 20:1": {
+   "refmet_id": "RM0150389",
+   "refmet_name": "Eicosenoic acid"
+  },
+  "FA 20:3": {
+   "refmet_id": "RM0152308",
+   "refmet_name": "Eicosatrienoic acid"
+  },
+  "FA 4:0": {
+   "refmet_id": "RM0153517",
+   "refmet_name": "Butyric acid"
+  },
+  "HexCer 38:1;O2": {
+   "refmet_id": "RM0045050",
+   "refmet_name": "HexCer 38:1;O2"
+  },
+  "HexCer 41:2;O2": {
+   "refmet_id": "RM0043942",
+   "refmet_name": "HexCer 41:2;O2"
+  },
+  "HexCer 42:3;O2": {
+   "refmet_id": "RM0040060",
+   "refmet_name": "HexCer 42:3;O2"
+  },
+  "LPC 20:3": {
+   "refmet_id": "RM0134469",
+   "refmet_name": "LPC 20:3"
+  },
+  "LPE 20:3": {
+   "refmet_id": "RM0012621",
+   "refmet_name": "LPE 20:3"
+  },
+  "PC 16:0_20:3": {
+   "refmet_id": "RM0014008",
+   "refmet_name": "PC 16:0_20:3"
+  },
+  "PC 18:0_20:3": {
+   "refmet_id": "RM0170562",
+   "refmet_name": "PC 18:0_20:3"
+  },
+  "PC 28:0": {
+   "refmet_id": "RM0134835",
+   "refmet_name": "PC 28:0"
+  },
+  "PC 33:1": {
+   "refmet_id": "RM0134891",
+   "refmet_name": "PC 33:1"
+  },
+  "PC 36:3": {
+   "refmet_id": "RM0010754",
+   "refmet_name": "PC 36:3"
+  },
+  "PC 38:2": {
+   "refmet_id": "RM0134844",
+   "refmet_name": "PC 38:2"
+  },
+  "PC 38:3": {
+   "refmet_id": "RM0134820",
+   "refmet_name": "PC 38:3"
+  },
+  "PC 38:5": {
+   "refmet_id": "RM0134823",
+   "refmet_name": "PC 38:5"
+  },
+  "PE 18:0_20:3": {
+   "refmet_id": "RM0001660",
+   "refmet_name": "PE 18:0_20:3"
+  },
+  "PE 38:3": {
+   "refmet_id": "RM0002934",
+   "refmet_name": "PE 38:3"
+  },
+  "PE O-38:6": {
+   "refmet_id": "RM0008899",
+   "refmet_name": "PE O-38:6"
+  },
+  "PI 18:0_20:3": {
+   "refmet_id": "RM0106376",
+   "refmet_name": "PI 18:0_20:3"
+  },
+  "PI 38:3": {
+   "refmet_id": "RM0056603",
+   "refmet_name": "PI 38:3"
+  },
+  "SM 31:1;O2": {
+   "refmet_id": "RM0120507",
+   "refmet_name": "SM 31:1;O2"
+  },
+  "SM 32:1;O2": {
+   "refmet_id": "RM0134150",
+   "refmet_name": "SM 32:1;O2"
+  },
+  "SM 32:2;O2": {
+   "refmet_id": "RM0134093",
+   "refmet_name": "SM 32:2;O2"
+  },
+  "SM 33:1;O2": {
+   "refmet_id": "RM0134154",
+   "refmet_name": "SM 33:1;O2"
+  },
+  "SM 33:2;O2": {
+   "refmet_id": "RM0059831",
+   "refmet_name": "SM 33:2;O2"
+  },
+  "SM 34:2;O2": {
+   "refmet_id": "RM0134151",
+   "refmet_name": "SM 34:2;O2"
+  },
+  "SM 35:1;O2": {
+   "refmet_id": "RM0059990",
+   "refmet_name": "SM 35:1;O2"
+  },
+  "SM 36:0;O2": {
+   "refmet_id": "RM0134098",
+   "refmet_name": "SM 36:0;O2"
+  },
+  "SM 36:2;O2": {
+   "refmet_id": "RM0134100",
+   "refmet_name": "SM 36:2;O2"
+  },
+  "SM 37:1;O2": {
+   "refmet_id": "RM0138770",
+   "refmet_name": "SM 37:1;O2"
+  },
+  "SM 38:0;O2": {
+   "refmet_id": "RM0134102",
+   "refmet_name": "SM 38:0;O2"
+  },
+  "SM 38:1;O2": {
+   "refmet_id": "RM0134157",
+   "refmet_name": "SM 38:1;O2"
+  },
+  "SM 38:2;O2": {
+   "refmet_id": "RM0059717",
+   "refmet_name": "SM 38:2;O2"
+  },
+  "SM 38:3;O2": {
+   "refmet_id": "RM0134103",
+   "refmet_name": "SM 38:3;O2"
+  },
+  "SM 39:1;O2": {
+   "refmet_id": "RM0120989",
+   "refmet_name": "SM 39:1;O2"
+  },
+  "SM 39:2;O2": {
+   "refmet_id": "RM0060121",
+   "refmet_name": "SM 39:2;O2"
+  },
+  "SM 40:2;O2": {
+   "refmet_id": "RM0122299",
+   "refmet_name": "SM 40:2;O2"
+  },
+  "SM 40:3;O2": {
+   "refmet_id": "RM0134106",
+   "refmet_name": "SM 40:3;O2"
+  },
+  "SM 41:2;O2": {
+   "refmet_id": "RM0134158",
+   "refmet_name": "SM 41:2;O2"
+  },
+  "SM 42:2;O2": {
+   "refmet_id": "RM0122625",
+   "refmet_name": "SM 42:2;O2"
+  },
+  "SM 42:3;O2": {
+   "refmet_id": "RM0134109",
+   "refmet_name": "SM 42:3;O2"
+  },
+  "SM 43:1;O2": {
+   "refmet_id": "RM0122662",
+   "refmet_name": "SM 43:1;O2"
+  }
+ }
+}
