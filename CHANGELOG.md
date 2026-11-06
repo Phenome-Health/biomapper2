@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.1](https://github.com/Phenome-Health/biomapper2/compare/v1.3.0...v1.3.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **api:** derive primary_curie from the chosen node; add per-source CURIE provenance ([9cadb54](https://github.com/Phenome-Health/biomapper2/commit/9cadb54cd56c423bc09456a3ab423847cf9449c0))
+* **lipids:** read lower-case ether prefixes on every parenthetical alternative ([ad38644](https://github.com/Phenome-Health/biomapper2/commit/ad3864411843c7ceaaccd5a0acc71216fff79c0d))
+* **lipids:** route Metabolon-style names through Goslin from their chain parenthetical ([12637ab](https://github.com/Phenome-Health/biomapper2/commit/12637abffd1ad16a0645ad183bd5ab8238c1d4c9))
+
 ## [1.3.0](https://github.com/Phenome-Health/biomapper2/compare/v1.2.1...v1.3.0) (2026-11-06)
 
 
