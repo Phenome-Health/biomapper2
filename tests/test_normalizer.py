@@ -525,6 +525,15 @@ class TestIcd10cm:
         assert set(curies) == {"ICD10CM:E11.9"}
         assert not invalid and not unrecognized
 
+    def test_fuzzy_tier_prefers_the_more_specific_vocab(self, normalizer):
+        """A longer column name skips the exact tier; the substring tier then finds both 'icd10' and
+        'icd10cm', and either would validate E11.9. The longer, more specific name must win."""
+        assert normalizer.determine_vocab("ICD10CM diagnosis code") == {"icd10cm"}
+        curies, _, _ = normalizer.get_curies({"ICD10CM diagnosis code": "E11.9"}, log_warnings=False)
+        assert set(curies) == {"ICD10CM:E11.9"}
+        # A plain ICD-10 column still matches ICD10
+        assert normalizer.determine_vocab("ICD10 diagnosis code") == {"icd10"}
+
     @pytest.mark.parametrize("local_id", ["E11", "E11.65", "S72.001A", "T36.0X1A", "Z79.4"])
     def test_accepts_cm_codes(self, normalizer, local_id):
         curies, invalid, _ = normalizer.get_curies({"icd10cm": local_id}, log_warnings=False, fuzzy_match_vocab=False)

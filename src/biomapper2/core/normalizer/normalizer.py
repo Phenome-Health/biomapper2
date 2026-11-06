@@ -296,6 +296,15 @@ class Normalizer:
                     if len(vocab_root) >= MIN_SUBSTRING_MATCH_LENGTH and vocab_root in field_name_cleaned:
                         matches_on_substring.add(vocab)
 
+                # Drop a match whose root sits inside a longer matched root ('icd10' inside 'icd10cm'):
+                # the field named the more specific vocab, and both may validate the same id
+                roots = {vocab: vocab.split(".")[0] for vocab in matches_on_substring}
+                matches_on_substring = {
+                    vocab
+                    for vocab, root in roots.items()
+                    if not any(root != other and root in other for other in roots.values())
+                }
+
                 if matches_on_substring:
                     logging.debug(f"Found substring match(es) for '{id_field_name}': {matches_on_substring}")
                     self.field_name_to_vocab_name_cache[cache_key] = matches_on_substring
