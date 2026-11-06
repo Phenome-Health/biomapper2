@@ -502,3 +502,45 @@ class TestRepeatedColons:
         )
         assert not curies
         assert invalid["ncit"] == ["C34831:C34915:C34916"]
+
+
+class TestIcd10cm:
+    """ICD-10-CM is its own vocabulary, not WHO ICD-10.
+
+    Regression: with no icd10cm vocab, the fuzzy tier found 'icd10' inside 'icd10cm' and silently
+    rewrote ICD10CM:E11.9 to ICD10:E11.9. The two code systems differ (CM is larger, and a code
+    can mean different things in each), so the prefix must survive as given.
+    """
+
+    @pytest.fixture
+    def normalizer(self):
+        return Normalizer()
+
+    @pytest.mark.parametrize("fuzzy", [True, False])
+    @pytest.mark.parametrize("field", ["ICD10CM", "icd10cm", "ICD-10-CM", "ICD10CM code"])
+    def test_keeps_its_own_prefix(self, normalizer, field, fuzzy):
+        curies, invalid, unrecognized = normalizer.get_curies(
+            {field: "E11.9"}, log_warnings=False, fuzzy_match_vocab=fuzzy
+        )
+        assert set(curies) == {"ICD10CM:E11.9"}
+        assert not invalid and not unrecognized
+
+    @pytest.mark.parametrize("local_id", ["E11", "E11.65", "S72.001A", "T36.0X1A", "Z79.4"])
+    def test_accepts_cm_codes(self, normalizer, local_id):
+        curies, invalid, _ = normalizer.get_curies({"icd10cm": local_id}, log_warnings=False, fuzzy_match_vocab=False)
+        assert f"ICD10CM:{local_id}" in curies
+        assert not invalid
+
+    def test_full_curie_input_keeps_prefix(self, normalizer):
+        curies, _, _ = normalizer.get_curies({"icd10cm": "ICD10CM:E11.9"}, log_warnings=False)
+        assert set(curies) == {"ICD10CM:E11.9"}
+
+    def test_icd10_is_unchanged(self, normalizer):
+        curies, _, _ = normalizer.get_curies({"icd10": "E11"}, log_warnings=False)
+        assert set(curies) == {"ICD10:E11"}
+
+    def test_iris(self, normalizer):
+        """ICD10's Biolink IRI points at the ICD-9 site, so it is overridden to the WHO browser."""
+        curies, _, _ = normalizer.get_curies({"icd10": "E11", "icd10cm": "E11.9"}, log_warnings=False)
+        assert curies["ICD10:E11"] == "https://icd.who.int/browse10/2019/en#/E11"
+        assert curies["ICD10CM:E11.9"] == "https://www.icd10data.com/search?s=E11.9"

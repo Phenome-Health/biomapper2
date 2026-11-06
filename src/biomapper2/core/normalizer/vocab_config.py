@@ -64,6 +64,10 @@ def load_prefix_info(biolink_client: BiolinkClient) -> dict[str, dict[str, str]]
     prefix_to_iri_map["PathWhiz.ProteinComplex"] = "https://smpdb.ca/pathwhiz/"
     prefix_to_iri_map["PathWhiz.Reaction"] = "https://smpdb.ca/pathwhiz/reactions/"
     prefix_to_iri_map["ICD10PCS"] = "https://www.icd10data.com/ICD10PCS/Codes/"
+    # ICD-10-CM (US clinical modification) is a separate code system from WHO ICD-10, so it gets its
+    # own prefix rather than being folded into ICD10. Search URL from Bioregistry: icd10data's code
+    # pages are nested by chapter/block, so a plain prefix + code won't resolve there.
+    prefix_to_iri_map["ICD10CM"] = "https://www.icd10data.com/search?s="
     prefix_to_iri_map["icd11.foundation"] = "https://icd.who.int/browse11/l-m/en#/"
     prefix_to_iri_map["PDQ"] = "https://www.cancer.gov/publications/pdq"
     prefix_to_iri_map["CHV"] = ""
@@ -94,6 +98,7 @@ def load_prefix_info(biolink_client: BiolinkClient) -> dict[str, dict[str, str]]
     # Override prefixes only when Biolink's IRI is broken
     prefix_to_iri_map["OMIM"] = "http://purl.bioontology.org/ontology/OMIM/"  # Works for regular ids and MTHU ids
     prefix_to_iri_map["REACT"] = "https://reactome.org/content/detail/"  # Works for Complexes and Pathways
+    prefix_to_iri_map["ICD10"] = "https://icd.who.int/browse10/2019/en#/"  # Biolink's points at the ICD-9-CM site
 
     # Return a mapping of lowercase prefixes to their normalized form (varying capitalization) and IRIs
     vocab_info_map = {
@@ -177,6 +182,7 @@ def load_validator_map() -> dict[str, dict[str, Any]]:
         "hps": {validator: validators.is_hps_id},
         "icd9": {validator: validators.is_icd9_id},
         "icd10": {validator: validators.is_icd10_id},
+        "icd10cm": {validator: validators.is_icd10_id},  # same code shape as ICD-10, incl. 7-char codes
         "icd10pcs": {validator: validators.is_icd10pcs_id},
         "icd11.foundation": {validator: validators.is_numeric_id},
         "inchikey": {validator: validators.is_inchikey_id},
