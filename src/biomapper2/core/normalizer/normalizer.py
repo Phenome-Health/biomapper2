@@ -296,6 +296,15 @@ class Normalizer:
                     if len(vocab_root) >= MIN_SUBSTRING_MATCH_LENGTH and vocab_root in field_name_cleaned:
                         matches_on_substring.add(vocab)
 
+                # Drop a match whose root sits inside a longer matched root ('icd10' inside 'icd10cm'):
+                # the field named the more specific vocab, and both may validate the same id
+                roots = {vocab: vocab.split(".")[0] for vocab in matches_on_substring}
+                matches_on_substring = {
+                    vocab
+                    for vocab, root in roots.items()
+                    if not any(root != other and root in other for other in roots.values())
+                }
+
                 if matches_on_substring:
                     logging.debug(f"Found substring match(es) for '{id_field_name}': {matches_on_substring}")
                     self.field_name_to_vocab_name_cache[cache_key] = matches_on_substring
@@ -405,7 +414,7 @@ class Normalizer:
         Blind stripping would leave a meaningless fragment, so the id AS GIVEN is always tried
         first: if it validates for the target vocabulary, that is what it is.
 
-        A REPEATED colon ("DOID::12386") is a typo rather than structure, so a colon-collapsed form
+        A REPEATED colon (``DOID::12386``) is a typo rather than structure, so a colon-collapsed form
         is offered too. It is an extra candidate, not a rewrite, so an id that legitimately contains
         a colon is still tried untouched first. (Note the obvious one-line fix for this -- taking the
         LAST colon-separated segment -- would quietly destroy those ids: HGVS's
@@ -459,8 +468,8 @@ class Normalizer:
 
         The '.0' is stripped ONLY for an actual float input, never for a string. A float is the
         spreadsheet artifact we mean to undo (pandas types an integer column containing blanks as
-        float64, so the code 12345 arrives as 12345.0), whereas in a string the '.0' is part of the
-        identifier -- ICD9 '250.0' (diabetes with coma) is a DIFFERENT code from '250' (diabetes
+        float64, so the code ``12345`` arrives as ``12345.0``), whereas in a string the '.0' is part of the
+        identifier -- ICD9 ``250.0`` (diabetes with coma) is a DIFFERENT code from ``250`` (diabetes
         mellitus), so stripping it silently changes the entity being referenced. Anything that can
         reach us as text (an ICD/OMOP/HCPCS-style dotted code) is therefore left intact.
         """
