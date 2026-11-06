@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from ... import config
 from ...core.annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
 from ...core.kestrel_passthrough import collect as collect_kestrel_passthrough
+from ...core.primary_curie import select_primary_curie
 from ...core.resolver import build_lipid_resolution
 from ..auth import validate_api_key
 from ..models import (
@@ -112,7 +113,7 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
 
     return EntityMappingResult(
         name=original_name,
-        curies=mapped_item.get("curies", []) or [],
+        **identity_fields(mapped_item),
         chosen_kg_id=mapped_item.get("chosen_kg_id"),
         chosen_kg_id_review=mapped_item.get("chosen_kg_id_review"),
         chosen_kg_id_lipid_hint=mapped_item.get("chosen_kg_id_lipid_hint"),
@@ -127,6 +128,31 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
         assigned_ids=mapped_item.get("assigned_ids", {}) or {},
         error=None,
     )
+
+
+def identity_fields(mapped_item: dict[str, Any] | pd.Series) -> dict[str, Any]:
+    """The CURIE fields every per-entity surface emits: curies, primary_curie, and their provenance.
+
+    ``primary_curie`` is derived from the COMMITTED node (see core/primary_curie.py), never from
+    ``curies[0]`` alone, so it cannot name a different node than ``chosen_kg_id``. Shared by the JSON
+    routes and the NDJSON stream so the two cannot drift. Values are plain lists/dicts (json-serializable).
+    """
+    if isinstance(mapped_item, pd.Series):
+        mapped_item = mapped_item.to_dict()
+    curies = list(mapped_item.get("curies", []) or [])
+    return {
+        "curies": curies,
+        "primary_curie": select_primary_curie(
+            curies,
+            mapped_item.get("chosen_kg_id"),
+            mapped_item.get("kg_ids") or {},
+            mapped_item.get("kg_equivalent_ids") or {},
+        ),
+        "curies_provided": sorted(mapped_item.get("curies_provided", []) or []),
+        "curies_assigned": {
+            slug: sorted(slug_curies or []) for slug, slug_curies in (mapped_item.get("curies_assigned") or {}).items()
+        },
+    }
 
 
 @router.post("/entity", response_model=EntityMappingResponse)
@@ -491,7 +517,9 @@ async def map_dataset_stream(
                     # Plain dict (or null) already assembled on the mapped item; json-serializable.
                     "lipid_resolution": mapped.get("lipid_resolution"),
                     "kg_equivalent_ids": mapped.get("kg_equivalent_ids", {}),
-                    "curies": mapped.get("curies", []),
+                    # curies + primary_curie + curies_provided/curies_assigned (provenance), same helper
+                    # as the JSON routes.
+                    **identity_fields(mapped),
                     "kg_ids": mapped.get("kg_ids", {}),
                     # Plain dict, never the dataclass: this payload is json.dumps'd below, OUTSIDE
                     # the try/except, so a non-serializable value here fails mid-stream after a 200
