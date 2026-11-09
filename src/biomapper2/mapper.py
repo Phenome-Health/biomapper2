@@ -16,6 +16,7 @@ import pandas as pd
 from . import config
 from .biolink_client import BiolinkClient
 from .config import PROJECT_ROOT, RERESOLUTION_ENABLED, get_kestrel_api_url
+from .core import icd10cm_fallback
 from .core.analysis import analyze_dataset_mapping
 from .core.annotation_engine import AnnotationEngine
 from .core.annotators import refmet_snapshot
@@ -35,11 +36,15 @@ from .core.certificate import (
 from .core.linker import Linker
 from .core.normalizer import Normalizer
 from .core.resolver import (
+    MAPPING_RELATION_BROAD,
+    MAPPING_RELATION_EXACT,
+    MAPPING_RELATION_UNKNOWN,
     Resolver,
     _goslin_base_metadata,
     build_lipid_resolution,
     build_lipid_structure_evidence,
     lipid_flat_columns,
+    mapping_fields,
 )
 from .models import Entity
 from .provenance import build_run_provenance
@@ -73,6 +78,38 @@ def _refmet_snapshot_version_for(refmet_source: str) -> str | None:
     if refmet_source in _SNAPSHOT_ATTRIBUTABLE_SOURCES:
         return refmet_snapshot.version()
     return None
+
+
+def _icd10cm_fields_for(
+    node: str | None,
+    kg_ids: dict[str, list[str]] | None,
+    fallback_map: dict[str, dict[str, Any]] | None,
+) -> dict[str, Any] | None:
+    """Relation/route/build for a committed node, or None when no fallback curie backs it.
+
+    ``fallback_map`` is the Linker's per-curie side-map ({original ICD10CM curie: {route, relation,
+    kg_id}}). The fields describe ``node`` only when the curies that back it in ``kg_ids`` are
+    fallback curies; the WEAKEST relation among them is reported (broad beats exact), so a row is
+    never labelled more specific than its weakest supporting evidence.
+    """
+    if node is None or not fallback_map or not kg_ids:
+        return None
+    backing = [fallback_map[c] for c in kg_ids.get(node, []) if c in fallback_map]
+    if not backing:
+        return None
+    relations = {b.get("mapping_relation") for b in backing}
+    if MAPPING_RELATION_BROAD in relations:
+        relation = MAPPING_RELATION_BROAD
+    elif relations == {MAPPING_RELATION_EXACT}:
+        relation = MAPPING_RELATION_EXACT
+    else:
+        relation = MAPPING_RELATION_UNKNOWN
+    routes = sorted({str(b.get("route")) for b in backing})
+    return {
+        "mapping_relation": relation,
+        "icd10cm_route": ",".join(routes),
+        "kg_build": icd10cm_fallback.kg_build_stamp(),
+    }
 
 
 class Mapper:
@@ -194,6 +231,7 @@ class Mapper:
         lipid_mapping_relation: str | None = None,
         lipid_ambiguous: bool | None = None,
         lipid_structure: "Any | None" = None,
+        mapping_provenance: dict[str, Any] | None = None,
     ) -> ResolutionCertificate:
         """Assemble one certificate. Shared by both emission paths so they cannot drift apart.
 
@@ -242,6 +280,11 @@ class Mapper:
             if lipid_mapping_relation is not None
             else None
         )
+        # The entity-general mirror (ICD-10-CM fallback rows): relation + route + KG build, merged only
+        # when set, so every other certificate stays byte-identical. Never ``ambiguous``: that key is a
+        # lipid-candidate-set signal and means nothing here.
+        if mapping_provenance:
+            extra_provenance = {**(extra_provenance or {}), **mapping_provenance}
         return issue(
             chosen_kg_id=chosen_kg_id,
             is_small_molecule=is_small_molecule,
@@ -342,6 +385,7 @@ class Mapper:
         refmet_source: str = REFMET_SOURCE_NOT_QUERIED,
         refmet_snapshot_version: str | None = None,
         lipid_row: "pd.Series | dict[str, Any] | None" = None,
+        icd10cm_fallback_map: dict[str, dict[str, Any]] | None = None,
     ) -> tuple[ResolutionCertificate, str | None, dict[str, list[str]], dict[str, Any] | None]:
         """Step 6 (+ optional Step 6.5): issue the certificate and, on a contradiction, re-resolve.
 
@@ -370,6 +414,11 @@ class Mapper:
                 return None
             return build_lipid_resolution(lipid_row, node, node_level=self._committed_node_lipid_level(lipid_row, node))
 
+        def _icd_prov(node: str | None) -> dict[str, Any] | None:
+            # Recomputed against whichever node a certificate commits, so a re-resolution swap away
+            # from a fallback node never carries the fallback's relation/route (and vice versa).
+            return _icd10cm_fields_for(node, kg_ids, icd10cm_fallback_map)
+
         def _structure_for(node: str | None, equiv: dict[str, list[str]] | None, lookup_ok: bool) -> "Any | None":
             # The structure-free lipid verdict, recomputed against whichever node a certificate commits
             # so a re-resolution swap never carries the replaced node's composition verdict. ``lookup_ok``
@@ -394,6 +443,7 @@ class Mapper:
             lipid_mapping_relation=(committed_lipid or {}).get("mapping_relation"),
             lipid_ambiguous=(committed_lipid or {}).get("ambiguous"),
             lipid_structure=committed_structure,
+            mapping_provenance=_icd_prov(chosen_kg_id),
         )
         if not (config.RERESOLUTION_ENABLED and certificate.state is CertificateState.CONTRADICTED):
             return certificate, chosen_kg_id, kg_equivalent_ids, committed_lipid
@@ -421,6 +471,7 @@ class Mapper:
                 lipid_mapping_relation=(committed_lipid or {}).get("mapping_relation"),
                 lipid_ambiguous=(committed_lipid or {}).get("ambiguous"),
                 lipid_structure=committed_structure,
+                mapping_provenance=_icd_prov(chosen_kg_id),
             )
             return refused, chosen_kg_id, kg_equivalent_ids, committed_lipid
 
@@ -444,6 +495,7 @@ class Mapper:
             lipid_mapping_relation=(swapped_lipid or {}).get("mapping_relation"),
             lipid_ambiguous=(swapped_lipid or {}).get("ambiguous"),
             lipid_structure=swapped_structure,
+            mapping_provenance=_icd_prov(new_id),
         )
         if swapped.state is CertificateState.CONTRADICTED:
             # The swapped node still contradicts the independent structure. Refuse rather than recurse
@@ -468,6 +520,7 @@ class Mapper:
                 lipid_mapping_relation=(committed_lipid or {}).get("mapping_relation"),
                 lipid_ambiguous=(committed_lipid or {}).get("ambiguous"),
                 lipid_structure=committed_structure,
+                mapping_provenance=_icd_prov(chosen_kg_id),
             )
             return refused, chosen_kg_id, kg_equivalent_ids, committed_lipid
 
@@ -560,6 +613,10 @@ class Mapper:
         # Do Step 3: link curies to KG nodes
         linked_result = self.linker.link(entity.to_series())
         assert isinstance(linked_result, pd.Series)
+        # The ICD-10-CM fallback side-map is internal provenance, not an output field: pop it before the
+        # row update so the mapped entity gains no new key from it.
+        icd10cm_map = linked_result.get(icd10cm_fallback.SIDE_MAP_FIELD) or {}
+        linked_result = linked_result.drop(labels=[icd10cm_fallback.SIDE_MAP_FIELD], errors="ignore")
         entity = entity.update_from(linked_result)
 
         # Do Step 4: resolve one-to-many KG matches
@@ -598,6 +655,11 @@ class Mapper:
             refmet_source=refmet_source,
             refmet_snapshot_version=refmet_snapshot_version,
             lipid_row=entity.to_series(),
+            icd10cm_fallback_map=icd10cm_map,
+        )
+        row_mapping = mapping_fields(
+            lipid_resolution=lipid_resolution,
+            icd10cm=_icd10cm_fields_for(chosen_kg_id, entity.kg_ids, icd10cm_map),
         )
         # Emitted as a plain dict, not the dataclass: pydantic rejects a raw dataclass at the
         # response model, and the NDJSON endpoint json.dumps's this value outside its try/except.
@@ -616,6 +678,8 @@ class Mapper:
                     # Mirrored from the certificate (a first-class field) so the row surface carries the
                     # Tier B freeze version too, parallel to refmet_snapshot_version.
                     "tier_b_snapshot_version": certificate.tier_b_snapshot_version,
+                    # Entity-general relation + ICD-10-CM fallback route/build; null off both paths.
+                    **row_mapping,
                 }
             )
         )
@@ -754,6 +818,13 @@ class Mapper:
 
         # Do Step 3: link curies to KG nodes
         linked_df = self.linker.link(df)
+        assert isinstance(linked_df, pd.DataFrame)
+        # Internal per-row ICD-10-CM fallback side-map: kept aside, never written to the TSV.
+        if icd10cm_fallback.SIDE_MAP_FIELD in linked_df.columns:
+            icd10cm_maps = linked_df[icd10cm_fallback.SIDE_MAP_FIELD]
+            linked_df = linked_df.drop(columns=[icd10cm_fallback.SIDE_MAP_FIELD])
+        else:
+            icd10cm_maps = pd.Series([{} for _ in range(len(df))], index=df.index, dtype=object)
         df = df.join(linked_df)
         logging.info(f"After step 3 (linking), df is: \n{df}")
 
@@ -784,7 +855,9 @@ class Mapper:
         reresolved_equiv: list[dict[str, list[str]]] = []
         # Unit 5: per-row lipid_resolution as lipid_-prefixed flat columns (null off the lipid path).
         lipid_column_rows: list[dict[str, Any]] = []
-        for _, row in df.iterrows():
+        mapping_column_rows: list[dict[str, Any]] = []
+        for index, row in df.iterrows():
+            row_icd10cm_map = icd10cm_maps.get(index) or {}
             committed = _scalar_or_none(row.get("chosen_kg_id"))
             equiv = row.get("kg_equivalent_ids") or {}
             row_availability = row.get("annotator_availability") or {}
@@ -805,11 +878,18 @@ class Mapper:
                 refmet_source=refmet_source,
                 refmet_snapshot_version=_refmet_snapshot_version_for(refmet_source),
                 lipid_row=row,
+                icd10cm_fallback_map=row_icd10cm_map,
             )
             certificate_rows.append(certificate)
             reresolved_ids.append(new_id)
             reresolved_equiv.append(new_equiv or {})
             lipid_column_rows.append(lipid_flat_columns(lipid_resolution))
+            mapping_column_rows.append(
+                mapping_fields(
+                    lipid_resolution=lipid_resolution,
+                    icd10cm=_icd10cm_fields_for(new_id, row.get("kg_ids") or {}, row_icd10cm_map),
+                )
+            )
         # Re-resolution may have swapped the committed node; reflect the correction in the emitted
         # chosen_kg_id / kg_equivalent_ids columns. Guarded by the flag so a default run's columns
         # (and their dtypes) are byte-for-byte unchanged.
@@ -819,6 +899,8 @@ class Mapper:
         df = df.join(pd.DataFrame([c.to_flat_columns() for c in certificate_rows], index=df.index))
         # Unit 5: lipid_-prefixed flat columns, one column set for every row (null off the lipid path).
         df = df.join(pd.DataFrame(lipid_column_rows, index=df.index))
+        # Entity-general relation + ICD-10-CM fallback route/build columns (null off both paths).
+        df = df.join(pd.DataFrame(mapping_column_rows, index=df.index, dtype=object))
         # The legacy flag is now DERIVED from the certificate (C4/L20) rather than passed through,
         # so the two can never disagree. Identical for one release; deprecation is a follow-up.
         # object dtype and an explicit index: the review is str | None per row, and a bare list with

@@ -31,7 +31,7 @@ What it measures (decided at Checkpoint 2, 2026-11-08)
 Run
 ---
     uv run python -m studies.analysis.icd10cm_twin_control \
-        --cdc-zip /path/icd10cm-code-descriptions-2027.zip --sssom /path/mondo.sssom.tsv \
+        --cdc-zip /path/icd10cm-code-descriptions-<FY>.zip --sssom /path/mondo.sssom.tsv \
         [--v121-project /path/to/v1.2.1/checkout]
 
 Results are ALWAYS written (SOP: expensive runs persist by default) to a timestamped

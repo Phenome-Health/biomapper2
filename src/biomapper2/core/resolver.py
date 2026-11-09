@@ -139,15 +139,61 @@ def _lipid_generalized_hint(
 # policy capped), ``narrow`` when it is finer (should not happen under Decision 2's at-or-above policy,
 # but is represented honestly if seen), ``unknown`` when either level is missing. Until 2026-11-05 this
 # compared against the EFFECTIVE level, so a policy-capped match read as ``exact``.
-LIPID_RELATION_EXACT = "exact"
-LIPID_RELATION_BROAD = "broad"
-LIPID_RELATION_NARROW = "narrow"
-LIPID_RELATION_UNKNOWN = "unknown"
-_LIPID_RELATION_PREDICATE: dict[str, str] = {
-    LIPID_RELATION_EXACT: "skos:exactMatch",
-    LIPID_RELATION_BROAD: "skos:broadMatch",
-    LIPID_RELATION_NARROW: "skos:narrowMatch",
+#
+# The relation vocabulary itself is ENTITY-GENERAL (``MAPPING_RELATION_*``): the lipid path and the
+# ICD-10-CM provided-id fallback (core/icd10cm_fallback.py) share one broad/exact vocabulary and one
+# SKOS predicate table. The ``LIPID_RELATION_*`` names are kept as aliases for existing callers.
+MAPPING_RELATION_EXACT = "exact"
+MAPPING_RELATION_BROAD = "broad"
+MAPPING_RELATION_NARROW = "narrow"
+MAPPING_RELATION_UNKNOWN = "unknown"
+_MAPPING_RELATION_PREDICATE: dict[str, str] = {
+    MAPPING_RELATION_EXACT: "skos:exactMatch",
+    MAPPING_RELATION_BROAD: "skos:broadMatch",
+    MAPPING_RELATION_NARROW: "skos:narrowMatch",
 }
+LIPID_RELATION_EXACT = MAPPING_RELATION_EXACT
+LIPID_RELATION_BROAD = MAPPING_RELATION_BROAD
+LIPID_RELATION_NARROW = MAPPING_RELATION_NARROW
+LIPID_RELATION_UNKNOWN = MAPPING_RELATION_UNKNOWN
+_LIPID_RELATION_PREDICATE = _MAPPING_RELATION_PREDICATE
+
+# Ordered keys of the additive, entity-general row fields. Null on every row that is neither a lipid
+# row nor an ICD-10-CM fallback row, so existing consumers see only new null keys/columns.
+#   mapping_relation / mapping_predicate: the SKOS relation between the query and the committed node.
+#   icd10cm_route: how an ICD-10-CM fallback committed the node (``twin``); null off the fallback.
+#   kg_build: the KG build that served an ICD-10-CM fallback row; null off the fallback.
+MAPPING_FIELDS: tuple[str, ...] = ("mapping_relation", "mapping_predicate", "icd10cm_route", "kg_build")
+
+
+def mapping_predicate_for(relation: str | None) -> str | None:
+    """The SKOS predicate for a relation; None for ``unknown`` or a missing relation."""
+    return _MAPPING_RELATION_PREDICATE.get(relation) if relation else None
+
+
+def mapping_fields(*, lipid_resolution: dict[str, Any] | None, icd10cm: dict[str, Any] | None) -> dict[str, str | None]:
+    """The entity-general row fields, every key always present.
+
+    An ICD-10-CM fallback commit (``icd10cm``: relation, route, build) wins; otherwise a lipid row lifts
+    its ``lipid_resolution`` relation/predicate to the top level (``lipid_resolution`` itself is not
+    touched); otherwise every field is None.
+    """
+    fields: dict[str, str | None] = dict.fromkeys(MAPPING_FIELDS)
+    if icd10cm:
+        relation = icd10cm.get("mapping_relation")
+        fields.update(
+            mapping_relation=relation,
+            mapping_predicate=mapping_predicate_for(relation),
+            icd10cm_route=icd10cm.get("icd10cm_route"),
+            kg_build=icd10cm.get("kg_build"),
+        )
+    elif lipid_resolution:
+        fields.update(
+            mapping_relation=lipid_resolution.get("mapping_relation"),
+            mapping_predicate=lipid_resolution.get("mapping_predicate"),
+        )
+    return fields
+
 
 # ``query_transformed`` values. A trust-off downgrade (asserted finer than effective) means the input's
 # slash-bearing name was queried in its underscore form; otherwise the query rode goslin's canonical

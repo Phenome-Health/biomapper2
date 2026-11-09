@@ -15,7 +15,7 @@ from ... import config
 from ...core.annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
 from ...core.kestrel_passthrough import collect as collect_kestrel_passthrough
 from ...core.primary_curie import select_primary_curie
-from ...core.resolver import build_lipid_resolution
+from ...core.resolver import MAPPING_FIELDS, build_lipid_resolution, mapping_fields
 from ..auth import validate_api_key
 from ..models import (
     BatchMappingRequest,
@@ -110,6 +110,7 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
     emitted = mapped_item.get("lipid_resolution")
     lipid_fields = emitted if isinstance(emitted, dict) else build_lipid_resolution(mapped_item)
     lipid_resolution = LipidResolution(**lipid_fields) if lipid_fields is not None else None
+    row_mapping = row_mapping_fields(mapped_item, lipid_fields)
 
     return EntityMappingResult(
         name=original_name,
@@ -118,6 +119,10 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
         chosen_kg_id_review=mapped_item.get("chosen_kg_id_review"),
         chosen_kg_id_lipid_hint=mapped_item.get("chosen_kg_id_lipid_hint"),
         lipid_resolution=lipid_resolution,
+        mapping_relation=row_mapping["mapping_relation"],
+        mapping_predicate=row_mapping["mapping_predicate"],
+        icd10cm_route=row_mapping["icd10cm_route"],
+        kg_build=row_mapping["kg_build"],
         resolution_certificate=certificate,
         refmet_availability=mapped_item.get("refmet_availability") or "not_queried",
         refmet_source=mapped_item.get("refmet_source") or "not_queried",
@@ -128,6 +133,25 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
         assigned_ids=mapped_item.get("assigned_ids", {}) or {},
         error=None,
     )
+
+
+def row_mapping_fields(
+    mapped_item: dict[str, Any] | pd.Series, lipid_fields: dict[str, Any] | None = None
+) -> dict[str, str | None]:
+    """The entity-general ``mapping_relation`` / ``mapping_predicate`` / ``icd10cm_route`` / ``kg_build``.
+
+    The mapper sets them on every row; a hand-assembled mapped item without them falls back to lifting
+    the lipid relation (and nulls otherwise), so the API and the mapper cannot disagree. Plain
+    str/None values, safe for the NDJSON stream's ``json.dumps``.
+    """
+    if isinstance(mapped_item, pd.Series):
+        mapped_item = mapped_item.to_dict()
+    if any(key in mapped_item for key in MAPPING_FIELDS):
+        return {key: mapped_item.get(key) for key in MAPPING_FIELDS}
+    if lipid_fields is None:
+        emitted = mapped_item.get("lipid_resolution")
+        lipid_fields = emitted if isinstance(emitted, dict) else None
+    return mapping_fields(lipid_resolution=lipid_fields, icd10cm=None)
 
 
 def identity_fields(mapped_item: dict[str, Any] | pd.Series) -> dict[str, Any]:
@@ -516,6 +540,8 @@ async def map_dataset_stream(
                     "chosen_kg_id_lipid_hint": mapped.get("chosen_kg_id_lipid_hint"),
                     # Plain dict (or null) already assembled on the mapped item; json-serializable.
                     "lipid_resolution": mapped.get("lipid_resolution"),
+                    # Entity-general relation + ICD-10-CM fallback route/build (null when unused).
+                    **row_mapping_fields(mapped),
                     "kg_equivalent_ids": mapped.get("kg_equivalent_ids", {}),
                     # curies + primary_curie + curies_provided/curies_assigned (provenance), same helper
                     # as the JSON routes.

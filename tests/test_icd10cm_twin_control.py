@@ -5,9 +5,9 @@ KRAKEN cannot link may be committed through its ``ICD10:X`` twin as an EXACT mat
 one. Every number it emits feeds a shipped config constant, so the arithmetic is pinned here on tiny
 fixtures, with no network.
 
-Gate (decided at Checkpoint 2): independent CDC-title vs KRAKEN-label agreement, >= 95% on non-null
-rows with n >= 200. Mondo SSSOM agreement is reported as Babel-Mondo CONSISTENCY only, never as
-evidence.
+Gate (decided at Checkpoint 2): independent CDC-title vs KRAKEN-label agreement, at or above
+``GATE_THRESHOLD`` on rows with a label and with at least ``GATE_MIN_N`` of them. Mondo SSSOM
+agreement is reported as Babel-Mondo CONSISTENCY only, never as evidence.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ def test_unspecified_boilerplate_does_not_cause_a_disagreement() -> None:
 def test_genuinely_different_concept_disagrees() -> None:
     verdict, score = study.title_verdict("Fabry disease", ["Gaucher disease type 1"])
     assert verdict == study.TITLE_DISAGREE
-    assert score < study.TITLE_MATCH_CUTOFF
+    assert score is not None and score < study.TITLE_MATCH_CUTOFF
 
 
 def test_best_label_wins_over_synonyms() -> None:
@@ -143,7 +143,7 @@ def test_sssom_parse_keeps_icd10cm_exact_rows_and_flags_ranges() -> None:
 
 def test_consistency_counts_ranges_out_and_twin_null_separately() -> None:
     rows = study.parse_sssom_icd10cm_exact(_SSSOM)
-    canonical = {
+    canonical: dict[str, str | None] = {
         "ICD10:A00": "MONDO:1",  # consistent
         "MONDO:1": "MONDO:1",
         "ICD10:K28": "MONDO:3",  # consistent
