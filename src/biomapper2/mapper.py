@@ -81,10 +81,11 @@ def _refmet_snapshot_version_for(refmet_source: str) -> str | None:
     return None
 
 
-def _preserve_input_columns(df: pd.DataFrame, output_columns: tuple[str, ...]) -> pd.DataFrame:
-    """Rename any input column that an output column is about to claim to ``<name>_input``.
+def _input_column_renames(df: pd.DataFrame, output_columns: tuple[str, ...]) -> dict[str, str]:
+    """``{input column: <name>_input}`` for every input column an output column is about to claim.
 
     Raises when the ``<name>_input`` name is itself already taken, rather than silently dropping data.
+    Cheap and side-effect free, so it is also called up front to fail fast before any paid work.
     """
     renames: dict[str, str] = {}
     for column in output_columns:
@@ -97,6 +98,15 @@ def _preserve_input_columns(df: pd.DataFrame, output_columns: tuple[str, ...]) -
                 f"as an output field and preserves an input {column!r} as {preserved!r}. Rename one of them."
             )
         renames[column] = preserved
+    return renames
+
+
+def _preserve_input_columns(df: pd.DataFrame, output_columns: tuple[str, ...]) -> pd.DataFrame:
+    """Rename any input column that an output column is about to claim to ``<name>_input``.
+
+    Raises when the ``<name>_input`` name is itself already taken, rather than silently dropping data.
+    """
+    renames = _input_column_renames(df, output_columns)
     if renames:
         logging.warning(f"Input columns {sorted(renames)} collide with output fields; preserved as {renames}")
         df = df.rename(columns=renames)
@@ -818,6 +828,9 @@ class Mapper:
         # Do some basic cleanup to try to ensure empty cells are represented consistently
         df[provided_id_columns] = df[provided_id_columns].replace("-", np.nan)
         df[provided_id_columns] = df[provided_id_columns].replace("NO_MATCH", np.nan)
+        # Fail fast on an unresolvable input/output column collision (the rename itself happens at
+        # Step 6) rather than after every annotation/linking/resolution call has already been paid for.
+        _input_column_renames(df, MAPPING_FIELDS)
         num_rows_start = len(df)
 
         # Do Step 1: annotate all rows with vocab IDs
