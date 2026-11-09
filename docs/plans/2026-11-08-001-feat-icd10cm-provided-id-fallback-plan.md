@@ -207,7 +207,7 @@ If `X` itself is not in the snapshot, it gets the twin retry only, and `icd10cm_
 
 ### Phase 1a: twin retry (PR 1)
 
-- [ ] **Unit 1: Twin control gate and regression list (study)**
+- [x] **Unit 1: Twin control gate and regression list (study)**
 
 **Goal:** Produce the R1b agreement number and the 1a regression list as committed artifacts, before the twin relation is set.
 
@@ -249,7 +249,7 @@ If `X` itself is not in the snapshot, it gets the twin retry only, and `icd10cm_
 
 **Compute budget:** About 98k codes at batch size 2000 is ~50 calls, plus 2.1k SSSOM rows and their MONDO targets. Run a 1k-code timing sample first, and record the projection in the PR.
 
-- [ ] **Unit 2: Entity-general `mapping_relation` and route fields**
+- [x] **Unit 2: Entity-general `mapping_relation` and route fields**
 
 **Goal:** Add the output contract (`mapping_relation`, `mapping_predicate`, `icd10cm_route`) without changing any existing output.
 
@@ -277,7 +277,7 @@ If `X` itself is not in the snapshot, it gets the twin retry only, and `icd10cm_
 
 **Verification:** The existing test suite passes. Any snapshot-comparison test that breaks only because of the additive null keys is updated deliberately, with the diff reviewed.
 
-- [ ] **Unit 3: Twin retry in the Linker**
+- [x] **Unit 3: Twin retry in the Linker**
 
 **Goal:** For rows whose provided `ICD10CM:X` misses, resolve through `ICD10:X` in the same batch, gated per row.
 
