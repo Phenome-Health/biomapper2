@@ -1,4 +1,4 @@
-"""ICD-10-CM provided-id fallback (Phase 1a: the same-code ``ICD10:`` twin).
+"""ICD-10-CM provided-id fallback (Phase 1a: the same-code ``ICD10:`` twin; Phase 1b: the parent walk-up).
 
 Why this exists
 ---------------
@@ -8,16 +8,24 @@ through the old accidental ``ICD10:`` rewrite came back unresolved. This module 
 labelled:
 
 * **Expansion (before the batch).** Every ``ICD10CM:X`` curie adds ``ICD10:X`` to the ONE batched
-  /canonicalize call the Linker already makes. No extra sequential round trip per row.
-* **Selection (after the batch, per row).** Tiers are direct > twin. If any of the row's own curies
-  linked under its own prefix, the fallback is ignored (it can never outvote a direct curie). Otherwise
-  each ``ICD10CM:X`` whose twin linked is written back under the ORIGINAL ``ICD10CM:X`` key through a
-  per-row overlay, so ``kg_ids_provided`` and resolver voting are unchanged.
+  /canonicalize call the Linker already makes, plus (walk-up enabled) ``ICD10CM:A`` and ``ICD10:A`` for
+  every existing ancestor ``A`` of ``X`` in the pinned CDC snapshot (core/icd10cm_hierarchy.py). No
+  extra sequential round trip per row.
+* **Selection (after the batch, per row).** Tiers are direct > twin > walk-up. If any of the row's own
+  curies linked under its own prefix, the fallback is ignored (it can never outvote a direct curie).
+  Otherwise, if any ``ICD10CM:X`` of the row has a twin hit, only twin hits are used (broad walk-up
+  evidence never outvotes exact-tier evidence). Otherwise each ``ICD10CM:X`` takes its most specific
+  ancestor hit, ``ICD10CM:A`` before ``ICD10:A`` within a level. Hits are written back under the
+  ORIGINAL ``ICD10CM:X`` key through a per-row overlay, so ``kg_ids_provided`` and voting are unchanged.
 * **Labelling.** A twin hit carries ``mapping_relation`` = ``config.ICD10CM_TWIN_MAPPING_RELATION`` (set
-  from the committed gate artifact), or ``broad`` for codes on the gate's disagreement denylist.
+  from the committed gate artifact), or ``broad`` for codes on the gate's disagreement denylist. A
+  walk-up hit is always ``broad``, with route ``walkup:<ancestor>`` and the snapshot version. A code
+  absent from the snapshot gets the twin only; when that misses, its route is
+  ``twin_only:not_in_snapshot``.
 * **R7a.** A lookup that is not a definite null is an error. Kestrel answers a miss with an explicit
   null; when bisect-on-5xx isolates (drops) a curie the row depends on, the row raises
-  :class:`Icd10cmFallbackLookupError` instead of reading the gap as "no node".
+  :class:`Icd10cmFallbackLookupError` instead of reading the gap as "no node". For the walk-up, an
+  ancestor is committed only when every MORE specific candidate came back as a definite null.
 """
 
 from __future__ import annotations
@@ -31,12 +39,16 @@ from pathlib import Path
 from typing import Any
 
 from .. import config
+from . import icd10cm_hierarchy
 
 logger = logging.getLogger(__name__)
 
 ICD10CM_PREFIX = "ICD10CM:"
 ICD10_PREFIX = "ICD10:"
 ROUTE_TWIN = "twin"
+ROUTE_WALKUP_PREFIX = "walkup:"
+ROUTE_TWIN_ONLY_NOT_IN_SNAPSHOT = "twin_only:not_in_snapshot"
+RELATION_BROAD = "broad"
 
 # The Linker's per-row side-map column/key: {original ICD10CM curie: {route, mapping_relation, kg_id}}.
 # Internal provenance consumed by the Mapper; never emitted as an output field.
@@ -61,6 +73,26 @@ def is_enabled() -> bool:
     return bool(config.ICD10CM_FALLBACK_ENABLED)
 
 
+def walkup_enabled() -> bool:
+    """The walk-up runs only when the fallback as a whole is on AND its own switch is on."""
+    return is_enabled() and bool(config.ICD10CM_WALKUP_ENABLED)
+
+
+def _code_of(curie: str) -> str:
+    return curie[len(ICD10CM_PREFIX) :]
+
+
+def ancestor_candidates(curie: str) -> list[tuple[str, list[str]]]:
+    """``[(ancestor code, [ICD10CM:A, ICD10:A]), ...]`` most specific first; [] off the walk-up.
+
+    Raises :class:`icd10cm_hierarchy.Icd10cmHierarchyError` when the walk-up is enabled and the snapshot
+    is missing or malformed: never a silent "no parent".
+    """
+    if not curie.startswith(ICD10CM_PREFIX) or not walkup_enabled():
+        return []
+    return [(a, [ICD10CM_PREFIX + a, ICD10_PREFIX + a]) for a in icd10cm_hierarchy.ancestors(_code_of(curie))]
+
+
 def twin_of(curie: str) -> str | None:
     """``ICD10:X`` for an ``ICD10CM:X`` curie; None for any other curie."""
     if curie.startswith(ICD10CM_PREFIX):
@@ -69,9 +101,20 @@ def twin_of(curie: str) -> str | None:
 
 
 def expand_candidates(curies: Iterable[str]) -> list[str]:
-    """The twin curies to add to the batch, deduplicated and excluding curies already being asked."""
+    """The twin (and, walk-up enabled, ancestor) curies to add to the batch.
+
+    Deduplicated and excluding curies already being asked.
+    """
     asked = set(curies)
-    return sorted({t for c in asked if (t := twin_of(c)) is not None and t not in asked})
+    added: set[str] = set()
+    for curie in asked:
+        twin = twin_of(curie)
+        if twin is None:
+            continue
+        added.add(twin)
+        for _, forms in ancestor_candidates(curie):
+            added.update(forms)
+    return sorted(added - asked)
 
 
 def select_for_row(
@@ -82,7 +125,9 @@ def select_for_row(
     """Per-row selection against the UNMODIFIED batch result.
 
     Returns ``(overlay, side_map)``: ``overlay`` maps an original ``ICD10CM:X`` curie to the node its twin
-    linked to (empty unless the fallback applies), ``side_map`` records route + relation per curie.
+    (or, failing every twin of the row, its most specific ancestor) linked to; empty unless the fallback
+    applies. ``side_map`` records route + relation (+ snapshot version on walk-up hits) per curie; a
+    not-in-snapshot code whose twin missed is recorded with ``kg_id`` None and the twin-only route.
     """
     icd_curies = [c for c in row_curies if c.startswith(ICD10CM_PREFIX)]
     if not icd_curies:
@@ -108,10 +153,47 @@ def select_for_row(
         node = canonical.get(twin) if twin else None
         if not node:
             continue
-        code = curie[len(ICD10CM_PREFIX) :]
-        relation = "broad" if code in denylist else config.ICD10CM_TWIN_MAPPING_RELATION
+        code = _code_of(curie)
+        relation = RELATION_BROAD if code in denylist else config.ICD10CM_TWIN_MAPPING_RELATION
         overlay[curie] = node
         side_map[curie] = {"route": ROUTE_TWIN, "mapping_relation": relation, "kg_id": node}
+    if overlay or not walkup_enabled():
+        return overlay, side_map  # twin tier present (walk-up hits discarded), or walk-up switched off
+    return _walkup_for_row(icd_curies, canonical, isolated)
+
+
+def _walkup_for_row(
+    icd_curies: list[str], canonical: Mapping[str, str | None], isolated: frozenset[str] | set[str]
+) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
+    """The walk-up tier: every twin of the row was a definite null."""
+    hierarchy = icd10cm_hierarchy.load_or_raise()
+    overlay: dict[str, str] = {}
+    side_map: dict[str, dict[str, Any]] = {}
+    for curie in icd_curies:
+        if not hierarchy.contains(_code_of(curie)):
+            side_map[curie] = {"route": ROUTE_TWIN_ONLY_NOT_IN_SNAPSHOT, "mapping_relation": None, "kg_id": None}
+            continue
+        for ancestor, forms in ancestor_candidates(curie):
+            hit = None
+            for form in forms:
+                if form in isolated:
+                    # R7a: a more specific candidate has no definite answer; never fall through past it.
+                    raise Icd10cmFallbackLookupError(
+                        f"/canonicalize gave no definite answer for {form} (isolated by bisect-on-5xx) while "
+                        f"walking up from {curie}; refusing to commit a broader ancestor"
+                    )
+                if canonical.get(form):
+                    hit = canonical[form]
+                    break
+            if hit:
+                overlay[curie] = hit
+                side_map[curie] = {
+                    "route": ROUTE_WALKUP_PREFIX + ancestor,
+                    "mapping_relation": RELATION_BROAD,
+                    "kg_id": hit,
+                    "snapshot_version": hierarchy.version,
+                }
+                break
     return overlay, side_map
 
 

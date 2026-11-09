@@ -161,9 +161,18 @@ _LIPID_RELATION_PREDICATE = _MAPPING_RELATION_PREDICATE
 # Ordered keys of the additive, entity-general row fields. Null on every row that is neither a lipid
 # row nor an ICD-10-CM fallback row, so existing consumers see only new null keys/columns.
 #   mapping_relation / mapping_predicate: the SKOS relation between the query and the committed node.
-#   icd10cm_route: how an ICD-10-CM fallback committed the node (``twin``); null off the fallback.
+#   icd10cm_route: how an ICD-10-CM fallback committed the node (``twin`` | ``walkup:<ancestor>``), or
+#     ``twin_only:not_in_snapshot`` on an unresolved row whose code is absent from the CDC snapshot; null
+#     off the fallback.
 #   kg_build: the KG build that served an ICD-10-CM fallback row; null off the fallback.
-MAPPING_FIELDS: tuple[str, ...] = ("mapping_relation", "mapping_predicate", "icd10cm_route", "kg_build")
+#   icd10cm_snapshot_version: the CDC hierarchy snapshot version, ONLY on rows the walk-up served.
+MAPPING_FIELDS: tuple[str, ...] = (
+    "mapping_relation",
+    "mapping_predicate",
+    "icd10cm_route",
+    "kg_build",
+    "icd10cm_snapshot_version",
+)
 
 
 def mapping_predicate_for(relation: str | None) -> str | None:
@@ -186,6 +195,7 @@ def mapping_fields(*, lipid_resolution: dict[str, Any] | None, icd10cm: dict[str
             mapping_predicate=mapping_predicate_for(relation),
             icd10cm_route=icd10cm.get("icd10cm_route"),
             kg_build=icd10cm.get("kg_build"),
+            icd10cm_snapshot_version=icd10cm.get("icd10cm_snapshot_version"),
         )
     elif lipid_resolution:
         fields.update(

@@ -123,6 +123,7 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
         mapping_predicate=row_mapping["mapping_predicate"],
         icd10cm_route=row_mapping["icd10cm_route"],
         kg_build=row_mapping["kg_build"],
+        icd10cm_snapshot_version=row_mapping["icd10cm_snapshot_version"],
         resolution_certificate=certificate,
         refmet_availability=mapped_item.get("refmet_availability") or "not_queried",
         refmet_source=mapped_item.get("refmet_source") or "not_queried",
@@ -138,7 +139,7 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
 def row_mapping_fields(
     mapped_item: dict[str, Any] | pd.Series, lipid_fields: dict[str, Any] | None = None
 ) -> dict[str, str | None]:
-    """The entity-general ``mapping_relation`` / ``mapping_predicate`` / ``icd10cm_route`` / ``kg_build``.
+    """The entity-general ``mapping_relation`` / ``mapping_predicate`` / ICD-10-CM fallback fields.
 
     The mapper sets them on every row; a hand-assembled mapped item without them falls back to lifting
     the lipid relation (and nulls otherwise), so the API and the mapper cannot disagree. Plain

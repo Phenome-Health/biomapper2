@@ -250,7 +250,5 @@ def test_wheel_install_outside_the_repo_loads_the_snapshot_and_inits_the_mapper(
     )
     env = {k: v for k, v in os.environ.items() if not k.startswith("BIOMAPPER2_ICD10CM")}
     env.pop("PYTHONPATH", None)
-    done = subprocess.run(
-        [str(python), "-c", probe], cwd=tmp_path, env=env, check=True, capture_output=True, text=True
-    )
+    done = subprocess.run([str(python), "-c", probe], cwd=tmp_path, env=env, check=True, capture_output=True, text=True)
     assert "FY2027" in done.stdout

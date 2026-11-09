@@ -121,13 +121,29 @@ def _icd10cm_fields_for(
     """Relation/route/build for a committed node, or None when no fallback curie backs it.
 
     ``fallback_map`` is the Linker's per-curie side-map ({original ICD10CM curie: {route, relation,
-    kg_id}}). The fields describe ``node`` only when the curies that back it in ``kg_ids`` are
-    fallback curies; the WEAKEST relation among them is reported (broad beats exact), so a row is
-    never labelled more specific than its weakest supporting evidence.
+    kg_id[, snapshot_version]}}). The fields describe ``node`` only when the curies that back it in
+    ``kg_ids`` are fallback curies; the WEAKEST relation among them is reported (broad beats exact), so a
+    row is never labelled more specific than its weakest supporting evidence. The hierarchy snapshot
+    version is stamped only when a walk-up curie backs the node.
+
+    An UNRESOLVED row (``node`` None) whose side-map holds only twin-only misses (codes absent from the
+    hierarchy snapshot) reports that route, with no relation, so the reason it was not walked up shows.
     """
-    if node is None or not fallback_map or not kg_ids:
+    if not fallback_map:
         return None
-    backing = [fallback_map[c] for c in kg_ids.get(node, []) if c in fallback_map]
+    if node is None:
+        misses = sorted({str(e.get("route")) for e in fallback_map.values() if e.get("kg_id") is None})
+        if not misses or any(e.get("kg_id") is not None for e in fallback_map.values()):
+            return None
+        return {
+            "mapping_relation": None,
+            "icd10cm_route": ",".join(misses),
+            "kg_build": icd10cm_fallback.kg_build_stamp(),
+            "icd10cm_snapshot_version": None,
+        }
+    if not kg_ids:
+        return None
+    backing = [fallback_map[c] for c in kg_ids.get(node, []) if c in fallback_map and fallback_map[c].get("kg_id")]
     if not backing:
         return None
     relations = {b.get("mapping_relation") for b in backing}
@@ -138,10 +154,12 @@ def _icd10cm_fields_for(
     else:
         relation = MAPPING_RELATION_UNKNOWN
     routes = sorted({str(b.get("route")) for b in backing})
+    snapshot_versions = sorted({str(b["snapshot_version"]) for b in backing if b.get("snapshot_version")})
     return {
         "mapping_relation": relation,
         "icd10cm_route": ",".join(routes),
         "kg_build": icd10cm_fallback.kg_build_stamp(),
+        "icd10cm_snapshot_version": ",".join(snapshot_versions) or None,
     }
 
 

@@ -1,10 +1,12 @@
-"""Unit 3: the ICD-10-CM same-code twin retry in the Linker.
+"""Units 3 and 5: the ICD-10-CM same-code twin retry and the parent walk-up in the Linker.
 
 Since v1.3.0 a provided ``ICD10CM:<code>`` keeps its prefix, and KRAKEN has no ``ICD10CM`` nodes, so the
 code comes back unresolved. The fallback asks for ``ICD10:<code>`` IN THE SAME batched /canonicalize
 call and, per row, writes a twin hit back under the ORIGINAL ``ICD10CM:`` key, so voting and
-``kg_ids_provided`` need no change. Tiers: direct > twin. A fallback lookup that is not a definite null
-is an error, never a silent unresolved (R7a).
+``kg_ids_provided`` need no change. When the twin also misses, the walk-up climbs to the most specific
+existing ancestor in the pinned CDC snapshot (asked in the same batch, as ``ICD10CM:`` then ``ICD10:``)
+and emits it ``broad``. Tiers: direct > twin > walk-up. A fallback lookup that is not a definite null is
+an error, never a silent unresolved (R7a).
 
 Kestrel is mocked from recorded live answers (``tests/fixtures/icd10cm_twin_regression.json``, written
 by studies/analysis/icd10cm_twin_control.py); live checks are in test_icd10cm_fallback_live.py.
@@ -23,7 +25,7 @@ import requests
 
 from biomapper2 import config
 from biomapper2.config import KESTREL_BATCH_SIZE_CANONICALIZE
-from biomapper2.core import icd10cm_fallback
+from biomapper2.core import icd10cm_fallback, icd10cm_hierarchy
 from biomapper2.core.linker import Linker
 from biomapper2.mapper import Mapper
 from biomapper2.provenance import KgBuildInfo
@@ -36,6 +38,10 @@ ARTIFACT_PATH = REPO_ROOT / "studies" / "analysis" / "results" / "icd10cm_twin_c
 
 FABRY = "MONDO:0010526"
 HYPERTENSION = "MONDO:0005044"
+T2DM = "MONDO:0005148"
+DEPRESSION = "MONDO:0002009"
+# Phase 1b success criteria: the two codes the twin misses, and the ancestor the walk-up reaches.
+WALKUP_EXPECTED = {"E11.65": (T2DM, "walkup:E11"), "F32.9": (DEPRESSION, "walkup:F32")}
 BUILD = KgBuildInfo(kg_version="2.3.0", git_commit="3dd08a5b7b17e320ceb0c0091e09b781d4d90242")
 
 
@@ -74,10 +80,14 @@ def _live_like_answers() -> dict[str, str | None]:
 @pytest.fixture(autouse=True)
 def _offline(monkeypatch: pytest.MonkeyPatch):
     icd10cm_fallback.reset()
+    icd10cm_hierarchy.reset()
     monkeypatch.setattr("biomapper2.provenance.fetch_kg_build_info", lambda url: ("0.5.0", BUILD))
     monkeypatch.setattr(config, "ICD10CM_FALLBACK_ENABLED", True)
+    monkeypatch.setattr(config, "ICD10CM_WALKUP_ENABLED", True)
+    monkeypatch.setattr(config, "ICD10CM_HIERARCHY_PATH", None)
     yield
     icd10cm_fallback.reset()
+    icd10cm_hierarchy.reset()
 
 
 @pytest.fixture
@@ -119,12 +129,20 @@ def test_every_regression_code_links_to_its_recorded_node(kestrel) -> None:
         assert kg_ids_provided == {FIXTURE["codes"][code]["kg_id"]: [f"ICD10CM:{code}"]}, code
 
 
-def test_success_criteria_codes_match_the_study_route_labels(mapper: Mapper, kestrel) -> None:
+@pytest.mark.parametrize("walkup", [True, False])
+def test_success_criteria_codes_match_the_study_route_labels(mapper: Mapper, kestrel, monkeypatch, walkup) -> None:
+    monkeypatch.setattr(config, "ICD10CM_WALKUP_ENABLED", walkup)
     for code, rec in FIXTURE["success_criteria_routes"].items():
         result = _map(mapper, icd10cm=code)
         if rec["route"] == "twin":
             assert result["chosen_kg_id"] == rec["twin_node"], code
             assert result["icd10cm_route"] == "twin", code
+        elif walkup:
+            # Twin miss -> Phase 1b walk-up to the most specific existing ancestor, emitted broad.
+            node, route = WALKUP_EXPECTED[code]
+            assert result["chosen_kg_id"] == node, code
+            assert result["icd10cm_route"] == route, code
+            assert result["mapping_relation"] == "broad", code
         else:
             assert result["chosen_kg_id"] is None, code
             assert result["icd10cm_route"] is None, code
@@ -176,7 +194,8 @@ def test_fallback_applies_whatever_the_entity_type(mapper: Mapper, kestrel) -> N
     assert result["icd10cm_route"] == "twin"
 
 
-def test_twin_miss_is_unresolved_with_no_route(mapper: Mapper, kestrel) -> None:
+def test_twin_miss_is_unresolved_with_no_route_when_walkup_is_off(mapper: Mapper, kestrel, monkeypatch) -> None:
+    monkeypatch.setattr(config, "ICD10CM_WALKUP_ENABLED", False)
     result = _map(mapper, icd10cm="E11.65")
     assert result["chosen_kg_id"] is None
     assert result["mapping_relation"] is None
@@ -301,7 +320,9 @@ def test_call_count_is_one_batched_canonicalize_per_chunk(monkeypatch: pytest.Mo
         return {c: None for c in curies}
 
     monkeypatch.setattr(utils, "bulk_kestrel_request", bulk)
-    codes = [f"Z{i // 100:02d}.{i % 100:02d}" for i in range(n_codes)]
+    # Real CDC codes so the walk-up has existing ancestors to add.
+    codes = [c for c in sorted(icd10cm_hierarchy.load_or_raise().codes) if "." in c][:n_codes]
+    assert len(codes) == n_codes
     direct = [f"ICD10CM:{c}" for c in codes]
     df = pd.DataFrame(
         {
@@ -311,10 +332,14 @@ def test_call_count_is_one_batched_canonicalize_per_chunk(monkeypatch: pytest.Mo
         }
     )
     Linker().link(df)
-    expected = math.ceil((len(direct) * 2) / KESTREL_BATCH_SIZE_CANONICALIZE)
+    # Twins plus every existing-ancestor form (ICD10CM: and ICD10:) ride the same batch.
+    candidates = icd10cm_fallback.expand_candidates(direct)
+    assert any(c.startswith("ICD10CM:") for c in candidates)  # the walk-up added ancestor candidates
+    expected = math.ceil((len(direct) + len(candidates)) / KESTREL_BATCH_SIZE_CANONICALIZE)
+    assert sum(calls) == len(direct) + len(candidates)
     assert len(calls) == expected
     if n_codes == 1500:
-        assert expected == 2  # crosses the chunk boundary
+        assert expected >= 2  # crosses the chunk boundary
 
 
 def test_non_icd_rows_make_the_same_calls_as_before(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -401,3 +426,204 @@ def test_row_fields_describe_only_a_node_backed_by_fallback_curies() -> None:
     # A swap to a node no fallback curie backs carries no fallback fields.
     assert _icd10cm_fields_for("CHEBI:2", kg_ids, side_map) is None
     assert _icd10cm_fields_for(None, kg_ids, side_map) is None
+
+
+# ================================================================================================
+# Unit 5: the parent walk-up (Phase 1b)
+# ================================================================================================
+def _answers_with(monkeypatch: pytest.MonkeyPatch, extra: dict[str, str | None]) -> _KestrelDouble:
+    answers = _live_like_answers()
+    answers.update(extra)
+    fake = _kestrel_from(answers)
+    monkeypatch.setattr("biomapper2.core.linker.kestrel_request", fake)
+    return fake
+
+
+def test_e11_65_walks_up_to_t2dm_broad(mapper: Mapper, kestrel) -> None:
+    result = _map(mapper, icd10cm="E11.65")
+    assert result["chosen_kg_id"] == T2DM
+    assert result["mapping_relation"] == "broad"
+    assert result["mapping_predicate"] == "skos:broadMatch"
+    assert result["icd10cm_route"] == "walkup:E11"
+    assert result["icd10cm_snapshot_version"] == icd10cm_hierarchy.version()
+    assert "FY2027" in result["icd10cm_snapshot_version"]
+    assert result["kg_build"] == "2.3.0@3dd08a5b7b17e320ceb0c0091e09b781d4d90242"
+    # Keyed by the ORIGINAL curie: the user never supplied ICD10:E11.
+    assert result["kg_ids_provided"] == {T2DM: ["ICD10CM:E11.65"]}
+    # Every more specific candidate was asked in the same single call (so each null is definite).
+    asked = set().union(*map(set, kestrel.calls))
+    assert {"ICD10CM:E11.65", "ICD10:E11.65", "ICD10CM:E11.6", "ICD10:E11.6", "ICD10CM:E11", "ICD10:E11"} <= asked
+
+
+def test_f32_9_walks_up_to_depression_broad(mapper: Mapper, kestrel) -> None:
+    result = _map(mapper, icd10cm="F32.9")
+    assert result["chosen_kg_id"] == DEPRESSION
+    assert result["mapping_relation"] == "broad"
+    assert result["icd10cm_route"] == "walkup:F32"
+
+
+def test_walkup_certificate_mirrors_route_and_snapshot_version(mapper: Mapper, kestrel) -> None:
+    prov = _map(mapper, icd10cm="E11.65")["resolution_certificate"]["provenance"]
+    assert prov["mapping_relation"] == "broad"
+    assert prov["icd10cm_route"] == "walkup:E11"
+    assert prov["icd10cm_snapshot_version"] == icd10cm_hierarchy.version()
+
+
+def test_most_specific_ancestor_wins(mapper: Mapper, monkeypatch) -> None:
+    _answers_with(monkeypatch, {"ICD10:E11.6": "MONDO:0000116"})
+    result = _map(mapper, icd10cm="E11.65")
+    assert result["chosen_kg_id"] == "MONDO:0000116"
+    assert result["icd10cm_route"] == "walkup:E11.6"
+
+
+def test_icd10cm_form_preferred_over_icd10_form_within_a_level(mapper: Mapper, monkeypatch) -> None:
+    _answers_with(monkeypatch, {"ICD10CM:E11.6": "MONDO:0000106", "ICD10:E11.6": "MONDO:0000116"})
+    result = _map(mapper, icd10cm="E11.65")
+    assert result["chosen_kg_id"] == "MONDO:0000106"
+    assert result["icd10cm_route"] == "walkup:E11.6"
+
+
+def test_twin_hit_means_the_walkup_is_never_used(mapper: Mapper, kestrel) -> None:
+    # ICD10:E75.2 (an ancestor of E75.21) also links in the fixture; the twin tier still wins.
+    result = _map(mapper, icd10cm="E75.21")
+    assert result["chosen_kg_id"] == FABRY
+    assert result["icd10cm_route"] == "twin"
+    assert result["mapping_relation"] == config.ICD10CM_TWIN_MAPPING_RELATION
+    assert result["icd10cm_snapshot_version"] is None
+
+
+def test_direct_hit_on_another_curie_ignores_the_walkup(mapper: Mapper, kestrel) -> None:
+    result = _map(mapper, icd10cm="E11.65", mondo="MONDO:0000001")
+    assert result["chosen_kg_id"] == "MONDO:0000001"
+    assert result["kg_ids"] == {"MONDO:0000001": ["MONDO:0000001"]}
+    assert result["icd10cm_route"] is None
+    assert result["icd10cm_snapshot_version"] is None
+
+
+def test_code_not_in_snapshot_gets_the_twin_only(mapper: Mapper, kestrel, monkeypatch) -> None:
+    assert not icd10cm_hierarchy.contains("E11.99")
+    result = _map(mapper, icd10cm="E11.99")
+    assert result["chosen_kg_id"] is None
+    assert result["icd10cm_route"] == "twin_only:not_in_snapshot"
+    assert result["mapping_relation"] is None
+    assert result["icd10cm_snapshot_version"] is None
+    asked = set().union(*map(set, kestrel.calls))
+    assert "ICD10:E11.99" in asked and "ICD10:E11" not in asked
+    # ...and a twin hit for such a code is still a plain twin hit.
+    _answers_with(monkeypatch, {"ICD10:E11.99": "MONDO:0000199"})
+    hit = _map(mapper, icd10cm="E11.99")
+    assert hit["chosen_kg_id"] == "MONDO:0000199"
+    assert hit["icd10cm_route"] == "twin"
+
+
+def test_multi_code_row_twin_tier_beats_walkup(mapper: Mapper, kestrel) -> None:
+    result = _map(mapper, icd10cm="E75.21", icd10cm_2="E11.65")
+    assert result["chosen_kg_id"] == FABRY
+    assert result["kg_ids"] == {FABRY: ["ICD10CM:E75.21"]}
+    assert result["icd10cm_route"] == "twin"
+    assert result["icd10cm_snapshot_version"] is None
+
+
+def test_multi_code_walkup_only_row_votes_normally(mapper: Mapper, kestrel) -> None:
+    result = _map(mapper, icd10cm="E11.65", icd10cm_2="E11.69", icd10cm_3="F32.9")
+    assert result["kg_ids"] == {T2DM: ["ICD10CM:E11.65", "ICD10CM:E11.69"], DEPRESSION: ["ICD10CM:F32.9"]}
+    assert result["chosen_kg_id"] == T2DM
+    assert result["mapping_relation"] == "broad"
+    assert result["icd10cm_route"] == "walkup:E11"
+
+
+def test_walkup_switch_off_gives_twin_only_behavior(mapper: Mapper, kestrel, monkeypatch) -> None:
+    monkeypatch.setattr(config, "ICD10CM_WALKUP_ENABLED", False)
+    result = _map(mapper, icd10cm="E11.65")
+    assert result["chosen_kg_id"] is None
+    assert result["icd10cm_route"] is None
+    assert result["icd10cm_snapshot_version"] is None
+    asked = set().union(*map(set, kestrel.calls))
+    assert "ICD10:E11.65" in asked
+    assert not any(c in asked for c in ("ICD10CM:E11.6", "ICD10:E11.6", "ICD10CM:E11", "ICD10:E11"))
+    # A twin hit is untouched by the walk-up switch.
+    assert _map(mapper, icd10cm="E75.21")["icd10cm_route"] == "twin"
+    # And a not-in-snapshot code records no walk-up route either.
+    assert _map(mapper, icd10cm="E11.99")["icd10cm_route"] is None
+
+
+def test_walkup_dataset_path_stamps_snapshot_version_only_on_walkup_rows(mapper: Mapper, kestrel, tmp_path) -> None:
+    df = pd.DataFrame({"name": ["a", "b", "c"], "icd10cm": ["E11.65", "E75.21", None]})
+    out = mapper.map_dataset_to_kg(
+        df,
+        entity_type="disease",
+        name_column="name",
+        provided_id_columns=["icd10cm"],
+        output_dir=tmp_path,
+        annotation_mode="none",
+    )
+    mapped = out[0] if isinstance(out, tuple) else out
+    if not isinstance(mapped, pd.DataFrame):
+        mapped = pd.read_csv(mapped, sep="\t")
+    rows = mapped.set_index("name")
+    assert rows.loc["a", "chosen_kg_id"] == T2DM
+    assert rows.loc["a", "icd10cm_route"] == "walkup:E11"
+    assert rows.loc["a", "icd10cm_snapshot_version"] == icd10cm_hierarchy.version()
+    assert rows.loc["b", "icd10cm_route"] == "twin"
+    assert pd.isna(rows.loc["b", "icd10cm_snapshot_version"])
+    assert pd.isna(rows.loc["c", "icd10cm_snapshot_version"])
+
+
+# ------------------------------------------------------------------------------------------------
+# R7a with the walk-up: a broad candidate commits only when every more specific one is a definite null
+# ------------------------------------------------------------------------------------------------
+def _bisect_isolating(monkeypatch: pytest.MonkeyPatch, poison: str, hits: dict[str, str]) -> None:
+    import biomapper2.utils as utils
+
+    def bulk(method, endpoint, session=None, **kw):
+        curies = kw["json"]["curies"]
+        if poison in curies:
+            raise _http_error(500)
+        return {c: hits.get(c) for c in curies}
+
+    monkeypatch.setattr(utils, "bulk_kestrel_request", bulk)
+    monkeypatch.setattr(utils, "KESTREL_BISECT_ON_5XX_ENABLED", True)
+    monkeypatch.setattr(utils.time, "sleep", lambda s: None)
+
+
+def _entity(*codes: str) -> dict[str, Any]:
+    curies = [f"ICD10CM:{c}" for c in codes]
+    return {"curies": curies, "curies_provided": curies, "curies_assigned": {}}
+
+
+def test_isolated_more_specific_ancestor_raises_instead_of_falling_through(monkeypatch) -> None:
+    _bisect_isolating(monkeypatch, "ICD10:E11.6", {"ICD10:E11": T2DM})
+    with pytest.raises(icd10cm_fallback.Icd10cmFallbackLookupError, match="ICD10:E11.6"):
+        Linker().link(_entity("E11.65"))
+
+
+def test_isolated_ancestor_below_the_committed_hit_does_not_raise(monkeypatch) -> None:
+    # ICD10CM:E11.6 linked, so the isolated, LESS specific ICD10:E11 is never consulted.
+    _bisect_isolating(monkeypatch, "ICD10:E11", {"ICD10CM:E11.6": "MONDO:0000106"})
+    linked = Linker().link(_entity("E11.65"))
+    assert isinstance(linked, pd.Series)
+    assert linked["kg_ids"] == {"MONDO:0000106": ["ICD10CM:E11.65"]}
+
+
+def test_isolated_ancestor_is_irrelevant_when_the_twin_hit(monkeypatch) -> None:
+    _bisect_isolating(monkeypatch, "ICD10:E75.2", {"ICD10:E75.21": FABRY})
+    linked = Linker().link(_entity("E75.21"))
+    assert isinstance(linked, pd.Series)
+    assert linked["kg_ids"] == {FABRY: ["ICD10CM:E75.21"]}
+
+
+def test_walkup_enabled_with_a_missing_snapshot_raises_at_link_time(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(config, "ICD10CM_HIERARCHY_PATH", str(tmp_path / "gone.tsv"))
+    fake = _kestrel_from(_live_like_answers())
+    monkeypatch.setattr("biomapper2.core.linker.kestrel_request", fake)
+    with pytest.raises(icd10cm_hierarchy.Icd10cmHierarchyError):
+        Linker().link(_entity("E11.65"))
+    assert fake.calls == []  # failed before any lookup, never degraded to "no parent"
+
+
+def test_non_icd_rows_are_untouched_by_the_walkup(monkeypatch) -> None:
+    fake = _kestrel_from({"MONDO:0000001": "MONDO:0000001"})
+    monkeypatch.setattr("biomapper2.core.linker.kestrel_request", fake)
+    entity = {"curies": ["MONDO:0000001"], "curies_provided": ["MONDO:0000001"], "curies_assigned": {}}
+    Linker().link(entity)
+    assert fake.calls == [["MONDO:0000001"]]
