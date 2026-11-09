@@ -16,7 +16,7 @@ import pandas as pd
 from . import config
 from .biolink_client import BiolinkClient
 from .config import PROJECT_ROOT, RERESOLUTION_ENABLED, get_kestrel_api_url
-from .core import icd10cm_fallback
+from .core import icd10cm_fallback, icd10cm_hierarchy
 from .core.analysis import analyze_dataset_mapping
 from .core.annotation_engine import AnnotationEngine
 from .core.annotators import refmet_snapshot
@@ -175,6 +175,10 @@ class Mapper:
         # would otherwise label every denylisted twin hit with the (possibly exact) gate relation.
         if config.ICD10CM_FALLBACK_ENABLED:
             icd10cm_fallback.twin_denylist()
+            # Same for the walk-up's CDC hierarchy snapshot: enabled-but-missing/malformed raises here,
+            # never degrades to "no parent" (Icd10cmHierarchyError).
+            if config.ICD10CM_WALKUP_ENABLED:
+                icd10cm_hierarchy.load_or_raise()
 
     @staticmethod
     def _tier_b_active() -> bool:
