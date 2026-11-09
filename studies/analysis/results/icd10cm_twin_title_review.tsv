@@ -1,0 +1,51 @@
+code	cdc_title	twin_node	node_name	best_score	reviewer_verdict	reviewer_note
+A02.0	Salmonella enteritis	MONDO:0000827	salmonellosis	0.500		
+A15.0	Tuberculosis of lung	MONDO:0004813	tuberculous pneumothorax	0.000		
+A25.0	Spirillosis	MONDO:0020532	spirillary rat-bite fever	0.000		
+A36.89	Other diphtheritic complications	MONDO:0001682	diphtheritic peritonitis	0.500		
+A54.39	Other gonococcal eye infection	MONDO:0004853	gonococcal endophthalmia	0.400		
+B39.4	Histoplasmosis capsulati, unspecified	MONDO:0002099	Histoplasma capsulatum infectious disease	0.500		
+B57.5	Chagas' disease (chronic) with other organ involvement	MONDO:0001444	Chagas disease	0.500		
+D19.9	Benign neoplasm of mesothelial tissue, unspecified	MONDO:0004230	adenomatoid tumor	0.000		
+D32.9	Benign neoplasm of meninges, unspecified	MONDO:0016642	meningioma	0.000		
+D35.1	Benign neoplasm of parathyroid gland	MONDO:0006890	parathyroid gland adenoma	0.571		
+D47.9	Neoplasm of uncertain behavior of lymphoid, hematopoietic and related tissue, unspecified	MONDO:0013081	lymphoproliferative syndrome 1	0.154		
+D48.6	Neoplasm of uncertain behavior of breast	MONDO:0015871	benign breast phyllodes tumor	0.500		
+D65	Disseminated intravascular coagulation [defibrination syndrome]	MONDO:0000809	purpura fulminans	0.000		
+D71	Functional disorders of polymorphonuclear neutrophils	MONDO:0018305	chronic granulomatous disease	0.000		
+D75.1	Secondary polycythemia	MONDO:0009892	Chuvash polycythemia	0.500		
+E70.39	Other specified albinism	MONDO:0008244	piebaldism	0.000		
+E78.49	Other hyperlipidemia	MONDO:0007759	hyperlipidemia, familial combined, LPL related	0.500		
+F41.0	Panic disorder [episodic paroxysmal anxiety]	MONDO:0005383	panic disorder	0.400		
+F81.9	Developmental disorder of scholastic skills, unspecified	MONDO:0004681	learning disability	0.333		
+G11.8	Other hereditary ataxias	DOID:0070756	neurodevelopmental disorder with variable motor and speech impairment	0.000		
+G60.2	Neuropathy in association with hereditary ataxia	MONDO:0011801	spinocerebellar ataxia, autosomal recessive, with axonal neuropathy 1	0.545		
+G71.0	Muscular dystrophy	MONDO:0021569	Emery-Dreifuss muscular dystrophy 2, autosomal dominant	0.500		
+H02.73	Vitiligo of eyelid and periocular area	MONDO:0006561	eyelid hypopigmentation	0.333		
+H21.1	Other vascular disorders of iris and ciliary body	MONDO:0001855	rubeosis iridis	0.286		
+I45.8	Other specified conduction disorders	MONDO:0100316	long QT syndrome 1	0.000		
+I49.8	Other specified cardiac arrhythmias	MONDO:0015263	Brugada syndrome	0.000		
+K21.9	Gastro-esophageal reflux disease without esophagitis	MONDO:0007186	gastroesophageal reflux disease	0.444		
+K62.89	Other specified diseases of anus and rectum	MONDO:0005538	proctitis	0.000		
+M00	Pyogenic arthritis	MONDO:0004471	bacterial arthritis	0.500		
+M35.1	Other overlap syndromes	MONDO:0005854	mixed connective tissue disease	0.000		
+M35.6	Relapsing panniculitis [Weber-Christian]	MONDO:0018063	nodular non-suppurative panniculitis	0.571		
+M89.3	Hypertrophy of bone	MONDO:0002185	hyperostosis	0.000		
+M89.8	Other specified disorders of bone	MONDO:0007244	Caffey disease	0.000		
+N04	Nephrotic syndrome	MONDO:0006835	minimal change disease	0.000		
+N06.20	Isolated proteinuria with diffuse membranous glomerulonephritis, unspecified	MONDO:0005376	membranous glomerulonephritis	0.500		
+N16	Renal tubulo-interstitial disorders in diseases classified elsewhere	MONDO:0006939	pyelonephritis	0.000		
+N25.8	Other disorders resulting from impaired renal tubular function	MONDO:0060564	HELIX syndrome	0.000		
+N28.0	Ischemia and infarction of kidney	MONDO:0006945	renal artery obstruction	0.000		
+P27.1	Bronchopulmonary dysplasia originating in the perinatal period	MONDO:0019091	bronchopulmonary dysplasia	0.571		
+P72.1	Transitory neonatal hyperthyroidism	MONDO:0001555	neonatal thyrotoxicosis	0.400		
+Q04.6	Congenital cerebral cysts	MONDO:0017410	porencephaly	0.400		
+Q26.8	Other congenital malformations of great veins	MONDO:0015987	scimitar syndrome	0.000		
+Q42.3	Congenital absence, atresia and stenosis of anus without fistula	MONDO:0001046	imperforate anus	0.222		
+Q61.5	Medullary cystic kidney	MONDO:0017842	Senior-Loken syndrome	0.000		
+Q81.1	Epidermolysis bullosa letalis	MONDO:0009182	junctional epidermolysis bullosa Herlitz type	0.500		
+Q86.8	Other congenital malformation syndromes due to known exogenous causes	MONDO:0016012	diethylstilbestrol syndrome	0.250		
+Q87.19	Other congenital malformation syndromes predominantly associated with short stature	MONDO:0019978	Robinow syndrome	0.200		
+R00	Abnormalities of heart beat	MONDO:0007263	cardiac rhythm disease	0.400		
+R48.8	Other symbolic dysfunctions	MONDO:0000716	agraphia	0.000		
+T67	Effects of heat and light	MESH:D018883	Heat Stroke	0.400		
