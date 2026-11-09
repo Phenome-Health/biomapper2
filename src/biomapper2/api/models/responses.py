@@ -322,12 +322,20 @@ class EntityMappingResult(BaseModel):
     icd10cm_route: str | None = Field(
         default=None,
         description="How an ICD-10-CM fallback committed chosen_kg_id: 'twin' (the same code under the "
-        "ICD10: prefix, because KRAKEN has no ICD10CM: node for it). Null when no fallback was used.",
+        "ICD10: prefix, because KRAKEN has no ICD10CM: node for it) or 'walkup:<ancestor>' (the most "
+        "specific existing parent code that linked; always mapping_relation 'broad'). On an unresolved "
+        "row, 'twin_only:not_in_snapshot' means the code is absent from the CDC hierarchy snapshot, so "
+        "only the twin was tried. Null when no fallback was used.",
     )
     kg_build: str | None = Field(
         default=None,
         description="The KG build ('<kg_version>@<git_commit>') that served an ICD-10-CM fallback row; null "
         "otherwise. Fallback hits exist only because of a specific KG build, so they carry it per row.",
+    )
+    icd10cm_snapshot_version: str | None = Field(
+        default=None,
+        description="Version of the pinned CDC ICD-10-CM hierarchy snapshot ('FY<year>/sha256:<12 hex>/"
+        "built:<date>') that served an ICD-10-CM walk-up row; null on every other row.",
     )
     kg_equivalent_ids: dict[str, list[str]] = Field(
         default_factory=dict,
