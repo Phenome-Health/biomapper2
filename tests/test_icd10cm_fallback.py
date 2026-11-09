@@ -627,6 +627,20 @@ def test_omitted_more_specific_ancestor_raises_instead_of_falling_through(monkey
         Linker().link(_entity("E11.65"))
 
 
+def test_omitted_twin_raises_instead_of_falling_through_to_walkup(monkeypatch) -> None:
+    # A successful /canonicalize that omits the twin ICD10:E11.65 must not let the walk-up commit ICD10:E11.
+    omitted = "ICD10:E11.65"
+
+    def partial(**kw: Any) -> dict[str, Any]:
+        if kw.get("endpoint") != "canonicalize":
+            return {}
+        return {c: ({"ICD10:E11": T2DM}.get(c)) for c in kw["batch_items"] if c != omitted}
+
+    monkeypatch.setattr("biomapper2.core.linker.kestrel_request", partial)
+    with pytest.raises(icd10cm_fallback.Icd10cmFallbackLookupError, match="ICD10:E11.65"):
+        Linker().link(_entity("E11.65"))
+
+
 def test_walkup_enabled_with_a_missing_snapshot_raises_at_link_time(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(config, "ICD10CM_HIERARCHY_PATH", str(tmp_path / "gone.tsv"))
     fake = _kestrel_from(_live_like_answers())

@@ -145,6 +145,13 @@ def select_for_row(
                 f"/canonicalize gave no definite answer for {sorted(unknown)} (isolated by bisect-on-5xx); "
                 f"refusing to read the gap as unresolved or to fall through to a weaker candidate"
             )
+    omitted = sorted(t for t in (twin_of(c) for c in icd_curies) if t is not None and t not in canonical)
+    if omitted:
+        # R7a: a successful response that omits a requested twin is not a definite null either.
+        raise Icd10cmFallbackLookupError(
+            f"/canonicalize returned no answer for {omitted}; "
+            f"refusing to read the gap as unresolved or to fall through to a weaker candidate"
+        )
     denylist = twin_denylist()
     overlay: dict[str, str] = {}
     side_map: dict[str, dict[str, Any]] = {}
