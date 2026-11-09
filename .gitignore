@@ -48,6 +48,17 @@ data/**/*.json
 !data/examples/olink_protein_metadata.tsv
 !data/groundtruth/diseases_handcrafted.tsv
 
+# Analysis artifacts that back numbers asserted in source comments. These MUST stay tracked --
+# a blanket *.json ignore is exactly how a number ends up cited with no artifact behind it.
+!studies/analysis/results/*.json
+# The ICD-10-CM twin gate's hand-review sheet travels with its artifact.
+!studies/analysis/results/icd10cm_twin_title_review.tsv
+# Packaged runtime data (shipped in the wheel; read via importlib.resources).
+!src/biomapper2/data/**/*.json
+# Committed test fixtures.
+!tests/fixtures/**/*.tsv
+!tests/fixtures/**/*.json
+
 # Allow release-please config and versioning files
 !release-please-config.json
 !.release-please-manifest.json

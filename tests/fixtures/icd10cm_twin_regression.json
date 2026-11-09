@@ -1,0 +1,10368 @@
+{
+ "description": "Phase 1a regression fixture: provided ICD10CM:<code> -> the node its ICD10: twin canonicalizes to on the pinned KG build. Derived from studies/analysis/results/icd10cm_twin_control.json.",
+ "kg_build": {
+  "kestrel_url": "https://kestrel.krakenkg.com/api",
+  "kestrel_version": "0.5.0",
+  "kg_version": "2.3.0",
+  "kraken_package_version": "2.2.0",
+  "biolink_version": "4.2.5",
+  "build_timestamp": "2026-09-25T00:34:42.623612+00:00",
+  "git_commit": "3dd08a5b7b17e320ceb0c0091e09b781d4d90242",
+  "sources": [
+   "babel",
+   "bio-age",
+   "bio-bmi",
+   "cdes",
+   "ctkg",
+   "dakg",
+   "kg2",
+   "lipidmaps",
+   "loinc",
+   "long-covid",
+   "microbiome-kg",
+   "multiomics-kg",
+   "ncbigene",
+   "pgs-catalog",
+   "refmet",
+   "robokop",
+   "translator-kg-open",
+   "umls"
+  ],
+  "kg_label": null,
+  "steps_run": {
+   "harmonize": false,
+   "integrate": true,
+   "postprocess": false
+  },
+  "build_duration_minutes": 136.2,
+  "node_count": null,
+  "edge_count": null,
+  "source_versions": {
+   "babel": "2026jul22",
+   "bio-age": "2019",
+   "bio-bmi": "2023",
+   "cdes": "accessed_2026-07-29",
+   "ctkg": "4.1.7",
+   "dakg": "0.5.7",
+   "kg2": "2.10.2",
+   "lipidmaps": "accessed_2026-08-07",
+   "loinc": "2.82",
+   "long-covid": "received_2026-09-17",
+   "microbiome-kg": "2.1.0",
+   "multiomics-kg": "2.1.0",
+   "ncbigene": "accessed_2026-08-31",
+   "pgs-catalog": "2026-07-29",
+   "refmet": "accessed_2026-08-07",
+   "robokop": "june2025",
+   "translator-kg-open": "2026_07_19",
+   "umls": "2025AA"
+  }
+ },
+ "codes": {
+  "A00": {
+   "kg_id": "MONDO:0015766",
+   "route": "twin"
+  },
+  "A01.0": {
+   "kg_id": "MONDO:0005619",
+   "route": "twin"
+  },
+  "A01.1": {
+   "kg_id": "MONDO:0018626",
+   "route": "twin"
+  },
+  "A01.2": {
+   "kg_id": "MONDO:0018626",
+   "route": "twin"
+  },
+  "A01.3": {
+   "kg_id": "MONDO:0018626",
+   "route": "twin"
+  },
+  "A01.4": {
+   "kg_id": "MONDO:0018626",
+   "route": "twin"
+  },
+  "A02.0": {
+   "kg_id": "MONDO:0000827",
+   "route": "twin"
+  },
+  "A03": {
+   "kg_id": "MONDO:0019345",
+   "route": "twin"
+  },
+  "A03.0": {
+   "kg_id": "MONDO:0019345",
+   "route": "twin"
+  },
+  "A03.1": {
+   "kg_id": "MONDO:0019345",
+   "route": "twin"
+  },
+  "A03.2": {
+   "kg_id": "MONDO:0019345",
+   "route": "twin"
+  },
+  "A04.7": {
+   "kg_id": "MONDO:0000705",
+   "route": "twin"
+  },
+  "A05.0": {
+   "kg_id": "MONDO:0005971",
+   "route": "twin"
+  },
+  "A05.1": {
+   "kg_id": "MONDO:0005498",
+   "route": "twin"
+  },
+  "A06": {
+   "kg_id": "MONDO:0005644",
+   "route": "twin"
+  },
+  "A07.0": {
+   "kg_id": "MONDO:0005662",
+   "route": "twin"
+  },
+  "A07.1": {
+   "kg_id": "MONDO:0001103",
+   "route": "twin"
+  },
+  "A07.2": {
+   "kg_id": "MONDO:0015474",
+   "route": "twin"
+  },
+  "A07.3": {
+   "kg_id": "MONDO:0018769",
+   "route": "twin"
+  },
+  "A07.4": {
+   "kg_id": "MONDO:0005725",
+   "route": "twin"
+  },
+  "A07.8": {
+   "kg_id": "MONDO:0001955",
+   "route": "twin"
+  },
+  "A15": {
+   "kg_id": "MONDO:0006052",
+   "route": "twin"
+  },
+  "A15.0": {
+   "kg_id": "MONDO:0004813",
+   "route": "twin"
+  },
+  "A15.5": {
+   "kg_id": "MONDO:0005819",
+   "route": "twin"
+  },
+  "A15.6": {
+   "kg_id": "MONDO:0005922",
+   "route": "twin"
+  },
+  "A18.0": {
+   "kg_id": "MONDO:0005962",
+   "route": "twin"
+  },
+  "A18.1": {
+   "kg_id": "MONDO:0006002",
+   "route": "twin"
+  },
+  "A18.12": {
+   "kg_id": "MONDO:0004272",
+   "route": "twin"
+  },
+  "A18.17": {
+   "kg_id": "MONDO:0000271",
+   "route": "twin"
+  },
+  "A18.2": {
+   "kg_id": "MONDO:0005831",
+   "route": "twin"
+  },
+  "A18.31": {
+   "kg_id": "MONDO:0006000",
+   "route": "twin"
+  },
+  "A18.84": {
+   "kg_id": "MONDO:0005903",
+   "route": "twin"
+  },
+  "A18.85": {
+   "kg_id": "MONDO:0005967",
+   "route": "twin"
+  },
+  "A19": {
+   "kg_id": "MONDO:0005848",
+   "route": "twin"
+  },
+  "A20": {
+   "kg_id": "MONDO:0019095",
+   "route": "twin"
+  },
+  "A20.0": {
+   "kg_id": "MONDO:0001112",
+   "route": "twin"
+  },
+  "A20.2": {
+   "kg_id": "MONDO:0001024",
+   "route": "twin"
+  },
+  "A20.7": {
+   "kg_id": "MONDO:0005956",
+   "route": "twin"
+  },
+  "A21.0": {
+   "kg_id": "MONDO:0001413",
+   "route": "twin"
+  },
+  "A21.1": {
+   "kg_id": "MONDO:0001665",
+   "route": "twin"
+  },
+  "A21.2": {
+   "kg_id": "MONDO:0002212",
+   "route": "twin"
+  },
+  "A22": {
+   "kg_id": "MONDO:0005119",
+   "route": "twin"
+  },
+  "A22.0": {
+   "kg_id": "MONDO:0004215",
+   "route": "twin"
+  },
+  "A22.2": {
+   "kg_id": "MONDO:0001701",
+   "route": "twin"
+  },
+  "A23": {
+   "kg_id": "MONDO:0005683",
+   "route": "twin"
+  },
+  "A23.0": {
+   "kg_id": "MONDO:0001972",
+   "route": "twin"
+  },
+  "A23.1": {
+   "kg_id": "MONDO:0001973",
+   "route": "twin"
+  },
+  "A23.3": {
+   "kg_id": "MONDO:0001857",
+   "route": "twin"
+  },
+  "A24.0": {
+   "kg_id": "MONDO:0005774",
+   "route": "twin"
+  },
+  "A24.9": {
+   "kg_id": "MONDO:0017775",
+   "route": "twin"
+  },
+  "A25.0": {
+   "kg_id": "MONDO:0020532",
+   "route": "twin"
+  },
+  "A25.1": {
+   "kg_id": "MONDO:0020533",
+   "route": "twin"
+  },
+  "A27": {
+   "kg_id": "MONDO:0005825",
+   "route": "twin"
+  },
+  "A27.0": {
+   "kg_id": "MONDO:0005825",
+   "route": "twin"
+  },
+  "A28.0": {
+   "kg_id": "MONDO:0005901",
+   "route": "twin"
+  },
+  "A28.1": {
+   "kg_id": "MONDO:0005692",
+   "route": "twin"
+  },
+  "A30": {
+   "kg_id": "MONDO:0005124",
+   "route": "twin"
+  },
+  "A30.0": {
+   "kg_id": "MONDO:0001391",
+   "route": "twin"
+  },
+  "A30.1": {
+   "kg_id": "MONDO:0005126",
+   "route": "twin"
+  },
+  "A30.3": {
+   "kg_id": "MONDO:0005125",
+   "route": "twin"
+  },
+  "A30.5": {
+   "kg_id": "MONDO:0005127",
+   "route": "twin"
+  },
+  "A31.1": {
+   "kg_id": "MONDO:0000327",
+   "route": "twin"
+  },
+  "A32": {
+   "kg_id": "MONDO:0005828",
+   "route": "twin"
+  },
+  "A33": {
+   "kg_id": "MONDO:0001737",
+   "route": "twin"
+  },
+  "A35": {
+   "kg_id": "MONDO:0005526",
+   "route": "twin"
+  },
+  "A36.3": {
+   "kg_id": "MONDO:0001479",
+   "route": "twin"
+  },
+  "A36.85": {
+   "kg_id": "MONDO:0001681",
+   "route": "twin"
+  },
+  "A36.89": {
+   "kg_id": "MONDO:0001682",
+   "route": "twin"
+  },
+  "A37.1": {
+   "kg_id": "MONDO:0001353",
+   "route": "twin"
+  },
+  "A38": {
+   "kg_id": "MONDO:0005952",
+   "route": "twin"
+  },
+  "A39.0": {
+   "kg_id": "MONDO:0018059",
+   "route": "twin"
+  },
+  "A42": {
+   "kg_id": "MONDO:0005631",
+   "route": "twin"
+  },
+  "A43": {
+   "kg_id": "MONDO:0017776",
+   "route": "twin"
+  },
+  "A44": {
+   "kg_id": "MONDO:0005664",
+   "route": "twin"
+  },
+  "A46": {
+   "kg_id": "MONDO:0001266",
+   "route": "twin"
+  },
+  "A48.0": {
+   "kg_id": "MONDO:0005767",
+   "route": "twin"
+  },
+  "A48.1": {
+   "kg_id": "MONDO:0005824",
+   "route": "twin"
+  },
+  "A48.3": {
+   "kg_id": "MONDO:0001881",
+   "route": "twin"
+  },
+  "A49.9": {
+   "kg_id": "MONDO:0005113",
+   "route": "twin"
+  },
+  "A50": {
+   "kg_id": "MONDO:0005714",
+   "route": "twin"
+  },
+  "A50.40": {
+   "kg_id": "MONDO:0005821",
+   "route": "twin"
+  },
+  "A50.5": {
+   "kg_id": "MONDO:0005821",
+   "route": "twin"
+  },
+  "A51.0": {
+   "kg_id": "MONDO:0005976",
+   "route": "twin"
+  },
+  "A52": {
+   "kg_id": "MONDO:0004497",
+   "route": "twin"
+  },
+  "A52.11": {
+   "kg_id": "MONDO:0005977",
+   "route": "twin"
+  },
+  "A52.2": {
+   "kg_id": "MONDO:0000927",
+   "route": "twin"
+  },
+  "A52.3": {
+   "kg_id": "MONDO:0004944",
+   "route": "twin"
+  },
+  "A53.0": {
+   "kg_id": "MONDO:0005822",
+   "route": "twin"
+  },
+  "A54": {
+   "kg_id": "MONDO:0004277",
+   "route": "twin"
+  },
+  "A54.32": {
+   "kg_id": "MONDO:0004774",
+   "route": "twin"
+  },
+  "A54.33": {
+   "kg_id": "MONDO:0004852",
+   "route": "twin"
+  },
+  "A54.39": {
+   "kg_id": "MONDO:0004853",
+   "route": "twin"
+  },
+  "A54.49": {
+   "kg_id": "MONDO:0001719",
+   "route": "twin"
+  },
+  "A55": {
+   "kg_id": "MONDO:0005834",
+   "route": "twin"
+  },
+  "A57": {
+   "kg_id": "MONDO:0001797",
+   "route": "twin"
+  },
+  "A58": {
+   "kg_id": "MONDO:0005777",
+   "route": "twin"
+  },
+  "A59": {
+   "kg_id": "MONDO:0002154",
+   "route": "twin"
+  },
+  "A59.00": {
+   "kg_id": "MONDO:0005993",
+   "route": "twin"
+  },
+  "A60": {
+   "kg_id": "MONDO:0005770",
+   "route": "twin"
+  },
+  "A63.0": {
+   "kg_id": "MONDO:0005647",
+   "route": "twin"
+  },
+  "A66": {
+   "kg_id": "MONDO:0006019",
+   "route": "twin"
+  },
+  "A66.0": {
+   "kg_id": "MONDO:0001067",
+   "route": "twin"
+  },
+  "A66.1": {
+   "kg_id": "MONDO:0001066",
+   "route": "twin"
+  },
+  "A66.4": {
+   "kg_id": "MONDO:0001066",
+   "route": "twin"
+  },
+  "A66.6": {
+   "kg_id": "MONDO:0001067",
+   "route": "twin"
+  },
+  "A67": {
+   "kg_id": "MONDO:0000979",
+   "route": "twin"
+  },
+  "A67.0": {
+   "kg_id": "MONDO:0000979",
+   "route": "twin"
+  },
+  "A67.1": {
+   "kg_id": "MONDO:0000979",
+   "route": "twin"
+  },
+  "A67.2": {
+   "kg_id": "MONDO:0000979",
+   "route": "twin"
+  },
+  "A67.3": {
+   "kg_id": "MONDO:0000979",
+   "route": "twin"
+  },
+  "A67.9": {
+   "kg_id": "MONDO:0000979",
+   "route": "twin"
+  },
+  "A68": {
+   "kg_id": "MONDO:0019633",
+   "route": "twin"
+  },
+  "A68.0": {
+   "kg_id": "MONDO:0001620",
+   "route": "twin"
+  },
+  "A68.1": {
+   "kg_id": "MONDO:0001621",
+   "route": "twin"
+  },
+  "A69.0": {
+   "kg_id": "MONDO:0017124",
+   "route": "twin"
+  },
+  "A69.1": {
+   "kg_id": "MONDO:0006865",
+   "route": "twin"
+  },
+  "A69.2": {
+   "kg_id": "MONDO:0019632",
+   "route": "twin"
+  },
+  "A69.22": {
+   "kg_id": "MONDO:0005845",
+   "route": "twin"
+  },
+  "A70": {
+   "kg_id": "MONDO:0005888",
+   "route": "twin"
+  },
+  "A71": {
+   "kg_id": "MONDO:0001249",
+   "route": "twin"
+  },
+  "A71.0": {
+   "kg_id": "MONDO:0001249",
+   "route": "twin"
+  },
+  "A71.1": {
+   "kg_id": "MONDO:0001249",
+   "route": "twin"
+  },
+  "A74.0": {
+   "kg_id": "MONDO:0005808",
+   "route": "twin"
+  },
+  "A75.0": {
+   "kg_id": "MONDO:0001246",
+   "route": "twin"
+  },
+  "A75.1": {
+   "kg_id": "MONDO:0005680",
+   "route": "twin"
+  },
+  "A75.2": {
+   "kg_id": "MONDO:0001246",
+   "route": "twin"
+  },
+  "A75.3": {
+   "kg_id": "MONDO:0019365",
+   "route": "twin"
+  },
+  "A75.9": {
+   "kg_id": "MONDO:0001246",
+   "route": "twin"
+  },
+  "A77.1": {
+   "kg_id": "MONDO:0024472",
+   "route": "twin"
+  },
+  "A77.2": {
+   "kg_id": "MONDO:0001154",
+   "route": "twin"
+  },
+  "A77.4": {
+   "kg_id": "MONDO:0016003",
+   "route": "twin"
+  },
+  "A77.9": {
+   "kg_id": "MONDO:0001195",
+   "route": "twin"
+  },
+  "A78": {
+   "kg_id": "MONDO:0019186",
+   "route": "twin"
+  },
+  "A79.0": {
+   "kg_id": "MONDO:0005991",
+   "route": "twin"
+  },
+  "A79.1": {
+   "kg_id": "MONDO:0019360",
+   "route": "twin"
+  },
+  "A80": {
+   "kg_id": "MONDO:0017373",
+   "route": "twin"
+  },
+  "A80.4": {
+   "kg_id": "MONDO:0003231",
+   "route": "twin"
+  },
+  "A81.0": {
+   "kg_id": "MONDO:0005357",
+   "route": "twin"
+  },
+  "A81.1": {
+   "kg_id": "MONDO:0009835",
+   "route": "twin"
+  },
+  "A81.2": {
+   "kg_id": "MONDO:0016318",
+   "route": "twin"
+  },
+  "A81.81": {
+   "kg_id": "MONDO:0006825",
+   "route": "twin"
+  },
+  "A81.82": {
+   "kg_id": "MONDO:0007656",
+   "route": "twin"
+  },
+  "A81.83": {
+   "kg_id": "MONDO:0010808",
+   "route": "twin"
+  },
+  "A81.9": {
+   "kg_id": "MONDO:0005429",
+   "route": "twin"
+  },
+  "A82": {
+   "kg_id": "MONDO:0019173",
+   "route": "twin"
+  },
+  "A83.0": {
+   "kg_id": "MONDO:0019209",
+   "route": "twin"
+  },
+  "A83.1": {
+   "kg_id": "MONDO:0019380",
+   "route": "twin"
+  },
+  "A83.2": {
+   "kg_id": "MONDO:0005736",
+   "route": "twin"
+  },
+  "A83.3": {
+   "kg_id": "MONDO:0005969",
+   "route": "twin"
+  },
+  "A83.4": {
+   "kg_id": "MONDO:0001137",
+   "route": "twin"
+  },
+  "A83.5": {
+   "kg_id": "MONDO:0019378",
+   "route": "twin"
+  },
+  "A84.1": {
+   "kg_id": "MONDO:0017572",
+   "route": "twin"
+  },
+  "A84.89": {
+   "kg_id": "MONDO:0005829",
+   "route": "twin"
+  },
+  "A85.8": {
+   "kg_id": "MONDO:0019384",
+   "route": "twin"
+  },
+  "A87": {
+   "kg_id": "MONDO:0007015",
+   "route": "twin"
+  },
+  "A87.2": {
+   "kg_id": "MONDO:0001449",
+   "route": "twin"
+  },
+  "A90": {
+   "kg_id": "MONDO:0005502",
+   "route": "twin"
+  },
+  "A91": {
+   "kg_id": "MONDO:0005358",
+   "route": "twin"
+  },
+  "A92": {
+   "kg_id": "NCIT:C35174",
+   "route": "twin"
+  },
+  "A92.1": {
+   "kg_id": "MONDO:0000342",
+   "route": "twin"
+  },
+  "A92.2": {
+   "kg_id": "MONDO:0006005",
+   "route": "twin"
+  },
+  "A92.3": {
+   "kg_id": "MONDO:0002282",
+   "route": "twin"
+  },
+  "A92.31": {
+   "kg_id": "MONDO:0019376",
+   "route": "twin"
+  },
+  "A92.4": {
+   "kg_id": "MONDO:0017880",
+   "route": "twin"
+  },
+  "A92.5": {
+   "kg_id": "MONDO:0018661",
+   "route": "twin"
+  },
+  "A92.8": {
+   "kg_id": "MONDO:0018661",
+   "route": "twin"
+  },
+  "A93.0": {
+   "kg_id": "MONDO:0000345",
+   "route": "twin"
+  },
+  "A93.1": {
+   "kg_id": "MONDO:0005913",
+   "route": "twin"
+  },
+  "A93.2": {
+   "kg_id": "MONDO:0005708",
+   "route": "twin"
+  },
+  "A94": {
+   "kg_id": "MONDO:0005108",
+   "route": "twin"
+  },
+  "A95": {
+   "kg_id": "MONDO:0020502",
+   "route": "twin"
+  },
+  "A96.2": {
+   "kg_id": "MONDO:0005820",
+   "route": "twin"
+  },
+  "A96.8": {
+   "kg_id": "MONDO:0017872",
+   "route": "twin"
+  },
+  "A98.0": {
+   "kg_id": "MONDO:0020501",
+   "route": "twin"
+  },
+  "A98.1": {
+   "kg_id": "MONDO:0017882",
+   "route": "twin"
+  },
+  "A98.2": {
+   "kg_id": "MONDO:0017881",
+   "route": "twin"
+  },
+  "A98.3": {
+   "kg_id": "MONDO:0020500",
+   "route": "twin"
+  },
+  "A98.4": {
+   "kg_id": "MONDO:0005737",
+   "route": "twin"
+  },
+  "A98.5": {
+   "kg_id": "MONDO:0005784",
+   "route": "twin"
+  },
+  "B00.0": {
+   "kg_id": "MONDO:0004712",
+   "route": "twin"
+  },
+  "B00.9": {
+   "kg_id": "MONDO:0004609",
+   "route": "twin"
+  },
+  "B01.9": {
+   "kg_id": "MONDO:0005700",
+   "route": "twin"
+  },
+  "B02": {
+   "kg_id": "MONDO:0005609",
+   "route": "twin"
+  },
+  "B02.21": {
+   "kg_id": "MONDO:0005769",
+   "route": "twin"
+  },
+  "B03": {
+   "kg_id": "MONDO:0004651",
+   "route": "twin"
+  },
+  "B04": {
+   "kg_id": "MONDO:0002594",
+   "route": "twin"
+  },
+  "B05": {
+   "kg_id": "MONDO:0004619",
+   "route": "twin"
+  },
+  "B06.9": {
+   "kg_id": "MONDO:0004656",
+   "route": "twin"
+  },
+  "B07.0": {
+   "kg_id": "MONDO:0001795",
+   "route": "twin"
+  },
+  "B08.010": {
+   "kg_id": "MONDO:0005720",
+   "route": "twin"
+  },
+  "B08.02": {
+   "kg_id": "MONDO:0005717",
+   "route": "twin"
+  },
+  "B08.04": {
+   "kg_id": "MONDO:0005850",
+   "route": "twin"
+  },
+  "B08.1": {
+   "kg_id": "MONDO:0005855",
+   "route": "twin"
+  },
+  "B08.2": {
+   "kg_id": "MONDO:0000337",
+   "route": "twin"
+  },
+  "B08.3": {
+   "kg_id": "MONDO:0006544",
+   "route": "twin"
+  },
+  "B08.4": {
+   "kg_id": "MONDO:0005779",
+   "route": "twin"
+  },
+  "B08.5": {
+   "kg_id": "MONDO:0005791",
+   "route": "twin"
+  },
+  "B18": {
+   "kg_id": "MONDO:0025085",
+   "route": "twin"
+  },
+  "B19.20": {
+   "kg_id": "MONDO:0005231",
+   "route": "twin"
+  },
+  "B20": {
+   "kg_id": "MONDO:0005109",
+   "route": "twin"
+  },
+  "B25": {
+   "kg_id": "MONDO:0850289",
+   "route": "twin"
+  },
+  "B26": {
+   "kg_id": "MONDO:0000989",
+   "route": "twin"
+  },
+  "B27": {
+   "kg_id": "MONDO:0005810",
+   "route": "twin"
+  },
+  "B30.0": {
+   "kg_id": "MONDO:0001615",
+   "route": "twin"
+  },
+  "B33.0": {
+   "kg_id": "MONDO:0005751",
+   "route": "twin"
+  },
+  "B33.4": {
+   "kg_id": "MONDO:0017879",
+   "route": "twin"
+  },
+  "B34.9": {
+   "kg_id": "MONDO:0005108",
+   "route": "twin"
+  },
+  "B35": {
+   "kg_id": "MONDO:0005983",
+   "route": "twin"
+  },
+  "B35.2": {
+   "kg_id": "MONDO:0001699",
+   "route": "twin"
+  },
+  "B35.3": {
+   "kg_id": "MONDO:0005984",
+   "route": "twin"
+  },
+  "B36.0": {
+   "kg_id": "MONDO:0005915",
+   "route": "twin"
+  },
+  "B36.1": {
+   "kg_id": "MONDO:0004677",
+   "route": "twin"
+  },
+  "B36.2": {
+   "kg_id": "MONDO:0001827",
+   "route": "twin"
+  },
+  "B36.3": {
+   "kg_id": "MONDO:0005669",
+   "route": "twin"
+  },
+  "B36.9": {
+   "kg_id": "MONDO:0024268",
+   "route": "twin"
+  },
+  "B37": {
+   "kg_id": "MONDO:0002026",
+   "route": "twin"
+  },
+  "B37.2": {
+   "kg_id": "MONDO:0001984",
+   "route": "twin"
+  },
+  "B37.3": {
+   "kg_id": "MONDO:0006014",
+   "route": "twin"
+  },
+  "B37.81": {
+   "kg_id": "MONDO:0001648",
+   "route": "twin"
+  },
+  "B37.9": {
+   "kg_id": "MONDO:0005886",
+   "route": "twin"
+  },
+  "B38": {
+   "kg_id": "MONDO:0005706",
+   "route": "twin"
+  },
+  "B39": {
+   "kg_id": "MONDO:0018312",
+   "route": "twin"
+  },
+  "B39.4": {
+   "kg_id": "MONDO:0002099",
+   "route": "twin"
+  },
+  "B40": {
+   "kg_id": "MONDO:0005672",
+   "route": "twin"
+  },
+  "B41": {
+   "kg_id": "MONDO:0005894",
+   "route": "twin"
+  },
+  "B42": {
+   "kg_id": "MONDO:0005968",
+   "route": "twin"
+  },
+  "B43.9": {
+   "kg_id": "MONDO:0015908",
+   "route": "twin"
+  },
+  "B44": {
+   "kg_id": "MONDO:0005657",
+   "route": "twin"
+  },
+  "B44.81": {
+   "kg_id": "MONDO:0015243",
+   "route": "twin"
+  },
+  "B45": {
+   "kg_id": "MONDO:0005724",
+   "route": "twin"
+  },
+  "B47": {
+   "kg_id": "MONDO:0005757",
+   "route": "twin"
+  },
+  "B48.0": {
+   "kg_id": "MONDO:0001616",
+   "route": "twin"
+  },
+  "B48.1": {
+   "kg_id": "MONDO:0005946",
+   "route": "twin"
+  },
+  "B48.2": {
+   "kg_id": "MONDO:0001215",
+   "route": "twin"
+  },
+  "B48.3": {
+   "kg_id": "MONDO:0005772",
+   "route": "twin"
+  },
+  "B49": {
+   "kg_id": "MONDO:0002041",
+   "route": "twin"
+  },
+  "B50": {
+   "kg_id": "MONDO:0005920",
+   "route": "twin"
+  },
+  "B50.0": {
+   "kg_id": "MONDO:0005625",
+   "route": "twin"
+  },
+  "B51": {
+   "kg_id": "MONDO:0005921",
+   "route": "twin"
+  },
+  "B52": {
+   "kg_id": "MONDO:0001943",
+   "route": "twin"
+  },
+  "B53.0": {
+   "kg_id": "MONDO:0001601",
+   "route": "twin"
+  },
+  "B54": {
+   "kg_id": "MONDO:0005136",
+   "route": "twin"
+  },
+  "B55": {
+   "kg_id": "MONDO:0011989",
+   "route": "twin"
+  },
+  "B55.0": {
+   "kg_id": "MONDO:0005445",
+   "route": "twin"
+  },
+  "B55.1": {
+   "kg_id": "MONDO:0005446",
+   "route": "twin"
+  },
+  "B55.2": {
+   "kg_id": "MONDO:0005859",
+   "route": "twin"
+  },
+  "B56": {
+   "kg_id": "MONDO:0005459",
+   "route": "twin"
+  },
+  "B57": {
+   "kg_id": "MONDO:0001444",
+   "route": "twin"
+  },
+  "B57.0": {
+   "kg_id": "MONDO:0001444",
+   "route": "twin"
+  },
+  "B57.1": {
+   "kg_id": "MONDO:0001444",
+   "route": "twin"
+  },
+  "B57.2": {
+   "kg_id": "MONDO:0000940",
+   "route": "twin"
+  },
+  "B57.3": {
+   "kg_id": "MONDO:0001444",
+   "route": "twin"
+  },
+  "B57.4": {
+   "kg_id": "MONDO:0001444",
+   "route": "twin"
+  },
+  "B57.5": {
+   "kg_id": "MONDO:0001444",
+   "route": "twin"
+  },
+  "B58": {
+   "kg_id": "MONDO:0005989",
+   "route": "twin"
+  },
+  "B59": {
+   "kg_id": "MONDO:0019121",
+   "route": "twin"
+  },
+  "B60.0": {
+   "kg_id": "MONDO:0005661",
+   "route": "twin"
+  },
+  "B60.8": {
+   "kg_id": "MONDO:0005846",
+   "route": "twin"
+  },
+  "B64": {
+   "kg_id": "MONDO:0002428",
+   "route": "twin"
+  },
+  "B65.1": {
+   "kg_id": "MONDO:0008412",
+   "route": "twin"
+  },
+  "B65.2": {
+   "kg_id": "MONDO:0008412",
+   "route": "twin"
+  },
+  "B65.3": {
+   "kg_id": "MONDO:0001260",
+   "route": "twin"
+  },
+  "B66.0": {
+   "kg_id": "MONDO:0005884",
+   "route": "twin"
+  },
+  "B66.1": {
+   "kg_id": "MONDO:0005705",
+   "route": "twin"
+  },
+  "B66.2": {
+   "kg_id": "MONDO:0005729",
+   "route": "twin"
+  },
+  "B66.3": {
+   "kg_id": "MONDO:0004668",
+   "route": "twin"
+  },
+  "B66.4": {
+   "kg_id": "MONDO:0005895",
+   "route": "twin"
+  },
+  "B66.5": {
+   "kg_id": "MONDO:0004672",
+   "route": "twin"
+  },
+  "B66.8": {
+   "kg_id": "MONDO:0005739",
+   "route": "twin"
+  },
+  "B67": {
+   "kg_id": "MONDO:0005738",
+   "route": "twin"
+  },
+  "B67.4": {
+   "kg_id": "MONDO:0018408",
+   "route": "twin"
+  },
+  "B67.7": {
+   "kg_id": "MONDO:0017282",
+   "route": "twin"
+  },
+  "B68.1": {
+   "kg_id": "MONDO:0000367",
+   "route": "twin"
+  },
+  "B69": {
+   "kg_id": "MONDO:0015484",
+   "route": "twin"
+  },
+  "B70.0": {
+   "kg_id": "MONDO:0015260",
+   "route": "twin"
+  },
+  "B70.1": {
+   "kg_id": "MONDO:0005963",
+   "route": "twin"
+  },
+  "B71": {
+   "kg_id": "MONDO:0042488",
+   "route": "twin"
+  },
+  "B71.0": {
+   "kg_id": "MONDO:0005802",
+   "route": "twin"
+  },
+  "B72": {
+   "kg_id": "MONDO:0016472",
+   "route": "twin"
+  },
+  "B73": {
+   "kg_id": "MONDO:0017137",
+   "route": "twin"
+  },
+  "B74": {
+   "kg_id": "MONDO:0016075",
+   "route": "twin"
+  },
+  "B74.3": {
+   "kg_id": "MONDO:0016566",
+   "route": "twin"
+  },
+  "B74.4": {
+   "kg_id": "MONDO:0005838",
+   "route": "twin"
+  },
+  "B74.8": {
+   "kg_id": "MONDO:0015636",
+   "route": "twin"
+  },
+  "B75": {
+   "kg_id": "MONDO:0019444",
+   "route": "twin"
+  },
+  "B76.0": {
+   "kg_id": "MONDO:0005645",
+   "route": "twin"
+  },
+  "B76.1": {
+   "kg_id": "MONDO:0005870",
+   "route": "twin"
+  },
+  "B77": {
+   "kg_id": "MONDO:0005654",
+   "route": "twin"
+  },
+  "B78": {
+   "kg_id": "MONDO:0005974",
+   "route": "twin"
+  },
+  "B80": {
+   "kg_id": "MONDO:0005746",
+   "route": "twin"
+  },
+  "B81.0": {
+   "kg_id": "MONDO:0015200",
+   "route": "twin"
+  },
+  "B81.1": {
+   "kg_id": "MONDO:0001532",
+   "route": "twin"
+  },
+  "B81.2": {
+   "kg_id": "MONDO:0005995",
+   "route": "twin"
+  },
+  "B83.0": {
+   "kg_id": "MONDO:0005988",
+   "route": "twin"
+  },
+  "B83.1": {
+   "kg_id": "MONDO:0005776",
+   "route": "twin"
+  },
+  "B83.9": {
+   "kg_id": "MONDO:0004664",
+   "route": "twin"
+  },
+  "B85.0": {
+   "kg_id": "MONDO:0003471",
+   "route": "twin"
+  },
+  "B85.1": {
+   "kg_id": "MONDO:0003482",
+   "route": "twin"
+  },
+  "B85.2": {
+   "kg_id": "MONDO:0003472",
+   "route": "twin"
+  },
+  "B85.3": {
+   "kg_id": "MONDO:0001794",
+   "route": "twin"
+  },
+  "B86": {
+   "kg_id": "MONDO:0004525",
+   "route": "twin"
+  },
+  "B87": {
+   "kg_id": "MONDO:0019147",
+   "route": "twin"
+  },
+  "B88.3": {
+   "kg_id": "MONDO:0001191",
+   "route": "twin"
+  },
+  "B88.9": {
+   "kg_id": "MONDO:0004389",
+   "route": "twin"
+  },
+  "C00": {
+   "kg_id": "MONDO:0006834",
+   "route": "twin"
+  },
+  "C00.0": {
+   "kg_id": "MONDO:0004621",
+   "route": "twin"
+  },
+  "C00.1": {
+   "kg_id": "MONDO:0004673",
+   "route": "twin"
+  },
+  "C00.3": {
+   "kg_id": "MONDO:0004621",
+   "route": "twin"
+  },
+  "C01": {
+   "kg_id": "MONDO:0004631",
+   "route": "twin"
+  },
+  "C02.0": {
+   "kg_id": "MONDO:0004631",
+   "route": "twin"
+  },
+  "C02.1": {
+   "kg_id": "MONDO:0004631",
+   "route": "twin"
+  },
+  "C02.2": {
+   "kg_id": "MONDO:0004631",
+   "route": "twin"
+  },
+  "C02.4": {
+   "kg_id": "MONDO:0004631",
+   "route": "twin"
+  },
+  "C02.9": {
+   "kg_id": "MONDO:0004631",
+   "route": "twin"
+  },
+  "C03": {
+   "kg_id": "MONDO:0005507",
+   "route": "twin"
+  },
+  "C03.0": {
+   "kg_id": "MONDO:0004615",
+   "route": "twin"
+  },
+  "C03.1": {
+   "kg_id": "MONDO:0004713",
+   "route": "twin"
+  },
+  "C04": {
+   "kg_id": "MONDO:0005515",
+   "route": "twin"
+  },
+  "C04.0": {
+   "kg_id": "MONDO:0005515",
+   "route": "twin"
+  },
+  "C04.1": {
+   "kg_id": "MONDO:0005515",
+   "route": "twin"
+  },
+  "C05.0": {
+   "kg_id": "MONDO:0004719",
+   "route": "twin"
+  },
+  "C05.1": {
+   "kg_id": "MONDO:0004611",
+   "route": "twin"
+  },
+  "C05.2": {
+   "kg_id": "MONDO:0004624",
+   "route": "twin"
+  },
+  "C06.0": {
+   "kg_id": "MONDO:0004645",
+   "route": "twin"
+  },
+  "C06.1": {
+   "kg_id": "MONDO:0004727",
+   "route": "twin"
+  },
+  "C06.2": {
+   "kg_id": "MONDO:0004682",
+   "route": "twin"
+  },
+  "C07": {
+   "kg_id": "MONDO:0004700",
+   "route": "twin"
+  },
+  "C08": {
+   "kg_id": "MONDO:0004669",
+   "route": "twin"
+  },
+  "C08.0": {
+   "kg_id": "MONDO:0004724",
+   "route": "twin"
+  },
+  "C08.1": {
+   "kg_id": "MONDO:0004667",
+   "route": "twin"
+  },
+  "C09": {
+   "kg_id": "MONDO:0006998",
+   "route": "twin"
+  },
+  "C09.0": {
+   "kg_id": "MONDO:0004690",
+   "route": "twin"
+  },
+  "C09.1": {
+   "kg_id": "MONDO:0004642",
+   "route": "twin"
+  },
+  "C10": {
+   "kg_id": "MONDO:0004608",
+   "route": "twin"
+  },
+  "C10.0": {
+   "kg_id": "MONDO:0004607",
+   "route": "twin"
+  },
+  "C10.1": {
+   "kg_id": "MONDO:0004473",
+   "route": "twin"
+  },
+  "C10.2": {
+   "kg_id": "MONDO:0004608",
+   "route": "twin"
+  },
+  "C10.3": {
+   "kg_id": "MONDO:0004608",
+   "route": "twin"
+  },
+  "C10.8": {
+   "kg_id": "MONDO:0004608",
+   "route": "twin"
+  },
+  "C11": {
+   "kg_id": "MONDO:0015459",
+   "route": "twin"
+  },
+  "C11.0": {
+   "kg_id": "MONDO:0015459",
+   "route": "twin"
+  },
+  "C11.1": {
+   "kg_id": "MONDO:0015459",
+   "route": "twin"
+  },
+  "C11.2": {
+   "kg_id": "MONDO:0015459",
+   "route": "twin"
+  },
+  "C11.3": {
+   "kg_id": "MONDO:0015459",
+   "route": "twin"
+  },
+  "C12": {
+   "kg_id": "MONDO:0004733",
+   "route": "twin"
+  },
+  "C13": {
+   "kg_id": "MONDO:0005806",
+   "route": "twin"
+  },
+  "C13.0": {
+   "kg_id": "MONDO:0004635",
+   "route": "twin"
+  },
+  "C13.1": {
+   "kg_id": "MONDO:0004637",
+   "route": "twin"
+  },
+  "C13.2": {
+   "kg_id": "MONDO:0005806",
+   "route": "twin"
+  },
+  "C14.2": {
+   "kg_id": "MONDO:0004685",
+   "route": "twin"
+  },
+  "C15.3": {
+   "kg_id": "MONDO:0007576",
+   "route": "twin"
+  },
+  "C15.4": {
+   "kg_id": "MONDO:0007576",
+   "route": "twin"
+  },
+  "C15.5": {
+   "kg_id": "MONDO:0007576",
+   "route": "twin"
+  },
+  "C16": {
+   "kg_id": "MONDO:0001056",
+   "route": "twin"
+  },
+  "C16.0": {
+   "kg_id": "MONDO:0001063",
+   "route": "twin"
+  },
+  "C16.1": {
+   "kg_id": "MONDO:0004950",
+   "route": "twin"
+  },
+  "C16.2": {
+   "kg_id": "MONDO:0001056",
+   "route": "twin"
+  },
+  "C16.3": {
+   "kg_id": "MONDO:0001062",
+   "route": "twin"
+  },
+  "C16.4": {
+   "kg_id": "MONDO:0001061",
+   "route": "twin"
+  },
+  "C16.5": {
+   "kg_id": "MONDO:0001056",
+   "route": "twin"
+  },
+  "C16.6": {
+   "kg_id": "MONDO:0001056",
+   "route": "twin"
+  },
+  "C17": {
+   "kg_id": "MONDO:0000956",
+   "route": "twin"
+  },
+  "C17.0": {
+   "kg_id": "MONDO:0000920",
+   "route": "twin"
+  },
+  "C17.1": {
+   "kg_id": "MONDO:0006815",
+   "route": "twin"
+  },
+  "C17.2": {
+   "kg_id": "MONDO:0000955",
+   "route": "twin"
+  },
+  "C18": {
+   "kg_id": "MONDO:0021063",
+   "route": "twin"
+  },
+  "C18.0": {
+   "kg_id": "MONDO:0002033",
+   "route": "twin"
+  },
+  "C18.1": {
+   "kg_id": "MONDO:0001235",
+   "route": "twin"
+  },
+  "C18.2": {
+   "kg_id": "MONDO:0002238",
+   "route": "twin"
+  },
+  "C18.3": {
+   "kg_id": "MONDO:0002357",
+   "route": "twin"
+  },
+  "C18.4": {
+   "kg_id": "MONDO:0002361",
+   "route": "twin"
+  },
+  "C18.5": {
+   "kg_id": "MONDO:0001463",
+   "route": "twin"
+  },
+  "C18.6": {
+   "kg_id": "MONDO:0001462",
+   "route": "twin"
+  },
+  "C18.7": {
+   "kg_id": "MONDO:0001464",
+   "route": "twin"
+  },
+  "C18.9": {
+   "kg_id": "MONDO:0005575",
+   "route": "twin"
+  },
+  "C19": {
+   "kg_id": "MONDO:0002425",
+   "route": "twin"
+  },
+  "C20": {
+   "kg_id": "MONDO:0006519",
+   "route": "twin"
+  },
+  "C21.0": {
+   "kg_id": "MONDO:0001879",
+   "route": "twin"
+  },
+  "C21.1": {
+   "kg_id": "MONDO:0001879",
+   "route": "twin"
+  },
+  "C22": {
+   "kg_id": "MONDO:0024477",
+   "route": "twin"
+  },
+  "C22.0": {
+   "kg_id": "MONDO:0002691",
+   "route": "twin"
+  },
+  "C22.1": {
+   "kg_id": "MONDO:0003210",
+   "route": "twin"
+  },
+  "C22.2": {
+   "kg_id": "MONDO:0018666",
+   "route": "twin"
+  },
+  "C22.3": {
+   "kg_id": "MONDO:0002387",
+   "route": "twin"
+  },
+  "C22.9": {
+   "kg_id": "MONDO:0002691",
+   "route": "twin"
+  },
+  "C23": {
+   "kg_id": "MONDO:0005411",
+   "route": "twin"
+  },
+  "C24.0": {
+   "kg_id": "MONDO:0003059",
+   "route": "twin"
+  },
+  "C24.1": {
+   "kg_id": "MONDO:0000919",
+   "route": "twin"
+  },
+  "C24.9": {
+   "kg_id": "MONDO:0003060",
+   "route": "twin"
+  },
+  "C25.0": {
+   "kg_id": "MONDO:0009831",
+   "route": "twin"
+  },
+  "C25.1": {
+   "kg_id": "MONDO:0009831",
+   "route": "twin"
+  },
+  "C25.2": {
+   "kg_id": "MONDO:0009831",
+   "route": "twin"
+  },
+  "C25.3": {
+   "kg_id": "MONDO:0005184",
+   "route": "twin"
+  },
+  "C25.4": {
+   "kg_id": "MONDO:0005893",
+   "route": "twin"
+  },
+  "C26.0": {
+   "kg_id": "MONDO:0005814",
+   "route": "twin"
+  },
+  "C26.1": {
+   "kg_id": "MONDO:0005966",
+   "route": "twin"
+  },
+  "C26.9": {
+   "kg_id": "MONDO:0002516",
+   "route": "twin"
+  },
+  "C30.0": {
+   "kg_id": "MONDO:0001128",
+   "route": "twin"
+  },
+  "C31.0": {
+   "kg_id": "MONDO:0001748",
+   "route": "twin"
+  },
+  "C31.1": {
+   "kg_id": "MONDO:0001763",
+   "route": "twin"
+  },
+  "C31.2": {
+   "kg_id": "MONDO:0001756",
+   "route": "twin"
+  },
+  "C31.3": {
+   "kg_id": "MONDO:0001994",
+   "route": "twin"
+  },
+  "C32": {
+   "kg_id": "MONDO:0002352",
+   "route": "twin"
+  },
+  "C32.0": {
+   "kg_id": "MONDO:0002351",
+   "route": "twin"
+  },
+  "C32.1": {
+   "kg_id": "MONDO:0001724",
+   "route": "twin"
+  },
+  "C32.2": {
+   "kg_id": "MONDO:0001293",
+   "route": "twin"
+  },
+  "C32.3": {
+   "kg_id": "MONDO:0001691",
+   "route": "twin"
+  },
+  "C33": {
+   "kg_id": "MONDO:0001407",
+   "route": "twin"
+  },
+  "C34": {
+   "kg_id": "MONDO:0001672",
+   "route": "twin"
+  },
+  "C34.0": {
+   "kg_id": "MONDO:0002811",
+   "route": "twin"
+  },
+  "C34.1": {
+   "kg_id": "MONDO:0008903",
+   "route": "twin"
+  },
+  "C34.2": {
+   "kg_id": "MONDO:0008903",
+   "route": "twin"
+  },
+  "C34.3": {
+   "kg_id": "MONDO:0008903",
+   "route": "twin"
+  },
+  "C37": {
+   "kg_id": "MONDO:0002586",
+   "route": "twin"
+  },
+  "C38.0": {
+   "kg_id": "MONDO:0001322",
+   "route": "twin"
+  },
+  "C38.2": {
+   "kg_id": "MONDO:0002972",
+   "route": "twin"
+  },
+  "C38.3": {
+   "kg_id": "MONDO:0005843",
+   "route": "twin"
+  },
+  "C38.4": {
+   "kg_id": "MONDO:0006294",
+   "route": "twin"
+  },
+  "C40.2": {
+   "kg_id": "MONDO:0000952",
+   "route": "twin"
+  },
+  "C40.3": {
+   "kg_id": "MONDO:0000953",
+   "route": "twin"
+  },
+  "C41.1": {
+   "kg_id": "MONDO:0005837",
+   "route": "twin"
+  },
+  "C43.9": {
+   "kg_id": "MONDO:0005012",
+   "route": "twin"
+  },
+  "C44": {
+   "kg_id": "MONDO:0002206",
+   "route": "twin"
+  },
+  "C44.510": {
+   "kg_id": "MONDO:0002940",
+   "route": "twin"
+  },
+  "C44.520": {
+   "kg_id": "MONDO:0001470",
+   "route": "twin"
+  },
+  "C45": {
+   "kg_id": "MONDO:0002373",
+   "route": "twin"
+  },
+  "C45.0": {
+   "kg_id": "MONDO:0005112",
+   "route": "twin"
+  },
+  "C45.1": {
+   "kg_id": "MONDO:0005512",
+   "route": "twin"
+  },
+  "C45.2": {
+   "kg_id": "MONDO:0003805",
+   "route": "twin"
+  },
+  "C46": {
+   "kg_id": "MONDO:0005055",
+   "route": "twin"
+  },
+  "C46.0": {
+   "kg_id": "MONDO:0005055",
+   "route": "twin"
+  },
+  "C46.1": {
+   "kg_id": "MONDO:0005055",
+   "route": "twin"
+  },
+  "C46.2": {
+   "kg_id": "MONDO:0005055",
+   "route": "twin"
+  },
+  "C46.3": {
+   "kg_id": "MONDO:0005055",
+   "route": "twin"
+  },
+  "C46.4": {
+   "kg_id": "MONDO:0005055",
+   "route": "twin"
+  },
+  "C46.5": {
+   "kg_id": "MONDO:0005055",
+   "route": "twin"
+  },
+  "C48": {
+   "kg_id": "MONDO:0005941",
+   "route": "twin"
+  },
+  "C48.0": {
+   "kg_id": "MONDO:0005941",
+   "route": "twin"
+  },
+  "C48.1": {
+   "kg_id": "MONDO:0002087",
+   "route": "twin"
+  },
+  "C49": {
+   "kg_id": "MONDO:0005089",
+   "route": "twin"
+  },
+  "C49.A": {
+   "kg_id": "MONDO:0011719",
+   "route": "twin"
+  },
+  "C50": {
+   "kg_id": "MONDO:0007254",
+   "route": "twin"
+  },
+  "C50.11": {
+   "kg_id": "MONDO:0001805",
+   "route": "twin"
+  },
+  "C50.31": {
+   "kg_id": "MONDO:0002068",
+   "route": "twin"
+  },
+  "C50.41": {
+   "kg_id": "MONDO:0004878",
+   "route": "twin"
+  },
+  "C50.51": {
+   "kg_id": "MONDO:0001850",
+   "route": "twin"
+  },
+  "C50.61": {
+   "kg_id": "MONDO:0002069",
+   "route": "twin"
+  },
+  "C50.A": {
+   "kg_id": "MONDO:0006804",
+   "route": "twin"
+  },
+  "C51": {
+   "kg_id": "MONDO:0001528",
+   "route": "twin"
+  },
+  "C51.0": {
+   "kg_id": "MONDO:0001403",
+   "route": "twin"
+  },
+  "C51.1": {
+   "kg_id": "MONDO:0001526",
+   "route": "twin"
+  },
+  "C51.2": {
+   "kg_id": "MONDO:0002290",
+   "route": "twin"
+  },
+  "C52": {
+   "kg_id": "MONDO:0001402",
+   "route": "twin"
+  },
+  "C53": {
+   "kg_id": "MONDO:0002974",
+   "route": "twin"
+  },
+  "C54": {
+   "kg_id": "MONDO:0006003",
+   "route": "twin"
+  },
+  "C54.1": {
+   "kg_id": "MONDO:0011962",
+   "route": "twin"
+  },
+  "C55": {
+   "kg_id": "MONDO:0002715",
+   "route": "twin"
+  },
+  "C56": {
+   "kg_id": "MONDO:0008170",
+   "route": "twin"
+  },
+  "C57": {
+   "kg_id": "MONDO:0001416",
+   "route": "twin"
+  },
+  "C57.0": {
+   "kg_id": "MONDO:0002158",
+   "route": "twin"
+  },
+  "C57.1": {
+   "kg_id": "MONDO:0001108",
+   "route": "twin"
+  },
+  "C57.2": {
+   "kg_id": "MONDO:0001352",
+   "route": "twin"
+  },
+  "C57.3": {
+   "kg_id": "MONDO:0001350",
+   "route": "twin"
+  },
+  "C57.4": {
+   "kg_id": "MONDO:0001351",
+   "route": "twin"
+  },
+  "C58": {
+   "kg_id": "MONDO:0002178",
+   "route": "twin"
+  },
+  "C60": {
+   "kg_id": "MONDO:0001325",
+   "route": "twin"
+  },
+  "C60.0": {
+   "kg_id": "MONDO:0001653",
+   "route": "twin"
+  },
+  "C60.1": {
+   "kg_id": "MONDO:0001388",
+   "route": "twin"
+  },
+  "C60.2": {
+   "kg_id": "MONDO:0001325",
+   "route": "twin"
+  },
+  "C61": {
+   "kg_id": "MONDO:0008315",
+   "route": "twin"
+  },
+  "C62": {
+   "kg_id": "MONDO:0005447",
+   "route": "twin"
+  },
+  "C62.0": {
+   "kg_id": "MONDO:0001480",
+   "route": "twin"
+  },
+  "C63.0": {
+   "kg_id": "MONDO:0001016",
+   "route": "twin"
+  },
+  "C63.1": {
+   "kg_id": "MONDO:0001654",
+   "route": "twin"
+  },
+  "C63.2": {
+   "kg_id": "MONDO:0003319",
+   "route": "twin"
+  },
+  "C63.9": {
+   "kg_id": "MONDO:0005836",
+   "route": "twin"
+  },
+  "C64": {
+   "kg_id": "MONDO:0002367",
+   "route": "twin"
+  },
+  "C65": {
+   "kg_id": "MONDO:0005519",
+   "route": "twin"
+  },
+  "C66": {
+   "kg_id": "MONDO:0008627",
+   "route": "twin"
+  },
+  "C67": {
+   "kg_id": "MONDO:0001187",
+   "route": "twin"
+  },
+  "C67.0": {
+   "kg_id": "MONDO:0001375",
+   "route": "twin"
+  },
+  "C67.1": {
+   "kg_id": "MONDO:0001380",
+   "route": "twin"
+  },
+  "C67.2": {
+   "kg_id": "MONDO:0001319",
+   "route": "twin"
+  },
+  "C67.3": {
+   "kg_id": "MONDO:0001376",
+   "route": "twin"
+  },
+  "C67.4": {
+   "kg_id": "MONDO:0001373",
+   "route": "twin"
+  },
+  "C67.5": {
+   "kg_id": "MONDO:0001372",
+   "route": "twin"
+  },
+  "C67.6": {
+   "kg_id": "MONDO:0001379",
+   "route": "twin"
+  },
+  "C67.7": {
+   "kg_id": "MONDO:0001378",
+   "route": "twin"
+  },
+  "C68.0": {
+   "kg_id": "MONDO:0004192",
+   "route": "twin"
+  },
+  "C68.1": {
+   "kg_id": "MONDO:0001869",
+   "route": "twin"
+  },
+  "C68.9": {
+   "kg_id": "MONDO:0006295",
+   "route": "twin"
+  },
+  "C69.0": {
+   "kg_id": "MONDO:0003454",
+   "route": "twin"
+  },
+  "C69.1": {
+   "kg_id": "MONDO:0003802",
+   "route": "twin"
+  },
+  "C69.2": {
+   "kg_id": "MONDO:0003072",
+   "route": "twin"
+  },
+  "C69.3": {
+   "kg_id": "MONDO:0006700",
+   "route": "twin"
+  },
+  "C69.4": {
+   "kg_id": "MONDO:0002969",
+   "route": "twin"
+  },
+  "C69.6": {
+   "kg_id": "MONDO:0002889",
+   "route": "twin"
+  },
+  "C70.1": {
+   "kg_id": "MONDO:0004151",
+   "route": "twin"
+  },
+  "C71": {
+   "kg_id": "MONDO:0001657",
+   "route": "twin"
+  },
+  "C71.0": {
+   "kg_id": "MONDO:0002071",
+   "route": "twin"
+  },
+  "C71.1": {
+   "kg_id": "MONDO:0001421",
+   "route": "twin"
+  },
+  "C71.2": {
+   "kg_id": "MONDO:0002218",
+   "route": "twin"
+  },
+  "C71.3": {
+   "kg_id": "MONDO:0001952",
+   "route": "twin"
+  },
+  "C71.4": {
+   "kg_id": "MONDO:0004709",
+   "route": "twin"
+  },
+  "C71.5": {
+   "kg_id": "MONDO:0002682",
+   "route": "twin"
+  },
+  "C71.6": {
+   "kg_id": "MONDO:0002913",
+   "route": "twin"
+  },
+  "C71.7": {
+   "kg_id": "MONDO:0002912",
+   "route": "twin"
+  },
+  "C71.9": {
+   "kg_id": "MONDO:0957196",
+   "route": "twin"
+  },
+  "C72.0": {
+   "kg_id": "MONDO:0003544",
+   "route": "twin"
+  },
+  "C72.2": {
+   "kg_id": "MONDO:0851100",
+   "route": "twin"
+  },
+  "C72.4": {
+   "kg_id": "MONDO:0002432",
+   "route": "twin"
+  },
+  "C72.50": {
+   "kg_id": "MONDO:0002433",
+   "route": "twin"
+  },
+  "C72.9": {
+   "kg_id": "MONDO:0002714",
+   "route": "twin"
+  },
+  "C73": {
+   "kg_id": "MONDO:0002108",
+   "route": "twin"
+  },
+  "C74": {
+   "kg_id": "MONDO:0002817",
+   "route": "twin"
+  },
+  "C74.0": {
+   "kg_id": "MONDO:0006639",
+   "route": "twin"
+  },
+  "C74.1": {
+   "kg_id": "MONDO:0003606",
+   "route": "twin"
+  },
+  "C75.0": {
+   "kg_id": "MONDO:0012004",
+   "route": "twin"
+  },
+  "C75.1": {
+   "kg_id": "MONDO:0002109",
+   "route": "twin"
+  },
+  "C75.3": {
+   "kg_id": "MONDO:0003249",
+   "route": "twin"
+  },
+  "C75.4": {
+   "kg_id": "MONDO:0004650",
+   "route": "twin"
+  },
+  "C75.9": {
+   "kg_id": "MONDO:0021069",
+   "route": "twin"
+  },
+  "C76.1": {
+   "kg_id": "MONDO:0003274",
+   "route": "twin"
+  },
+  "C80.1": {
+   "kg_id": "MONDO:0004992",
+   "route": "twin"
+  },
+  "C81": {
+   "kg_id": "MONDO:0004952",
+   "route": "twin"
+  },
+  "C81.1": {
+   "kg_id": "MONDO:0004665",
+   "route": "twin"
+  },
+  "C81.2": {
+   "kg_id": "MONDO:0004633",
+   "route": "twin"
+  },
+  "C81.3": {
+   "kg_id": "MONDO:0004620",
+   "route": "twin"
+  },
+  "C81.4": {
+   "kg_id": "MONDO:0004604",
+   "route": "twin"
+  },
+  "C82": {
+   "kg_id": "NCIT:C7218",
+   "route": "twin"
+  },
+  "C83.390": {
+   "kg_id": "MONDO:0002571",
+   "route": "twin"
+  },
+  "C83.7": {
+   "kg_id": "MONDO:0007243",
+   "route": "twin"
+  },
+  "C83.8": {
+   "kg_id": "MONDO:0019466",
+   "route": "twin"
+  },
+  "C84.0": {
+   "kg_id": "MONDO:0009691",
+   "route": "twin"
+  },
+  "C84.1": {
+   "kg_id": "MONDO:0017844",
+   "route": "twin"
+  },
+  "C85.2": {
+   "kg_id": "MONDO:0020323",
+   "route": "twin"
+  },
+  "C85.9": {
+   "kg_id": "MONDO:0005062",
+   "route": "twin"
+  },
+  "C86.3": {
+   "kg_id": "MONDO:0019475",
+   "route": "twin"
+  },
+  "C86.5": {
+   "kg_id": "MONDO:0004977",
+   "route": "twin"
+  },
+  "C88.0": {
+   "kg_id": "MONDO:0100280",
+   "route": "twin"
+  },
+  "C88.2": {
+   "kg_id": "MONDO:0019464",
+   "route": "twin"
+  },
+  "C88.3": {
+   "kg_id": "MONDO:0015045",
+   "route": "twin"
+  },
+  "C88.9": {
+   "kg_id": "MONDO:0002459",
+   "route": "twin"
+  },
+  "C88.90": {
+   "kg_id": "MONDO:0002459",
+   "route": "twin"
+  },
+  "C90.0": {
+   "kg_id": "MONDO:0009693",
+   "route": "twin"
+  },
+  "C90.1": {
+   "kg_id": "MONDO:0018689",
+   "route": "twin"
+  },
+  "C90.2": {
+   "kg_id": "MONDO:0002754",
+   "route": "twin"
+  },
+  "C90.3": {
+   "kg_id": "MONDO:0005615",
+   "route": "twin"
+  },
+  "C91": {
+   "kg_id": "MONDO:0005402",
+   "route": "twin"
+  },
+  "C91.00": {
+   "kg_id": "MONDO:0004967",
+   "route": "twin"
+  },
+  "C91.1": {
+   "kg_id": "MONDO:0002083",
+   "route": "twin"
+  },
+  "C91.10": {
+   "kg_id": "MONDO:0004948",
+   "route": "twin"
+  },
+  "C91.4": {
+   "kg_id": "MONDO:0018935",
+   "route": "twin"
+  },
+  "C91.42": {
+   "kg_id": "MONDO:0004110",
+   "route": "twin"
+  },
+  "C91.5": {
+   "kg_id": "MONDO:0019471",
+   "route": "twin"
+  },
+  "C92": {
+   "kg_id": "MONDO:0004643",
+   "route": "twin"
+  },
+  "C92.0": {
+   "kg_id": "MONDO:0005223",
+   "route": "twin"
+  },
+  "C92.2": {
+   "kg_id": "MONDO:0004653",
+   "route": "twin"
+  },
+  "C92.3": {
+   "kg_id": "MONDO:0006861",
+   "route": "twin"
+  },
+  "C92.4": {
+   "kg_id": "MONDO:0012883",
+   "route": "twin"
+  },
+  "C92.5": {
+   "kg_id": "MONDO:0018871",
+   "route": "twin"
+  },
+  "C93.1": {
+   "kg_id": "MONDO:0004614",
+   "route": "twin"
+  },
+  "C93.3": {
+   "kg_id": "MONDO:0011908",
+   "route": "twin"
+  },
+  "C93.Z": {
+   "kg_id": "MONDO:0004600",
+   "route": "twin"
+  },
+  "C94.2": {
+   "kg_id": "MONDO:0018872",
+   "route": "twin"
+  },
+  "C94.3": {
+   "kg_id": "MONDO:0020334",
+   "route": "twin"
+  },
+  "C94.8": {
+   "kg_id": "MONDO:0019470",
+   "route": "twin"
+  },
+  "C95.0": {
+   "kg_id": "MONDO:0020322",
+   "route": "twin"
+  },
+  "C95.00": {
+   "kg_id": "MONDO:0010643",
+   "route": "twin"
+  },
+  "C95.90": {
+   "kg_id": "MONDO:0005059",
+   "route": "twin"
+  },
+  "C96.0": {
+   "kg_id": "MONDO:0018310",
+   "route": "twin"
+  },
+  "C96.21": {
+   "kg_id": "MONDO:0020333",
+   "route": "twin"
+  },
+  "C96.22": {
+   "kg_id": "MONDO:0019024",
+   "route": "twin"
+  },
+  "C96.4": {
+   "kg_id": "MONDO:0005764",
+   "route": "twin"
+  },
+  "C96.6": {
+   "kg_id": "MONDO:0018310",
+   "route": "twin"
+  },
+  "D00.0": {
+   "kg_id": "MONDO:0004636",
+   "route": "twin"
+  },
+  "D00.1": {
+   "kg_id": "MONDO:0004708",
+   "route": "twin"
+  },
+  "D00.2": {
+   "kg_id": "MONDO:0004716",
+   "route": "twin"
+  },
+  "D01.0": {
+   "kg_id": "MONDO:0004663",
+   "route": "twin"
+  },
+  "D01.2": {
+   "kg_id": "MONDO:0004725",
+   "route": "twin"
+  },
+  "D01.4": {
+   "kg_id": "MONDO:0004698",
+   "route": "twin"
+  },
+  "D01.5": {
+   "kg_id": "MONDO:0004715",
+   "route": "twin"
+  },
+  "D02.0": {
+   "kg_id": "MONDO:0004696",
+   "route": "twin"
+  },
+  "D02.1": {
+   "kg_id": "MONDO:0004661",
+   "route": "twin"
+  },
+  "D02.2": {
+   "kg_id": "MONDO:0004660",
+   "route": "twin"
+  },
+  "D02.3": {
+   "kg_id": "MONDO:0003784",
+   "route": "twin"
+  },
+  "D04": {
+   "kg_id": "MONDO:0004641",
+   "route": "twin"
+  },
+  "D04.0": {
+   "kg_id": "MONDO:0004641",
+   "route": "twin"
+  },
+  "D04.2": {
+   "kg_id": "MONDO:0004641",
+   "route": "twin"
+  },
+  "D04.3": {
+   "kg_id": "MONDO:0004641",
+   "route": "twin"
+  },
+  "D04.4": {
+   "kg_id": "MONDO:0004641",
+   "route": "twin"
+  },
+  "D04.6": {
+   "kg_id": "MONDO:0004641",
+   "route": "twin"
+  },
+  "D04.7": {
+   "kg_id": "MONDO:0004641",
+   "route": "twin"
+  },
+  "D05": {
+   "kg_id": "MONDO:0004658",
+   "route": "twin"
+  },
+  "D06": {
+   "kg_id": "MONDO:0042487",
+   "route": "twin"
+  },
+  "D07.0": {
+   "kg_id": "MONDO:0003315",
+   "route": "twin"
+  },
+  "D07.4": {
+   "kg_id": "MONDO:0004671",
+   "route": "twin"
+  },
+  "D07.5": {
+   "kg_id": "MONDO:0006234",
+   "route": "twin"
+  },
+  "D09.0": {
+   "kg_id": "MONDO:0004703",
+   "route": "twin"
+  },
+  "D09.1": {
+   "kg_id": "MONDO:0004732",
+   "route": "twin"
+  },
+  "D09.2": {
+   "kg_id": "MONDO:0004659",
+   "route": "twin"
+  },
+  "D09.9": {
+   "kg_id": "MONDO:0004647",
+   "route": "twin"
+  },
+  "D11": {
+   "kg_id": "MONDO:0004669",
+   "route": "twin"
+  },
+  "D12.6": {
+   "kg_id": "MONDO:0012041",
+   "route": "twin"
+  },
+  "D13.7": {
+   "kg_id": "MONDO:0005815",
+   "route": "twin"
+  },
+  "D17": {
+   "kg_id": "MONDO:0005106",
+   "route": "twin"
+  },
+  "D17.9": {
+   "kg_id": "MONDO:0005106",
+   "route": "twin"
+  },
+  "D18.0": {
+   "kg_id": "MONDO:0006500",
+   "route": "twin"
+  },
+  "D18.02": {
+   "kg_id": "MONDO:0002328",
+   "route": "twin"
+  },
+  "D18.03": {
+   "kg_id": "MONDO:0002337",
+   "route": "twin"
+  },
+  "D18.1": {
+   "kg_id": "MONDO:0002013",
+   "route": "twin"
+  },
+  "D19.9": {
+   "kg_id": "MONDO:0004230",
+   "route": "twin"
+  },
+  "D21": {
+   "kg_id": "MONDO:0003061",
+   "route": "twin"
+  },
+  "D24": {
+   "kg_id": "MONDO:0002056",
+   "route": "twin"
+  },
+  "D25": {
+   "kg_id": "MONDO:0007886",
+   "route": "twin"
+  },
+  "D25.0": {
+   "kg_id": "MONDO:0001664",
+   "route": "twin"
+  },
+  "D25.1": {
+   "kg_id": "MONDO:0001843",
+   "route": "twin"
+  },
+  "D25.2": {
+   "kg_id": "MONDO:0001745",
+   "route": "twin"
+  },
+  "D26.9": {
+   "kg_id": "MONDO:0000751",
+   "route": "twin"
+  },
+  "D32.9": {
+   "kg_id": "MONDO:0016642",
+   "route": "twin"
+  },
+  "D35.1": {
+   "kg_id": "MONDO:0006890",
+   "route": "twin"
+  },
+  "D3A.8": {
+   "kg_id": "MONDO:0019496",
+   "route": "twin"
+  },
+  "D45": {
+   "kg_id": "MONDO:0009891",
+   "route": "twin"
+  },
+  "D47": {
+   "kg_id": "NCIT:C7588",
+   "route": "twin"
+  },
+  "D47.01": {
+   "kg_id": "MONDO:0019316",
+   "route": "twin"
+  },
+  "D47.02": {
+   "kg_id": "MONDO:0016586",
+   "route": "twin"
+  },
+  "D47.09": {
+   "kg_id": "MONDO:0007950",
+   "route": "twin"
+  },
+  "D47.1": {
+   "kg_id": "MONDO:0020076",
+   "route": "twin"
+  },
+  "D47.3": {
+   "kg_id": "MONDO:0005029",
+   "route": "twin"
+  },
+  "D47.4": {
+   "kg_id": "MONDO:0009692",
+   "route": "twin"
+  },
+  "D47.9": {
+   "kg_id": "MONDO:0013081",
+   "route": "twin"
+  },
+  "D47.Z2": {
+   "kg_id": "MONDO:0015564",
+   "route": "twin"
+  },
+  "D48.6": {
+   "kg_id": "MONDO:0015871",
+   "route": "twin"
+  },
+  "D50": {
+   "kg_id": "MONDO:0001357",
+   "route": "twin"
+  },
+  "D51.0": {
+   "kg_id": "MONDO:0008228",
+   "route": "twin"
+  },
+  "D52": {
+   "kg_id": "MONDO:0001860",
+   "route": "twin"
+  },
+  "D53.0": {
+   "kg_id": "MONDO:0001638",
+   "route": "twin"
+  },
+  "D53.1": {
+   "kg_id": "MONDO:0001700",
+   "route": "twin"
+  },
+  "D55.0": {
+   "kg_id": "MONDO:0001761",
+   "route": "twin"
+  },
+  "D56": {
+   "kg_id": "MONDO:0000984",
+   "route": "twin"
+  },
+  "D56.0": {
+   "kg_id": "MONDO:0007716",
+   "route": "twin"
+  },
+  "D56.1": {
+   "kg_id": "MONDO:0019402",
+   "route": "twin"
+  },
+  "D56.2": {
+   "kg_id": "MONDO:0016489",
+   "route": "twin"
+  },
+  "D57": {
+   "kg_id": "MONDO:0011382",
+   "route": "twin"
+  },
+  "D57.1": {
+   "kg_id": "MONDO:0011382",
+   "route": "twin"
+  },
+  "D57.2": {
+   "kg_id": "MONDO:0011382",
+   "route": "twin"
+  },
+  "D58.0": {
+   "kg_id": "MONDO:0019350",
+   "route": "twin"
+  },
+  "D58.1": {
+   "kg_id": "MONDO:0017319",
+   "route": "twin"
+  },
+  "D58.2": {
+   "kg_id": "MONDO:0016242",
+   "route": "twin"
+  },
+  "D58.9": {
+   "kg_id": "MONDO:0003689",
+   "route": "twin"
+  },
+  "D59.3": {
+   "kg_id": "MONDO:0001549",
+   "route": "twin"
+  },
+  "D59.5": {
+   "kg_id": "MONDO:0100244",
+   "route": "twin"
+  },
+  "D59.6": {
+   "kg_id": "MONDO:0100244",
+   "route": "twin"
+  },
+  "D61.0": {
+   "kg_id": "MONDO:0009833",
+   "route": "twin"
+  },
+  "D61.01": {
+   "kg_id": "MONDO:0015253",
+   "route": "twin"
+  },
+  "D61.03": {
+   "kg_id": "MONDO:0019391",
+   "route": "twin"
+  },
+  "D61.09": {
+   "kg_id": "MONDO:0019391",
+   "route": "twin"
+  },
+  "D61.81": {
+   "kg_id": "MONDO:0001529",
+   "route": "twin"
+  },
+  "D61.82": {
+   "kg_id": "MONDO:0005868",
+   "route": "twin"
+  },
+  "D61.9": {
+   "kg_id": "MONDO:0015909",
+   "route": "twin"
+  },
+  "D64.3": {
+   "kg_id": "MONDO:0015194",
+   "route": "twin"
+  },
+  "D64.4": {
+   "kg_id": "MONDO:0019403",
+   "route": "twin"
+  },
+  "D64.9": {
+   "kg_id": "MONDO:0002280",
+   "route": "twin"
+  },
+  "D65": {
+   "kg_id": "MONDO:0000809",
+   "route": "twin"
+  },
+  "D66": {
+   "kg_id": "MONDO:0010602",
+   "route": "twin"
+  },
+  "D67": {
+   "kg_id": "MONDO:0010604",
+   "route": "twin"
+  },
+  "D68.0": {
+   "kg_id": "MONDO:0019565",
+   "route": "twin"
+  },
+  "D68.01": {
+   "kg_id": "MONDO:0008668",
+   "route": "twin"
+  },
+  "D68.02": {
+   "kg_id": "MONDO:0013304",
+   "route": "twin"
+  },
+  "D68.03": {
+   "kg_id": "MONDO:0010191",
+   "route": "twin"
+  },
+  "D68.04": {
+   "kg_id": "MONDO:0020460",
+   "route": "twin"
+  },
+  "D68.1": {
+   "kg_id": "MONDO:0012897",
+   "route": "twin"
+  },
+  "D68.2": {
+   "kg_id": "MONDO:0009211",
+   "route": "twin"
+  },
+  "D68.59": {
+   "kg_id": "MONDO:0002304",
+   "route": "twin"
+  },
+  "D68.61": {
+   "kg_id": "MONDO:8000010",
+   "route": "twin"
+  },
+  "D68.8": {
+   "kg_id": "MONDO:0009883",
+   "route": "twin"
+  },
+  "D68.9": {
+   "kg_id": "MONDO:0001531",
+   "route": "twin"
+  },
+  "D69.0": {
+   "kg_id": "MONDO:0019167",
+   "route": "twin"
+  },
+  "D69.1": {
+   "kg_id": "MONDO:0007686",
+   "route": "twin"
+  },
+  "D69.2": {
+   "kg_id": "MONDO:0002610",
+   "route": "twin"
+  },
+  "D69.3": {
+   "kg_id": "MONDO:0008558",
+   "route": "twin"
+  },
+  "D69.4": {
+   "kg_id": "MONDO:0015912",
+   "route": "twin"
+  },
+  "D69.41": {
+   "kg_id": "MONDO:0016030",
+   "route": "twin"
+  },
+  "D69.5": {
+   "kg_id": "MONDO:0001198",
+   "route": "twin"
+  },
+  "D69.6": {
+   "kg_id": "MONDO:0002049",
+   "route": "twin"
+  },
+  "D69.8": {
+   "kg_id": "MONDO:0012354",
+   "route": "twin"
+  },
+  "D69.9": {
+   "kg_id": "MONDO:0002243",
+   "route": "twin"
+  },
+  "D70": {
+   "kg_id": "MONDO:0018542",
+   "route": "twin"
+  },
+  "D70.4": {
+   "kg_id": "MONDO:0008090",
+   "route": "twin"
+  },
+  "D71": {
+   "kg_id": "MONDO:0018305",
+   "route": "twin"
+  },
+  "D71.1": {
+   "kg_id": "MONDO:0009953",
+   "route": "twin"
+  },
+  "D71.8": {
+   "kg_id": "MONDO:0018305",
+   "route": "twin"
+  },
+  "D72.1": {
+   "kg_id": "MONDO:0015691",
+   "route": "twin"
+  },
+  "D72.8": {
+   "kg_id": "MONDO:0013767",
+   "route": "twin"
+  },
+  "D72.810": {
+   "kg_id": "MONDO:0003783",
+   "route": "twin"
+  },
+  "D72.819": {
+   "kg_id": "MONDO:0003785",
+   "route": "twin"
+  },
+  "D72.9": {
+   "kg_id": "MONDO:0004805",
+   "route": "twin"
+  },
+  "D73": {
+   "kg_id": "MONDO:0002332",
+   "route": "twin"
+  },
+  "D73.1": {
+   "kg_id": "MONDO:0006795",
+   "route": "twin"
+  },
+  "D73.2": {
+   "kg_id": "MONDO:0001367",
+   "route": "twin"
+  },
+  "D73.3": {
+   "kg_id": "MONDO:0002333",
+   "route": "twin"
+  },
+  "D73.5": {
+   "kg_id": "MONDO:0006978",
+   "route": "twin"
+  },
+  "D74": {
+   "kg_id": "MONDO:0001117",
+   "route": "twin"
+  },
+  "D75.0": {
+   "kg_id": "MONDO:0007572",
+   "route": "twin"
+  },
+  "D75.1": {
+   "kg_id": "MONDO:0009892",
+   "route": "twin"
+  },
+  "D75.81": {
+   "kg_id": "MONDO:0009692",
+   "route": "twin"
+  },
+  "D75.83": {
+   "kg_id": "MONDO:0002249",
+   "route": "twin"
+  },
+  "D75.9": {
+   "kg_id": "MONDO:0005570",
+   "route": "twin"
+  },
+  "D76.1": {
+   "kg_id": "MONDO:0015540",
+   "route": "twin"
+  },
+  "D80.1": {
+   "kg_id": "MONDO:0015977",
+   "route": "twin"
+  },
+  "D80.3": {
+   "kg_id": "MONDO:0001901",
+   "route": "twin"
+  },
+  "D80.5": {
+   "kg_id": "MONDO:0003947",
+   "route": "twin"
+  },
+  "D80.7": {
+   "kg_id": "MONDO:0015698",
+   "route": "twin"
+  },
+  "D81": {
+   "kg_id": "MONDO:0015131",
+   "route": "twin"
+  },
+  "D81.1": {
+   "kg_id": "MONDO:0011225",
+   "route": "twin"
+  },
+  "D81.2": {
+   "kg_id": "MONDO:0012163",
+   "route": "twin"
+  },
+  "D81.30": {
+   "kg_id": "MONDO:0007064",
+   "route": "twin"
+  },
+  "D81.4": {
+   "kg_id": "MONDO:0009451",
+   "route": "twin"
+  },
+  "D81.5": {
+   "kg_id": "MONDO:0013171",
+   "route": "twin"
+  },
+  "D81.6": {
+   "kg_id": "MONDO:0008855",
+   "route": "twin"
+  },
+  "D81.8": {
+   "kg_id": "MONDO:0011338",
+   "route": "twin"
+  },
+  "D81.81": {
+   "kg_id": "MONDO:0015454",
+   "route": "twin"
+  },
+  "D81.810": {
+   "kg_id": "MONDO:0009665",
+   "route": "twin"
+  },
+  "D81.818": {
+   "kg_id": "MONDO:0009666",
+   "route": "twin"
+  },
+  "D82.0": {
+   "kg_id": "MONDO:0010518",
+   "route": "twin"
+  },
+  "D82.1": {
+   "kg_id": "MONDO:0008564",
+   "route": "twin"
+  },
+  "D82.3": {
+   "kg_id": "MONDO:0010627",
+   "route": "twin"
+  },
+  "D82.8": {
+   "kg_id": "MONDO:0011405",
+   "route": "twin"
+  },
+  "D83": {
+   "kg_id": "MONDO:0015517",
+   "route": "twin"
+  },
+  "D84.1": {
+   "kg_id": "MONDO:0009006",
+   "route": "twin"
+  },
+  "D84.8": {
+   "kg_id": "MONDO:0000133",
+   "route": "twin"
+  },
+  "D84.9": {
+   "kg_id": "MONDO:0003778",
+   "route": "twin"
+  },
+  "D86": {
+   "kg_id": "MONDO:0019338",
+   "route": "twin"
+  },
+  "D86.0": {
+   "kg_id": "MONDO:0001708",
+   "route": "twin"
+  },
+  "D86.3": {
+   "kg_id": "MONDO:0006611",
+   "route": "twin"
+  },
+  "D86.81": {
+   "kg_id": "DOID:12055",
+   "route": "twin"
+  },
+  "D86.89": {
+   "kg_id": "MONDO:0007011",
+   "route": "twin"
+  },
+  "D89.0": {
+   "kg_id": "MONDO:0002272",
+   "route": "twin"
+  },
+  "D89.1": {
+   "kg_id": "MONDO:0005576",
+   "route": "twin"
+  },
+  "D89.82": {
+   "kg_id": "MONDO:0017979",
+   "route": "twin"
+  },
+  "D89.9": {
+   "kg_id": "MONDO:0005046",
+   "route": "twin"
+  },
+  "E00.1": {
+   "kg_id": "MONDO:0018612",
+   "route": "twin"
+  },
+  "E01.2": {
+   "kg_id": "MONDO:0006742",
+   "route": "twin"
+  },
+  "E02": {
+   "kg_id": "NCIT:C132053",
+   "route": "twin"
+  },
+  "E03.1": {
+   "kg_id": "MONDO:0018612",
+   "route": "twin"
+  },
+  "E03.9": {
+   "kg_id": "MONDO:0009718",
+   "route": "twin"
+  },
+  "E04.9": {
+   "kg_id": "MONDO:0005397",
+   "route": "twin"
+  },
+  "E05.0": {
+   "kg_id": "MONDO:0005364",
+   "route": "twin"
+  },
+  "E05.2": {
+   "kg_id": "MONDO:0001252",
+   "route": "twin"
+  },
+  "E05.9": {
+   "kg_id": "MONDO:0010138",
+   "route": "twin"
+  },
+  "E06": {
+   "kg_id": "MONDO:0004126",
+   "route": "twin"
+  },
+  "E06.0": {
+   "kg_id": "MONDO:0001947",
+   "route": "twin"
+  },
+  "E06.1": {
+   "kg_id": "MONDO:0006982",
+   "route": "twin"
+  },
+  "E06.3": {
+   "kg_id": "MONDO:0007699",
+   "route": "twin"
+  },
+  "E06.5": {
+   "kg_id": "MONDO:0018992",
+   "route": "twin"
+  },
+  "E07.1": {
+   "kg_id": "MONDO:0010134",
+   "route": "twin"
+  },
+  "E07.81": {
+   "kg_id": "MONDO:0006755",
+   "route": "twin"
+  },
+  "E07.9": {
+   "kg_id": "MONDO:0003240",
+   "route": "twin"
+  },
+  "E10": {
+   "kg_id": "MONDO:0007454",
+   "route": "twin"
+  },
+  "E11": {
+   "kg_id": "MONDO:0005148",
+   "route": "twin"
+  },
+  "E11.8": {
+   "kg_id": "MONDO:0018911",
+   "route": "twin"
+  },
+  "E13": {
+   "kg_id": "MONDO:0009192",
+   "route": "twin"
+  },
+  "E13.8": {
+   "kg_id": "MONDO:0009101",
+   "route": "twin"
+  },
+  "E16": {
+   "kg_id": "MONDO:0001933",
+   "route": "twin"
+  },
+  "E16.1": {
+   "kg_id": "MONDO:0002177",
+   "route": "twin"
+  },
+  "E16.2": {
+   "kg_id": "MONDO:0004946",
+   "route": "twin"
+  },
+  "E16.4": {
+   "kg_id": "MONDO:0019610",
+   "route": "twin"
+  },
+  "E16.9": {
+   "kg_id": "MONDO:0005803",
+   "route": "twin"
+  },
+  "E20": {
+   "kg_id": "MONDO:0001220",
+   "route": "twin"
+  },
+  "E20.1": {
+   "kg_id": "MONDO:0019992",
+   "route": "twin"
+  },
+  "E20.8": {
+   "kg_id": "MONDO:0018543",
+   "route": "twin"
+  },
+  "E21.0": {
+   "kg_id": "MONDO:0010837",
+   "route": "twin"
+  },
+  "E21.3": {
+   "kg_id": "MONDO:0001741",
+   "route": "twin"
+  },
+  "E21.5": {
+   "kg_id": "MONDO:0001223",
+   "route": "twin"
+  },
+  "E22.1": {
+   "kg_id": "MONDO:0024305",
+   "route": "twin"
+  },
+  "E22.2": {
+   "kg_id": "MONDO:0006802",
+   "route": "twin"
+  },
+  "E22.8": {
+   "kg_id": "MONDO:0019165",
+   "route": "twin"
+  },
+  "E23.0": {
+   "kg_id": "MONDO:0000050",
+   "route": "twin"
+  },
+  "E23.2": {
+   "kg_id": "MONDO:0004782",
+   "route": "twin"
+  },
+  "E23.6": {
+   "kg_id": "MONDO:0009239",
+   "route": "twin"
+  },
+  "E24": {
+   "kg_id": "MONDO:0003009",
+   "route": "twin"
+  },
+  "E24.0": {
+   "kg_id": "MONDO:0020528",
+   "route": "twin"
+  },
+  "E24.1": {
+   "kg_id": "MONDO:0016035",
+   "route": "twin"
+  },
+  "E24.3": {
+   "kg_id": "MONDO:0020527",
+   "route": "twin"
+  },
+  "E25": {
+   "kg_id": "MONDO:0018479",
+   "route": "twin"
+  },
+  "E26": {
+   "kg_id": "MONDO:0003009",
+   "route": "twin"
+  },
+  "E26.01": {
+   "kg_id": "MONDO:0001422",
+   "route": "twin"
+  },
+  "E26.02": {
+   "kg_id": "MONDO:0007080",
+   "route": "twin"
+  },
+  "E26.8": {
+   "kg_id": "MONDO:0100344",
+   "route": "twin"
+  },
+  "E26.81": {
+   "kg_id": "MONDO:0015231",
+   "route": "twin"
+  },
+  "E27.1": {
+   "kg_id": "MONDO:0015129",
+   "route": "twin"
+  },
+  "E27.5": {
+   "kg_id": "MONDO:0001473",
+   "route": "twin"
+  },
+  "E27.8": {
+   "kg_id": "MONDO:0012675",
+   "route": "twin"
+  },
+  "E27.9": {
+   "kg_id": "MONDO:0005495",
+   "route": "twin"
+  },
+  "E28.0": {
+   "kg_id": "DOID:14336",
+   "route": "twin"
+  },
+  "E28.2": {
+   "kg_id": "MONDO:0008487",
+   "route": "twin"
+  },
+  "E28.3": {
+   "kg_id": "MONDO:0005387",
+   "route": "twin"
+  },
+  "E28.31": {
+   "kg_id": "MONDO:0001119",
+   "route": "twin"
+  },
+  "E30.1": {
+   "kg_id": "MONDO:0007690",
+   "route": "twin"
+  },
+  "E31.0": {
+   "kg_id": "MONDO:0010580",
+   "route": "twin"
+  },
+  "E31.21": {
+   "kg_id": "MONDO:0007540",
+   "route": "twin"
+  },
+  "E31.22": {
+   "kg_id": "MONDO:0008234",
+   "route": "twin"
+  },
+  "E31.23": {
+   "kg_id": "MONDO:0008082",
+   "route": "twin"
+  },
+  "E32": {
+   "kg_id": "MONDO:0003393",
+   "route": "twin"
+  },
+  "E34.321": {
+   "kg_id": "MONDO:0009877",
+   "route": "twin"
+  },
+  "E34.5": {
+   "kg_id": "MONDO:0019154",
+   "route": "twin"
+  },
+  "E34.51": {
+   "kg_id": "MONDO:0021023",
+   "route": "twin"
+  },
+  "E34.8": {
+   "kg_id": "MONDO:0008310",
+   "route": "twin"
+  },
+  "E34.9": {
+   "kg_id": "MONDO:0005151",
+   "route": "twin"
+  },
+  "E40": {
+   "kg_id": "MONDO:0006826",
+   "route": "twin"
+  },
+  "E41": {
+   "kg_id": "MONDO:0006848",
+   "route": "twin"
+  },
+  "E46": {
+   "kg_id": "MONDO:0001371",
+   "route": "twin"
+  },
+  "E50.7": {
+   "kg_id": "MONDO:0000948",
+   "route": "twin"
+  },
+  "E50.8": {
+   "kg_id": "MONDO:0007417",
+   "route": "twin"
+  },
+  "E51.1": {
+   "kg_id": "MONDO:0006676",
+   "route": "twin"
+  },
+  "E51.11": {
+   "kg_id": "MONDO:0024182",
+   "route": "twin"
+  },
+  "E51.12": {
+   "kg_id": "MONDO:0024183",
+   "route": "twin"
+  },
+  "E51.2": {
+   "kg_id": "MONDO:0007020",
+   "route": "twin"
+  },
+  "E52": {
+   "kg_id": "MONDO:0019975",
+   "route": "twin"
+  },
+  "E53.0": {
+   "kg_id": "MONDO:0004573",
+   "route": "twin"
+  },
+  "E53.1": {
+   "kg_id": "MONDO:0004574",
+   "route": "twin"
+  },
+  "E54": {
+   "kg_id": "MONDO:0009412",
+   "route": "twin"
+  },
+  "E55": {
+   "kg_id": "MONDO:0100471",
+   "route": "twin"
+  },
+  "E55.0": {
+   "kg_id": "MONDO:0024299",
+   "route": "twin"
+  },
+  "E56": {
+   "kg_id": "MONDO:0024298",
+   "route": "twin"
+  },
+  "E56.1": {
+   "kg_id": "MONDO:0001244",
+   "route": "twin"
+  },
+  "E66.9": {
+   "kg_id": "MONDO:0011122",
+   "route": "twin"
+  },
+  "E67.0": {
+   "kg_id": "MONDO:0006798",
+   "route": "twin"
+  },
+  "E67.1": {
+   "kg_id": "MONDO:0021162",
+   "route": "twin"
+  },
+  "E67.3": {
+   "kg_id": "MONDO:0004937",
+   "route": "twin"
+  },
+  "E70.21": {
+   "kg_id": "MONDO:0004741",
+   "route": "twin"
+  },
+  "E70.29": {
+   "kg_id": "MONDO:0001910",
+   "route": "twin"
+  },
+  "E70.3": {
+   "kg_id": "MONDO:0018910",
+   "route": "twin"
+  },
+  "E70.330": {
+   "kg_id": "MONDO:0008963",
+   "route": "twin"
+  },
+  "E70.331": {
+   "kg_id": "MONDO:0019312",
+   "route": "twin"
+  },
+  "E70.39": {
+   "kg_id": "MONDO:0008244",
+   "route": "twin"
+  },
+  "E70.4": {
+   "kg_id": "MONDO:0019228",
+   "route": "twin"
+  },
+  "E70.8": {
+   "kg_id": "MONDO:0010379",
+   "route": "twin"
+  },
+  "E70.81": {
+   "kg_id": "MONDO:0012084",
+   "route": "twin"
+  },
+  "E71.0": {
+   "kg_id": "MONDO:0009563",
+   "route": "twin"
+  },
+  "E71.1": {
+   "kg_id": "MONDO:0009612",
+   "route": "twin"
+  },
+  "E71.110": {
+   "kg_id": "MONDO:0009475",
+   "route": "twin"
+  },
+  "E71.111": {
+   "kg_id": "MONDO:0017359",
+   "route": "twin"
+  },
+  "E71.121": {
+   "kg_id": "MONDO:0011628",
+   "route": "twin"
+  },
+  "E71.3": {
+   "kg_id": "MONDO:0009855",
+   "route": "twin"
+  },
+  "E71.313": {
+   "kg_id": "MONDO:0009282",
+   "route": "twin"
+  },
+  "E71.41": {
+   "kg_id": "MONDO:0008919",
+   "route": "twin"
+  },
+  "E71.5": {
+   "kg_id": "MONDO:0019053",
+   "route": "twin"
+  },
+  "E71.510": {
+   "kg_id": "MONDO:0019609",
+   "route": "twin"
+  },
+  "E71.52": {
+   "kg_id": "MONDO:0018544",
+   "route": "twin"
+  },
+  "E71.540": {
+   "kg_id": "MONDO:0015776",
+   "route": "twin"
+  },
+  "E72.0": {
+   "kg_id": "MONDO:0011669",
+   "route": "twin"
+  },
+  "E72.01": {
+   "kg_id": "MONDO:0009067",
+   "route": "twin"
+  },
+  "E72.02": {
+   "kg_id": "MONDO:0009324",
+   "route": "twin"
+  },
+  "E72.03": {
+   "kg_id": "MONDO:0010645",
+   "route": "twin"
+  },
+  "E72.1": {
+   "kg_id": "MONDO:0011698",
+   "route": "twin"
+  },
+  "E72.11": {
+   "kg_id": "MONDO:0004737",
+   "route": "twin"
+  },
+  "E72.19": {
+   "kg_id": "MONDO:0009058",
+   "route": "twin"
+  },
+  "E72.2": {
+   "kg_id": "MONDO:0004739",
+   "route": "twin"
+  },
+  "E72.21": {
+   "kg_id": "MONDO:0008814",
+   "route": "twin"
+  },
+  "E72.23": {
+   "kg_id": "MONDO:0015991",
+   "route": "twin"
+  },
+  "E72.3": {
+   "kg_id": "MONDO:0009388",
+   "route": "twin"
+  },
+  "E72.4": {
+   "kg_id": "MONDO:0010703",
+   "route": "twin"
+  },
+  "E72.51": {
+   "kg_id": "MONDO:0011612",
+   "route": "twin"
+  },
+  "E72.53": {
+   "kg_id": "MONDO:0002474",
+   "route": "twin"
+  },
+  "E72.530": {
+   "kg_id": "MONDO:0009823",
+   "route": "twin"
+  },
+  "E72.538": {
+   "kg_id": "MONDO:0009824",
+   "route": "twin"
+  },
+  "E72.59": {
+   "kg_id": "MONDO:0009070",
+   "route": "twin"
+  },
+  "E72.8": {
+   "kg_id": "MONDO:0060591",
+   "route": "twin"
+  },
+  "E72.9": {
+   "kg_id": "MONDO:0004736",
+   "route": "twin"
+  },
+  "E73": {
+   "kg_id": "MONDO:0100345",
+   "route": "twin"
+  },
+  "E73.0": {
+   "kg_id": "MONDO:0009115",
+   "route": "twin"
+  },
+  "E74.0": {
+   "kg_id": "MONDO:0009867",
+   "route": "twin"
+  },
+  "E74.01": {
+   "kg_id": "MONDO:0002413",
+   "route": "twin"
+  },
+  "E74.02": {
+   "kg_id": "MONDO:0009290",
+   "route": "twin"
+  },
+  "E74.03": {
+   "kg_id": "MONDO:0009291",
+   "route": "twin"
+  },
+  "E74.04": {
+   "kg_id": "MONDO:0009293",
+   "route": "twin"
+  },
+  "E74.05": {
+   "kg_id": "MONDO:0010281",
+   "route": "twin"
+  },
+  "E74.09": {
+   "kg_id": "MONDO:0009295",
+   "route": "twin"
+  },
+  "E74.11": {
+   "kg_id": "MONDO:0009252",
+   "route": "twin"
+  },
+  "E74.12": {
+   "kg_id": "MONDO:0009249",
+   "route": "twin"
+  },
+  "E74.19": {
+   "kg_id": "MONDO:0009251",
+   "route": "twin"
+  },
+  "E74.21": {
+   "kg_id": "MONDO:0018116",
+   "route": "twin"
+  },
+  "E74.29": {
+   "kg_id": "MONDO:0009255",
+   "route": "twin"
+  },
+  "E74.31": {
+   "kg_id": "MONDO:0009114",
+   "route": "twin"
+  },
+  "E74.39": {
+   "kg_id": "MONDO:0011731",
+   "route": "twin"
+  },
+  "E74.4": {
+   "kg_id": "MONDO:0019169",
+   "route": "twin"
+  },
+  "E74.810": {
+   "kg_id": "MONDO:0000188",
+   "route": "twin"
+  },
+  "E74.818": {
+   "kg_id": "MONDO:0009297",
+   "route": "twin"
+  },
+  "E74.89": {
+   "kg_id": "MONDO:0009846",
+   "route": "twin"
+  },
+  "E74.9": {
+   "kg_id": "MONDO:0019214",
+   "route": "twin"
+  },
+  "E75.0": {
+   "kg_id": "MONDO:0017720",
+   "route": "twin"
+  },
+  "E75.01": {
+   "kg_id": "MONDO:0010006",
+   "route": "twin"
+  },
+  "E75.02": {
+   "kg_id": "MONDO:0010100",
+   "route": "twin"
+  },
+  "E75.10": {
+   "kg_id": "MONDO:0017719",
+   "route": "twin"
+  },
+  "E75.19": {
+   "kg_id": "MONDO:0018149",
+   "route": "twin"
+  },
+  "E75.2": {
+   "kg_id": "MONDO:0012125",
+   "route": "twin"
+  },
+  "E75.21": {
+   "kg_id": "MONDO:0010526",
+   "route": "twin"
+  },
+  "E75.22": {
+   "kg_id": "MONDO:0018150",
+   "route": "twin"
+  },
+  "E75.23": {
+   "kg_id": "MONDO:0009499",
+   "route": "twin"
+  },
+  "E75.24": {
+   "kg_id": "MONDO:0001982",
+   "route": "twin"
+  },
+  "E75.25": {
+   "kg_id": "MONDO:0018868",
+   "route": "twin"
+  },
+  "E75.26": {
+   "kg_id": "MONDO:0010088",
+   "route": "twin"
+  },
+  "E75.27": {
+   "kg_id": "MONDO:0010714",
+   "route": "twin"
+  },
+  "E75.28": {
+   "kg_id": "MONDO:0010079",
+   "route": "twin"
+  },
+  "E75.29": {
+   "kg_id": "MONDO:0044718",
+   "route": "twin"
+  },
+  "E75.3": {
+   "kg_id": "MONDO:0019255",
+   "route": "twin"
+  },
+  "E75.4": {
+   "kg_id": "MONDO:0008083",
+   "route": "twin"
+  },
+  "E75.5": {
+   "kg_id": "MONDO:0019148",
+   "route": "twin"
+  },
+  "E75.6": {
+   "kg_id": "MONDO:0019245",
+   "route": "twin"
+  },
+  "E76.0": {
+   "kg_id": "MONDO:0011760",
+   "route": "twin"
+  },
+  "E76.01": {
+   "kg_id": "MONDO:0011758",
+   "route": "twin"
+  },
+  "E76.02": {
+   "kg_id": "MONDO:0011759",
+   "route": "twin"
+  },
+  "E76.1": {
+   "kg_id": "MONDO:0010674",
+   "route": "twin"
+  },
+  "E76.210": {
+   "kg_id": "MONDO:0009659",
+   "route": "twin"
+  },
+  "E76.211": {
+   "kg_id": "MONDO:0009660",
+   "route": "twin"
+  },
+  "E76.219": {
+   "kg_id": "MONDO:0018938",
+   "route": "twin"
+  },
+  "E76.22": {
+   "kg_id": "MONDO:0009657",
+   "route": "twin"
+  },
+  "E76.29": {
+   "kg_id": "MONDO:0009662",
+   "route": "twin"
+  },
+  "E76.3": {
+   "kg_id": "MONDO:0019249",
+   "route": "twin"
+  },
+  "E77.1": {
+   "kg_id": "MONDO:0008830",
+   "route": "twin"
+  },
+  "E77.8": {
+   "kg_id": "MONDO:0800044",
+   "route": "twin"
+  },
+  "E78.0": {
+   "kg_id": "MONDO:0011374",
+   "route": "twin"
+  },
+  "E78.01": {
+   "kg_id": "MONDO:0005439",
+   "route": "twin"
+  },
+  "E78.1": {
+   "kg_id": "MONDO:0007788",
+   "route": "twin"
+  },
+  "E78.3": {
+   "kg_id": "MONDO:0009528",
+   "route": "twin"
+  },
+  "E78.49": {
+   "kg_id": "MONDO:0007759",
+   "route": "twin"
+  },
+  "E78.5": {
+   "kg_id": "MONDO:0001336",
+   "route": "twin"
+  },
+  "E78.6": {
+   "kg_id": "MONDO:0008692",
+   "route": "twin"
+  },
+  "E78.71": {
+   "kg_id": "MONDO:0010543",
+   "route": "twin"
+  },
+  "E78.72": {
+   "kg_id": "MONDO:0010035",
+   "route": "twin"
+  },
+  "E78.81": {
+   "kg_id": "MONDO:0015347",
+   "route": "twin"
+  },
+  "E79.1": {
+   "kg_id": "MONDO:0010298",
+   "route": "twin"
+  },
+  "E79.8": {
+   "kg_id": "MONDO:0019254",
+   "route": "twin"
+  },
+  "E80.0": {
+   "kg_id": "MONDO:0001676",
+   "route": "twin"
+  },
+  "E80.1": {
+   "kg_id": "MONDO:0015104",
+   "route": "twin"
+  },
+  "E80.20": {
+   "kg_id": "MONDO:0019142",
+   "route": "twin"
+  },
+  "E80.29": {
+   "kg_id": "MONDO:0007369",
+   "route": "twin"
+  },
+  "E80.4": {
+   "kg_id": "MONDO:0007745",
+   "route": "twin"
+  },
+  "E80.6": {
+   "kg_id": "MONDO:0009380",
+   "route": "twin"
+  },
+  "E83.01": {
+   "kg_id": "MONDO:0010200",
+   "route": "twin"
+  },
+  "E83.1": {
+   "kg_id": "MONDO:0021001",
+   "route": "twin"
+  },
+  "E83.11": {
+   "kg_id": "MONDO:0006507",
+   "route": "twin"
+  },
+  "E83.39": {
+   "kg_id": "MONDO:0018570",
+   "route": "twin"
+  },
+  "E83.4": {
+   "kg_id": "MONDO:0018100",
+   "route": "twin"
+  },
+  "E83.5": {
+   "kg_id": "MONDO:0018458",
+   "route": "twin"
+  },
+  "E83.52": {
+   "kg_id": "MONDO:0001566",
+   "route": "twin"
+  },
+  "E84": {
+   "kg_id": "MONDO:0009061",
+   "route": "twin"
+  },
+  "E85": {
+   "kg_id": "MONDO:0019065",
+   "route": "twin"
+  },
+  "E85.0": {
+   "kg_id": "MONDO:0007727",
+   "route": "twin"
+  },
+  "E85.3": {
+   "kg_id": "MONDO:0019439",
+   "route": "twin"
+  },
+  "E85.81": {
+   "kg_id": "MONDO:0019438",
+   "route": "twin"
+  },
+  "E85.82": {
+   "kg_id": "MONDO:0007100",
+   "route": "twin"
+  },
+  "E87.20": {
+   "kg_id": "MONDO:0024306",
+   "route": "twin"
+  },
+  "E88.01": {
+   "kg_id": "MONDO:0013282",
+   "route": "twin"
+  },
+  "E88.02": {
+   "kg_id": "MONDO:0009009",
+   "route": "twin"
+  },
+  "E88.1": {
+   "kg_id": "MONDO:0012071",
+   "route": "twin"
+  },
+  "E88.10": {
+   "kg_id": "MONDO:0006573",
+   "route": "twin"
+  },
+  "E88.2": {
+   "kg_id": "MONDO:0006574",
+   "route": "twin"
+  },
+  "E88.41": {
+   "kg_id": "MONDO:0010789",
+   "route": "twin"
+  },
+  "E88.42": {
+   "kg_id": "MONDO:0010790",
+   "route": "twin"
+  },
+  "E88.8": {
+   "kg_id": "MONDO:0060611",
+   "route": "twin"
+  },
+  "E88.81": {
+   "kg_id": "MONDO:0011565",
+   "route": "twin"
+  },
+  "E88.810": {
+   "kg_id": "MONDO:0011565",
+   "route": "twin"
+  },
+  "E88.9": {
+   "kg_id": "MONDO:0005066",
+   "route": "twin"
+  },
+  "E89.0": {
+   "kg_id": "MONDO:0002002",
+   "route": "twin"
+  },
+  "E89.1": {
+   "kg_id": "MONDO:0002239",
+   "route": "twin"
+  },
+  "F01": {
+   "kg_id": "MONDO:0004648",
+   "route": "twin"
+  },
+  "F09": {
+   "kg_id": "MONDO:0002039",
+   "route": "twin"
+  },
+  "F10.1": {
+   "kg_id": "MONDO:0002046",
+   "route": "twin"
+  },
+  "F11.1": {
+   "kg_id": "MONDO:0001225",
+   "route": "twin"
+  },
+  "F11.2": {
+   "kg_id": "MONDO:0005530",
+   "route": "twin"
+  },
+  "F12": {
+   "kg_id": "MONDO:0005689",
+   "route": "twin"
+  },
+  "F12.1": {
+   "kg_id": "MONDO:0005689",
+   "route": "twin"
+  },
+  "F12.2": {
+   "kg_id": "MONDO:0005689",
+   "route": "twin"
+  },
+  "F13.11": {
+   "kg_id": "MONDO:0004599",
+   "route": "twin"
+  },
+  "F14.1": {
+   "kg_id": "MONDO:0004456",
+   "route": "twin"
+  },
+  "F14.2": {
+   "kg_id": "MONDO:0005186",
+   "route": "twin"
+  },
+  "F16.1": {
+   "kg_id": "MONDO:0001585",
+   "route": "twin"
+  },
+  "F16.2": {
+   "kg_id": "MONDO:0004939",
+   "route": "twin"
+  },
+  "F17": {
+   "kg_id": "MONDO:0008575",
+   "route": "twin"
+  },
+  "F20": {
+   "kg_id": "MONDO:0005090",
+   "route": "twin"
+  },
+  "F20.0": {
+   "kg_id": "MONDO:0001484",
+   "route": "twin"
+  },
+  "F20.81": {
+   "kg_id": "MONDO:0001265",
+   "route": "twin"
+  },
+  "F21": {
+   "kg_id": "MONDO:0001087",
+   "route": "twin"
+  },
+  "F22": {
+   "kg_id": "MONDO:0004359",
+   "route": "twin"
+  },
+  "F25": {
+   "kg_id": "MONDO:0005487",
+   "route": "twin"
+  },
+  "F31": {
+   "kg_id": "MONDO:0004985",
+   "route": "twin"
+  },
+  "F32": {
+   "kg_id": "MONDO:0002009",
+   "route": "twin"
+  },
+  "F32.89": {
+   "kg_id": "MONDO:0001485",
+   "route": "twin"
+  },
+  "F33.9": {
+   "kg_id": "MONDO:0002009",
+   "route": "twin"
+  },
+  "F34.0": {
+   "kg_id": "MONDO:0004572",
+   "route": "twin"
+  },
+  "F34.1": {
+   "kg_id": "MONDO:0001442",
+   "route": "twin"
+  },
+  "F39": {
+   "kg_id": "MONDO:0005371",
+   "route": "twin"
+  },
+  "F40": {
+   "kg_id": "MONDO:0003699",
+   "route": "twin"
+  },
+  "F40.0": {
+   "kg_id": "MONDO:0003709",
+   "route": "twin"
+  },
+  "F40.1": {
+   "kg_id": "MONDO:0001247",
+   "route": "twin"
+  },
+  "F40.2": {
+   "kg_id": "MONDO:0012000",
+   "route": "twin"
+  },
+  "F40.243": {
+   "kg_id": "MONDO:0003748",
+   "route": "twin"
+  },
+  "F41.0": {
+   "kg_id": "MONDO:0005383",
+   "route": "twin"
+  },
+  "F41.1": {
+   "kg_id": "MONDO:0001942",
+   "route": "twin"
+  },
+  "F41.9": {
+   "kg_id": "MONDO:0005618",
+   "route": "twin"
+  },
+  "F42": {
+   "kg_id": "MONDO:0008114",
+   "route": "twin"
+  },
+  "F43.1": {
+   "kg_id": "MONDO:0005146",
+   "route": "twin"
+  },
+  "F44": {
+   "kg_id": "MONDO:0002104",
+   "route": "twin"
+  },
+  "F44.0": {
+   "kg_id": "MONDO:0001185",
+   "route": "twin"
+  },
+  "F44.81": {
+   "kg_id": "MONDO:0001159",
+   "route": "twin"
+  },
+  "F44.9": {
+   "kg_id": "MONDO:0001160",
+   "route": "twin"
+  },
+  "F45": {
+   "kg_id": "MONDO:0003117",
+   "route": "twin"
+  },
+  "F45.0": {
+   "kg_id": "MONDO:0001830",
+   "route": "twin"
+  },
+  "F45.21": {
+   "kg_id": "MONDO:0001596",
+   "route": "twin"
+  },
+  "F45.8": {
+   "kg_id": "MONDO:0002443",
+   "route": "twin"
+  },
+  "F48.9": {
+   "kg_id": "MONDO:0001160",
+   "route": "twin"
+  },
+  "F50": {
+   "kg_id": "MONDO:0005451",
+   "route": "twin"
+  },
+  "F50.0": {
+   "kg_id": "DOID:8689",
+   "route": "twin"
+  },
+  "F50.2": {
+   "kg_id": "MONDO:0005452",
+   "route": "twin"
+  },
+  "F52": {
+   "kg_id": "MONDO:0002134",
+   "route": "twin"
+  },
+  "F52.0": {
+   "kg_id": "MONDO:0001821",
+   "route": "twin"
+  },
+  "F52.31": {
+   "kg_id": "MONDO:0004258",
+   "route": "twin"
+  },
+  "F52.32": {
+   "kg_id": "MONDO:0003522",
+   "route": "twin"
+  },
+  "F52.4": {
+   "kg_id": "MONDO:0001780",
+   "route": "twin"
+  },
+  "F52.5": {
+   "kg_id": "MONDO:0000946",
+   "route": "twin"
+  },
+  "F52.6": {
+   "kg_id": "MONDO:0001196",
+   "route": "twin"
+  },
+  "F52.9": {
+   "kg_id": "MONDO:0002134",
+   "route": "twin"
+  },
+  "F53.0": {
+   "kg_id": "MONDO:0005929",
+   "route": "twin"
+  },
+  "F60": {
+   "kg_id": "MONDO:0002028",
+   "route": "twin"
+  },
+  "F60.0": {
+   "kg_id": "MONDO:0001163",
+   "route": "twin"
+  },
+  "F60.1": {
+   "kg_id": "MONDO:0001161",
+   "route": "twin"
+  },
+  "F60.2": {
+   "kg_id": "MONDO:0001164",
+   "route": "twin"
+  },
+  "F60.3": {
+   "kg_id": "MONDO:0001156",
+   "route": "twin"
+  },
+  "F60.4": {
+   "kg_id": "MONDO:0002613",
+   "route": "twin"
+  },
+  "F60.5": {
+   "kg_id": "MONDO:0001158",
+   "route": "twin"
+  },
+  "F60.6": {
+   "kg_id": "MONDO:0002027",
+   "route": "twin"
+  },
+  "F60.7": {
+   "kg_id": "MONDO:0001157",
+   "route": "twin"
+  },
+  "F60.81": {
+   "kg_id": "MONDO:0002411",
+   "route": "twin"
+  },
+  "F63.0": {
+   "kg_id": "MONDO:0011662",
+   "route": "twin"
+  },
+  "F63.1": {
+   "kg_id": "MONDO:0001522",
+   "route": "twin"
+  },
+  "F63.2": {
+   "kg_id": "MONDO:0001520",
+   "route": "twin"
+  },
+  "F63.81": {
+   "kg_id": "MONDO:0001521",
+   "route": "twin"
+  },
+  "F63.9": {
+   "kg_id": "MONDO:0001162",
+   "route": "twin"
+  },
+  "F64": {
+   "kg_id": "DOID:1234",
+   "route": "twin"
+  },
+  "F64.1": {
+   "kg_id": "DOID:1233",
+   "route": "twin"
+  },
+  "F64.2": {
+   "kg_id": "DOID:1234",
+   "route": "twin"
+  },
+  "F65.0": {
+   "kg_id": "MONDO:0001504",
+   "route": "twin"
+  },
+  "F65.2": {
+   "kg_id": "MONDO:0000983",
+   "route": "twin"
+  },
+  "F65.3": {
+   "kg_id": "MONDO:0001135",
+   "route": "twin"
+  },
+  "F65.4": {
+   "kg_id": "MONDO:0001692",
+   "route": "twin"
+  },
+  "F65.51": {
+   "kg_id": "MONDO:0001139",
+   "route": "twin"
+  },
+  "F65.52": {
+   "kg_id": "MONDO:0001132",
+   "route": "twin"
+  },
+  "F72": {
+   "kg_id": "MONDO:0010402",
+   "route": "twin"
+  },
+  "F78.A": {
+   "kg_id": "MONDO:0010497",
+   "route": "twin"
+  },
+  "F80.1": {
+   "kg_id": "MONDO:0001276",
+   "route": "twin"
+  },
+  "F80.2": {
+   "kg_id": "MONDO:0001568",
+   "route": "twin"
+  },
+  "F80.81": {
+   "kg_id": "MONDO:0000723",
+   "route": "twin"
+  },
+  "F80.9": {
+   "kg_id": "MONDO:0002182",
+   "route": "twin"
+  },
+  "F81.0": {
+   "kg_id": "MONDO:0005489",
+   "route": "twin"
+  },
+  "F81.9": {
+   "kg_id": "MONDO:0004681",
+   "route": "twin"
+  },
+  "F82": {
+   "kg_id": "MONDO:0004922",
+   "route": "twin"
+  },
+  "F84": {
+   "kg_id": "MONDO:0016052",
+   "route": "twin"
+  },
+  "F84.0": {
+   "kg_id": "MONDO:0005260",
+   "route": "twin"
+  },
+  "F84.2": {
+   "kg_id": "MONDO:0010726",
+   "route": "twin"
+  },
+  "F84.3": {
+   "kg_id": "MONDO:0015681",
+   "route": "twin"
+  },
+  "F84.5": {
+   "kg_id": "MONDO:0100610",
+   "route": "twin"
+  },
+  "F91": {
+   "kg_id": "MONDO:0005352",
+   "route": "twin"
+  },
+  "F95": {
+   "kg_id": "MONDO:0002420",
+   "route": "twin"
+  },
+  "F95.0": {
+   "kg_id": "MONDO:0002419",
+   "route": "twin"
+  },
+  "F95.1": {
+   "kg_id": "MONDO:0001074",
+   "route": "twin"
+  },
+  "F95.2": {
+   "kg_id": "MONDO:0007661",
+   "route": "twin"
+  },
+  "F98.4": {
+   "kg_id": "MONDO:0002265",
+   "route": "twin"
+  },
+  "F99": {
+   "kg_id": "MONDO:0002025",
+   "route": "twin"
+  },
+  "G00": {
+   "kg_id": "MONDO:0006670",
+   "route": "twin"
+  },
+  "G00.0": {
+   "kg_id": "MONDO:0000889",
+   "route": "twin"
+  },
+  "G00.2": {
+   "kg_id": "MONDO:0001316",
+   "route": "twin"
+  },
+  "G03": {
+   "kg_id": "MONDO:0015304",
+   "route": "twin"
+  },
+  "G03.0": {
+   "kg_id": "MONDO:0006662",
+   "route": "twin"
+  },
+  "G03.1": {
+   "kg_id": "MONDO:0001007",
+   "route": "twin"
+  },
+  "G04.02": {
+   "kg_id": "MONDO:0001773",
+   "route": "twin"
+  },
+  "G04.1": {
+   "kg_id": "MONDO:0008039",
+   "route": "twin"
+  },
+  "G10": {
+   "kg_id": "MONDO:0011299",
+   "route": "twin"
+  },
+  "G11.0": {
+   "kg_id": "MONDO:0011025",
+   "route": "twin"
+  },
+  "G11.1": {
+   "kg_id": "MONDO:0014666",
+   "route": "twin"
+  },
+  "G11.11": {
+   "kg_id": "MONDO:0100339",
+   "route": "twin"
+  },
+  "G11.4": {
+   "kg_id": "MONDO:0010156",
+   "route": "twin"
+  },
+  "G11.8": {
+   "kg_id": "DOID:0070756",
+   "route": "twin"
+  },
+  "G12.0": {
+   "kg_id": "MONDO:0009669",
+   "route": "twin"
+  },
+  "G12.1": {
+   "kg_id": "MONDO:0010056",
+   "route": "twin"
+  },
+  "G12.2": {
+   "kg_id": "MONDO:0007103",
+   "route": "twin"
+  },
+  "G12.21": {
+   "kg_id": "MONDO:0004976",
+   "route": "twin"
+  },
+  "G12.22": {
+   "kg_id": "MONDO:0008890",
+   "route": "twin"
+  },
+  "G12.23": {
+   "kg_id": "MONDO:0018155",
+   "route": "twin"
+  },
+  "G12.9": {
+   "kg_id": "MONDO:0001516",
+   "route": "twin"
+  },
+  "G14": {
+   "kg_id": "MONDO:0017416",
+   "route": "twin"
+  },
+  "G20": {
+   "kg_id": "MONDO:0014231",
+   "route": "twin"
+  },
+  "G21": {
+   "kg_id": "MONDO:0006966",
+   "route": "twin"
+  },
+  "G21.0": {
+   "kg_id": "MONDO:0019790",
+   "route": "twin"
+  },
+  "G21.3": {
+   "kg_id": "MONDO:0001945",
+   "route": "twin"
+  },
+  "G23.0": {
+   "kg_id": "MONDO:0024457",
+   "route": "twin"
+  },
+  "G23.1": {
+   "kg_id": "MONDO:0019037",
+   "route": "twin"
+  },
+  "G23.2": {
+   "kg_id": "MONDO:0003122",
+   "route": "twin"
+  },
+  "G24": {
+   "kg_id": "MONDO:0003441",
+   "route": "twin"
+  },
+  "G24.1": {
+   "kg_id": "MONDO:0000476",
+   "route": "twin"
+  },
+  "G24.2": {
+   "kg_id": "MONDO:0000476",
+   "route": "twin"
+  },
+  "G24.4": {
+   "kg_id": "MONDO:0004901",
+   "route": "twin"
+  },
+  "G24.5": {
+   "kg_id": "MONDO:0011728",
+   "route": "twin"
+  },
+  "G24.8": {
+   "kg_id": "MONDO:0012629",
+   "route": "twin"
+  },
+  "G25.0": {
+   "kg_id": "MONDO:0003233",
+   "route": "twin"
+  },
+  "G25.5": {
+   "kg_id": "MONDO:0010327",
+   "route": "twin"
+  },
+  "G25.8": {
+   "kg_id": "MONDO:0021022",
+   "route": "twin"
+  },
+  "G25.81": {
+   "kg_id": "MONDO:0005391",
+   "route": "twin"
+  },
+  "G25.82": {
+   "kg_id": "MONDO:0008491",
+   "route": "twin"
+  },
+  "G25.83": {
+   "kg_id": "MONDO:0002085",
+   "route": "twin"
+  },
+  "G25.9": {
+   "kg_id": "MONDO:0001815",
+   "route": "twin"
+  },
+  "G30": {
+   "kg_id": "MONDO:0007089",
+   "route": "twin"
+  },
+  "G31.0": {
+   "kg_id": "MONDO:0011842",
+   "route": "twin"
+  },
+  "G31.01": {
+   "kg_id": "MONDO:0008243",
+   "route": "twin"
+  },
+  "G31.8": {
+   "kg_id": "MONDO:0018866",
+   "route": "twin"
+  },
+  "G31.81": {
+   "kg_id": "MONDO:0008758",
+   "route": "twin"
+  },
+  "G31.82": {
+   "kg_id": "MONDO:0009723",
+   "route": "twin"
+  },
+  "G31.83": {
+   "kg_id": "MONDO:0007488",
+   "route": "twin"
+  },
+  "G31.86": {
+   "kg_id": "MONDO:0008752",
+   "route": "twin"
+  },
+  "G31.9": {
+   "kg_id": "MONDO:0005559",
+   "route": "twin"
+  },
+  "G35": {
+   "kg_id": "MONDO:0005301",
+   "route": "twin"
+  },
+  "G35.A": {
+   "kg_id": "MONDO:0005314",
+   "route": "twin"
+  },
+  "G35.B": {
+   "kg_id": "MONDO:0000451",
+   "route": "twin"
+  },
+  "G35.C": {
+   "kg_id": "MONDO:0000450",
+   "route": "twin"
+  },
+  "G36.0": {
+   "kg_id": "MONDO:0019100",
+   "route": "twin"
+  },
+  "G37.0": {
+   "kg_id": "MONDO:0016430",
+   "route": "twin"
+  },
+  "G37.2": {
+   "kg_id": "MONDO:0006692",
+   "route": "twin"
+  },
+  "G37.8": {
+   "kg_id": "MONDO:0012514",
+   "route": "twin"
+  },
+  "G40": {
+   "kg_id": "MONDO:0005027",
+   "route": "twin"
+  },
+  "G40.3": {
+   "kg_id": "MONDO:0018214",
+   "route": "twin"
+  },
+  "G40.4": {
+   "kg_id": "MONDO:0013784",
+   "route": "twin"
+  },
+  "G40.8": {
+   "kg_id": "MONDO:0015643",
+   "route": "twin"
+  },
+  "G40.909": {
+   "kg_id": "MONDO:0005027",
+   "route": "twin"
+  },
+  "G40.C": {
+   "kg_id": "MONDO:0009697",
+   "route": "twin"
+  },
+  "G43": {
+   "kg_id": "MONDO:0005277",
+   "route": "twin"
+  },
+  "G43.0": {
+   "kg_id": "MONDO:0100431",
+   "route": "twin"
+  },
+  "G43.1": {
+   "kg_id": "MONDO:0005475",
+   "route": "twin"
+  },
+  "G43.8": {
+   "kg_id": "MONDO:0000700",
+   "route": "twin"
+  },
+  "G44.0": {
+   "kg_id": "MONDO:0043537",
+   "route": "twin"
+  },
+  "G45.0": {
+   "kg_id": "MONDO:0001613",
+   "route": "twin"
+  },
+  "G45.4": {
+   "kg_id": "MONDO:0001617",
+   "route": "twin"
+  },
+  "G45.9": {
+   "kg_id": "MONDO:0005264",
+   "route": "twin"
+  },
+  "G46.3": {
+   "kg_id": "MONDO:0006827",
+   "route": "twin"
+  },
+  "G47.13": {
+   "kg_id": "MONDO:0004617",
+   "route": "twin"
+  },
+  "G47.3": {
+   "kg_id": "MONDO:0005296",
+   "route": "twin"
+  },
+  "G47.33": {
+   "kg_id": "MONDO:0007147",
+   "route": "twin"
+  },
+  "G47.41": {
+   "kg_id": "MONDO:0021107",
+   "route": "twin"
+  },
+  "G47.52": {
+   "kg_id": "MONDO:0005937",
+   "route": "twin"
+  },
+  "G47.61": {
+   "kg_id": "MONDO:0005905",
+   "route": "twin"
+  },
+  "G47.63": {
+   "kg_id": "MONDO:0002443",
+   "route": "twin"
+  },
+  "G50.0": {
+   "kg_id": "MONDO:0008599",
+   "route": "twin"
+  },
+  "G51": {
+   "kg_id": "MONDO:0002098",
+   "route": "twin"
+  },
+  "G51.0": {
+   "kg_id": "MONDO:0005665",
+   "route": "twin"
+  },
+  "G51.1": {
+   "kg_id": "MONDO:0001873",
+   "route": "twin"
+  },
+  "G51.2": {
+   "kg_id": "MONDO:0007969",
+   "route": "twin"
+  },
+  "G52": {
+   "kg_id": "MONDO:0002639",
+   "route": "twin"
+  },
+  "G52.0": {
+   "kg_id": "MONDO:0002727",
+   "route": "twin"
+  },
+  "G52.1": {
+   "kg_id": "MONDO:0016372",
+   "route": "twin"
+  },
+  "G52.2": {
+   "kg_id": "MONDO:0001535",
+   "route": "twin"
+  },
+  "G52.3": {
+   "kg_id": "MONDO:0001810",
+   "route": "twin"
+  },
+  "G52.7": {
+   "kg_id": "MONDO:0001819",
+   "route": "twin"
+  },
+  "G52.9": {
+   "kg_id": "MONDO:0003569",
+   "route": "twin"
+  },
+  "G54.0": {
+   "kg_id": "MONDO:0005979",
+   "route": "twin"
+  },
+  "G54.5": {
+   "kg_id": "MONDO:0008076",
+   "route": "twin"
+  },
+  "G56.0": {
+   "kg_id": "MONDO:0007275",
+   "route": "twin"
+  },
+  "G56.10": {
+   "kg_id": "MONDO:0003598",
+   "route": "twin"
+  },
+  "G56.2": {
+   "kg_id": "MONDO:0001458",
+   "route": "twin"
+  },
+  "G56.3": {
+   "kg_id": "MONDO:0006940",
+   "route": "twin"
+  },
+  "G57.0": {
+   "kg_id": "MONDO:0001543",
+   "route": "twin"
+  },
+  "G57.2": {
+   "kg_id": "MONDO:0006759",
+   "route": "twin"
+  },
+  "G57.3": {
+   "kg_id": "MONDO:0001542",
+   "route": "twin"
+  },
+  "G57.5": {
+   "kg_id": "MONDO:0006994",
+   "route": "twin"
+  },
+  "G57.6": {
+   "kg_id": "MONDO:0001541",
+   "route": "twin"
+  },
+  "G58.7": {
+   "kg_id": "MONDO:0002128",
+   "route": "twin"
+  },
+  "G58.9": {
+   "kg_id": "MONDO:0001397",
+   "route": "twin"
+  },
+  "G60": {
+   "kg_id": "MONDO:0020766",
+   "route": "twin"
+  },
+  "G60.0": {
+   "kg_id": "MONDO:0000902",
+   "route": "twin"
+  },
+  "G60.1": {
+   "kg_id": "MONDO:0011101",
+   "route": "twin"
+  },
+  "G60.2": {
+   "kg_id": "MONDO:0011801",
+   "route": "twin"
+  },
+  "G60.8": {
+   "kg_id": "MONDO:0015364",
+   "route": "twin"
+  },
+  "G61.0": {
+   "kg_id": "MONDO:0016218",
+   "route": "twin"
+  },
+  "G61.81": {
+   "kg_id": "MONDO:0006702",
+   "route": "twin"
+  },
+  "G62.0": {
+   "kg_id": "MONDO:0001904",
+   "route": "twin"
+  },
+  "G62.1": {
+   "kg_id": "MONDO:0006645",
+   "route": "twin"
+  },
+  "G62.81": {
+   "kg_id": "MONDO:0001957",
+   "route": "twin"
+  },
+  "G62.9": {
+   "kg_id": "MONDO:0005244",
+   "route": "twin"
+  },
+  "G70.0": {
+   "kg_id": "MONDO:0009688",
+   "route": "twin"
+  },
+  "G70.00": {
+   "kg_id": "MONDO:0009688",
+   "route": "twin"
+  },
+  "G70.80": {
+   "kg_id": "MONDO:0018556",
+   "route": "twin"
+  },
+  "G70.9": {
+   "kg_id": "MONDO:0019056",
+   "route": "twin"
+  },
+  "G71": {
+   "kg_id": "MONDO:0003939",
+   "route": "twin"
+  },
+  "G71.0": {
+   "kg_id": "MONDO:0021569",
+   "route": "twin"
+  },
+  "G71.02": {
+   "kg_id": "MONDO:0001347",
+   "route": "twin"
+  },
+  "G71.03": {
+   "kg_id": "MONDO:0016971",
+   "route": "twin"
+  },
+  "G71.09": {
+   "kg_id": "MONDO:0008116",
+   "route": "twin"
+  },
+  "G71.1": {
+   "kg_id": "MONDO:0011266",
+   "route": "twin"
+  },
+  "G71.11": {
+   "kg_id": "MONDO:0008056",
+   "route": "twin"
+  },
+  "G71.12": {
+   "kg_id": "MONDO:0009710",
+   "route": "twin"
+  },
+  "G71.19": {
+   "kg_id": "MONDO:0008195",
+   "route": "twin"
+  },
+  "G71.2": {
+   "kg_id": "MONDO:0011246",
+   "route": "twin"
+  },
+  "G71.21": {
+   "kg_id": "MONDO:0018958",
+   "route": "twin"
+  },
+  "G71.22": {
+   "kg_id": "MONDO:0018947",
+   "route": "twin"
+  },
+  "G71.220": {
+   "kg_id": "MONDO:0010683",
+   "route": "twin"
+  },
+  "G71.228": {
+   "kg_id": "MONDO:0008048",
+   "route": "twin"
+  },
+  "G71.29": {
+   "kg_id": "MONDO:0007294",
+   "route": "twin"
+  },
+  "G71.3": {
+   "kg_id": "MONDO:0100294",
+   "route": "twin"
+  },
+  "G71.8": {
+   "kg_id": "MONDO:0011271",
+   "route": "twin"
+  },
+  "G72.3": {
+   "kg_id": "MONDO:0000995",
+   "route": "twin"
+  },
+  "G72.41": {
+   "kg_id": "MONDO:0007827",
+   "route": "twin"
+  },
+  "G72.9": {
+   "kg_id": "MONDO:0005336",
+   "route": "twin"
+  },
+  "G73.1": {
+   "kg_id": "MONDO:0018556",
+   "route": "twin"
+  },
+  "G80": {
+   "kg_id": "MONDO:0006497",
+   "route": "twin"
+  },
+  "G80.1": {
+   "kg_id": "MONDO:0001167",
+   "route": "twin"
+  },
+  "G82.2": {
+   "kg_id": "MONDO:0003757",
+   "route": "twin"
+  },
+  "G82.5": {
+   "kg_id": "MONDO:0001590",
+   "route": "twin"
+  },
+  "G83.0": {
+   "kg_id": "MONDO:0004618",
+   "route": "twin"
+  },
+  "G83.4": {
+   "kg_id": "MONDO:0005693",
+   "route": "twin"
+  },
+  "G83.5": {
+   "kg_id": "MONDO:0016567",
+   "route": "twin"
+  },
+  "G83.81": {
+   "kg_id": "MONDO:0003754",
+   "route": "twin"
+  },
+  "G83.82": {
+   "kg_id": "MONDO:0006650",
+   "route": "twin"
+  },
+  "G90.0": {
+   "kg_id": "MONDO:0001295",
+   "route": "twin"
+  },
+  "G90.1": {
+   "kg_id": "MONDO:0009131",
+   "route": "twin"
+  },
+  "G90.2": {
+   "kg_id": "MONDO:0001294",
+   "route": "twin"
+  },
+  "G90.4": {
+   "kg_id": "MONDO:0043975",
+   "route": "twin"
+  },
+  "G90.5": {
+   "kg_id": "MONDO:0011441",
+   "route": "twin"
+  },
+  "G91": {
+   "kg_id": "MONDO:0001150",
+   "route": "twin"
+  },
+  "G91.0": {
+   "kg_id": "MONDO:0002045",
+   "route": "twin"
+  },
+  "G91.1": {
+   "kg_id": "MONDO:0001896",
+   "route": "twin"
+  },
+  "G91.2": {
+   "kg_id": "MONDO:0009366",
+   "route": "twin"
+  },
+  "G93.2": {
+   "kg_id": "MONDO:0009468",
+   "route": "twin"
+  },
+  "G93.32": {
+   "kg_id": "MONDO:0005404",
+   "route": "twin"
+  },
+  "G93.40": {
+   "kg_id": "MONDO:0005560",
+   "route": "twin"
+  },
+  "G93.42": {
+   "kg_id": "MONDO:0011391",
+   "route": "twin"
+  },
+  "G93.5": {
+   "kg_id": "MONDO:0001291",
+   "route": "twin"
+  },
+  "G93.7": {
+   "kg_id": "MONDO:0005942",
+   "route": "twin"
+  },
+  "G93.9": {
+   "kg_id": "MONDO:0005560",
+   "route": "twin"
+  },
+  "G95.1": {
+   "kg_id": "MONDO:0002552",
+   "route": "twin"
+  },
+  "G95.9": {
+   "kg_id": "MONDO:0002545",
+   "route": "twin"
+  },
+  "G96.81": {
+   "kg_id": "MONDO:0006811",
+   "route": "twin"
+  },
+  "G96.9": {
+   "kg_id": "MONDO:0002602",
+   "route": "twin"
+  },
+  "G98": {
+   "kg_id": "MONDO:0016241",
+   "route": "twin"
+  },
+  "H00.01": {
+   "kg_id": "MONDO:0001642",
+   "route": "twin"
+  },
+  "H00.02": {
+   "kg_id": "MONDO:0004917",
+   "route": "twin"
+  },
+  "H00.1": {
+   "kg_id": "MONDO:0005844",
+   "route": "twin"
+  },
+  "H01.0": {
+   "kg_id": "MONDO:0004785",
+   "route": "twin"
+  },
+  "H01.01": {
+   "kg_id": "MONDO:0004799",
+   "route": "twin"
+  },
+  "H01.02": {
+   "kg_id": "MONDO:0001813",
+   "route": "twin"
+  },
+  "H01.1": {
+   "kg_id": "MONDO:0002137",
+   "route": "twin"
+  },
+  "H01.12": {
+   "kg_id": "MONDO:0004706",
+   "route": "twin"
+  },
+  "H01.13": {
+   "kg_id": "MONDO:0002136",
+   "route": "twin"
+  },
+  "H01.14": {
+   "kg_id": "MONDO:0004718",
+   "route": "twin"
+  },
+  "H02.1": {
+   "kg_id": "MONDO:0002043",
+   "route": "twin"
+  },
+  "H02.2": {
+   "kg_id": "MONDO:0001604",
+   "route": "twin"
+  },
+  "H02.21": {
+   "kg_id": "MONDO:0001623",
+   "route": "twin"
+  },
+  "H02.22": {
+   "kg_id": "MONDO:0001622",
+   "route": "twin"
+  },
+  "H02.23": {
+   "kg_id": "MONDO:0001603",
+   "route": "twin"
+  },
+  "H02.3": {
+   "kg_id": "MONDO:0002660",
+   "route": "twin"
+  },
+  "H02.4": {
+   "kg_id": "MONDO:0000728",
+   "route": "twin"
+  },
+  "H02.52": {
+   "kg_id": "MONDO:0001008",
+   "route": "twin"
+  },
+  "H02.71": {
+   "kg_id": "MONDO:0007769",
+   "route": "twin"
+  },
+  "H02.72": {
+   "kg_id": "MONDO:0001335",
+   "route": "twin"
+  },
+  "H02.73": {
+   "kg_id": "MONDO:0006561",
+   "route": "twin"
+  },
+  "H02.86": {
+   "kg_id": "MONDO:0001334",
+   "route": "twin"
+  },
+  "H02.9": {
+   "kg_id": "MONDO:0003382",
+   "route": "twin"
+  },
+  "H04": {
+   "kg_id": "MONDO:0001854",
+   "route": "twin"
+  },
+  "H04.0": {
+   "kg_id": "MONDO:0004804",
+   "route": "twin"
+  },
+  "H04.01": {
+   "kg_id": "MONDO:0004812",
+   "route": "twin"
+  },
+  "H04.02": {
+   "kg_id": "MONDO:0004800",
+   "route": "twin"
+  },
+  "H04.03": {
+   "kg_id": "MONDO:0001588",
+   "route": "twin"
+  },
+  "H04.12": {
+   "kg_id": "MONDO:0006733",
+   "route": "twin"
+  },
+  "H04.15": {
+   "kg_id": "MONDO:0002124",
+   "route": "twin"
+  },
+  "H04.16": {
+   "kg_id": "MONDO:0001203",
+   "route": "twin"
+  },
+  "H04.2": {
+   "kg_id": "MONDO:0001793",
+   "route": "twin"
+  },
+  "H04.21": {
+   "kg_id": "MONDO:0001918",
+   "route": "twin"
+  },
+  "H04.22": {
+   "kg_id": "MONDO:0001792",
+   "route": "twin"
+  },
+  "H04.3": {
+   "kg_id": "MONDO:0004055",
+   "route": "twin"
+  },
+  "H04.30": {
+   "kg_id": "MONDO:0004926",
+   "route": "twin"
+  },
+  "H04.31": {
+   "kg_id": "MONDO:0001611",
+   "route": "twin"
+  },
+  "H04.32": {
+   "kg_id": "MONDO:0001610",
+   "route": "twin"
+  },
+  "H04.33": {
+   "kg_id": "MONDO:0004054",
+   "route": "twin"
+  },
+  "H04.4": {
+   "kg_id": "MONDO:0004923",
+   "route": "twin"
+  },
+  "H04.41": {
+   "kg_id": "MONDO:0004925",
+   "route": "twin"
+  },
+  "H04.42": {
+   "kg_id": "MONDO:0004924",
+   "route": "twin"
+  },
+  "H04.52": {
+   "kg_id": "MONDO:0001766",
+   "route": "twin"
+  },
+  "H04.54": {
+   "kg_id": "MONDO:0001768",
+   "route": "twin"
+  },
+  "H04.55": {
+   "kg_id": "MONDO:0001769",
+   "route": "twin"
+  },
+  "H04.56": {
+   "kg_id": "MONDO:0001767",
+   "route": "twin"
+  },
+  "H04.57": {
+   "kg_id": "MONDO:0002511",
+   "route": "twin"
+  },
+  "H04.81": {
+   "kg_id": "MONDO:0000957",
+   "route": "twin"
+  },
+  "H05.0": {
+   "kg_id": "MONDO:0001230",
+   "route": "twin"
+  },
+  "H05.01": {
+   "kg_id": "MONDO:0006881",
+   "route": "twin"
+  },
+  "H05.02": {
+   "kg_id": "MONDO:0001232",
+   "route": "twin"
+  },
+  "H05.03": {
+   "kg_id": "MONDO:0001231",
+   "route": "twin"
+  },
+  "H05.1": {
+   "kg_id": "MONDO:0001849",
+   "route": "twin"
+  },
+  "H05.11": {
+   "kg_id": "MONDO:0001048",
+   "route": "twin"
+  },
+  "H05.21": {
+   "kg_id": "MONDO:0001510",
+   "route": "twin"
+  },
+  "H05.24": {
+   "kg_id": "MONDO:0004929",
+   "route": "twin"
+  },
+  "H05.25": {
+   "kg_id": "MONDO:0001512",
+   "route": "twin"
+  },
+  "H05.26": {
+   "kg_id": "MONDO:0001513",
+   "route": "twin"
+  },
+  "H05.4": {
+   "kg_id": "MONDO:0001210",
+   "route": "twin"
+  },
+  "H05.81": {
+   "kg_id": "MONDO:0001915",
+   "route": "twin"
+  },
+  "H05.82": {
+   "kg_id": "MONDO:0004746",
+   "route": "twin"
+  },
+  "H05.9": {
+   "kg_id": "MONDO:0004751",
+   "route": "twin"
+  },
+  "H10": {
+   "kg_id": "MONDO:0003799",
+   "route": "twin"
+  },
+  "H10.0": {
+   "kg_id": "MONDO:0006668",
+   "route": "twin"
+  },
+  "H10.01": {
+   "kg_id": "MONDO:0001228",
+   "route": "twin"
+  },
+  "H10.02": {
+   "kg_id": "MONDO:0001214",
+   "route": "twin"
+  },
+  "H10.1": {
+   "kg_id": "MONDO:0001224",
+   "route": "twin"
+  },
+  "H10.22": {
+   "kg_id": "MONDO:0001217",
+   "route": "twin"
+  },
+  "H10.23": {
+   "kg_id": "MONDO:0001219",
+   "route": "twin"
+  },
+  "H10.4": {
+   "kg_id": "MONDO:0002314",
+   "route": "twin"
+  },
+  "H10.42": {
+   "kg_id": "MONDO:0004811",
+   "route": "twin"
+  },
+  "H10.43": {
+   "kg_id": "MONDO:0001685",
+   "route": "twin"
+  },
+  "H10.44": {
+   "kg_id": "MONDO:0002313",
+   "route": "twin"
+  },
+  "H10.5": {
+   "kg_id": "MONDO:0002307",
+   "route": "twin"
+  },
+  "H10.52": {
+   "kg_id": "MONDO:0002306",
+   "route": "twin"
+  },
+  "H10.53": {
+   "kg_id": "MONDO:0001853",
+   "route": "twin"
+  },
+  "H10.82": {
+   "kg_id": "MONDO:0004856",
+   "route": "twin"
+  },
+  "H11.02": {
+   "kg_id": "MONDO:0001722",
+   "route": "twin"
+  },
+  "H11.10": {
+   "kg_id": "MONDO:0000949",
+   "route": "twin"
+  },
+  "H11.11": {
+   "kg_id": "MONDO:0001331",
+   "route": "twin"
+  },
+  "H11.12": {
+   "kg_id": "MONDO:0001412",
+   "route": "twin"
+  },
+  "H11.13": {
+   "kg_id": "MONDO:0006537",
+   "route": "twin"
+  },
+  "H11.15": {
+   "kg_id": "MONDO:0001179",
+   "route": "twin"
+  },
+  "H11.41": {
+   "kg_id": "MONDO:0001174",
+   "route": "twin"
+  },
+  "H11.82": {
+   "kg_id": "MONDO:0002931",
+   "route": "twin"
+  },
+  "H11.9": {
+   "kg_id": "MONDO:0006170",
+   "route": "twin"
+  },
+  "H15": {
+   "kg_id": "MONDO:0001269",
+   "route": "twin"
+  },
+  "H15.0": {
+   "kg_id": "MONDO:0001718",
+   "route": "twin"
+  },
+  "H15.01": {
+   "kg_id": "MONDO:0001804",
+   "route": "twin"
+  },
+  "H15.02": {
+   "kg_id": "MONDO:0001936",
+   "route": "twin"
+  },
+  "H15.03": {
+   "kg_id": "MONDO:0001774",
+   "route": "twin"
+  },
+  "H15.04": {
+   "kg_id": "MONDO:0001816",
+   "route": "twin"
+  },
+  "H15.05": {
+   "kg_id": "MONDO:0001914",
+   "route": "twin"
+  },
+  "H15.11": {
+   "kg_id": "MONDO:0001439",
+   "route": "twin"
+  },
+  "H15.12": {
+   "kg_id": "MONDO:0004170",
+   "route": "twin"
+  },
+  "H15.81": {
+   "kg_id": "MONDO:0001800",
+   "route": "twin"
+  },
+  "H15.82": {
+   "kg_id": "MONDO:0001799",
+   "route": "twin"
+  },
+  "H15.83": {
+   "kg_id": "MONDO:0001801",
+   "route": "twin"
+  },
+  "H15.85": {
+   "kg_id": "MONDO:0001320",
+   "route": "twin"
+  },
+  "H16": {
+   "kg_id": "MONDO:0003085",
+   "route": "twin"
+  },
+  "H16.0": {
+   "kg_id": "MONDO:0004577",
+   "route": "twin"
+  },
+  "H16.01": {
+   "kg_id": "MONDO:0004918",
+   "route": "twin"
+  },
+  "H16.02": {
+   "kg_id": "MONDO:0001037",
+   "route": "twin"
+  },
+  "H16.03": {
+   "kg_id": "MONDO:0001035",
+   "route": "twin"
+  },
+  "H16.04": {
+   "kg_id": "MONDO:0001034",
+   "route": "twin"
+  },
+  "H16.05": {
+   "kg_id": "MONDO:0001032",
+   "route": "twin"
+  },
+  "H16.06": {
+   "kg_id": "MONDO:0001033",
+   "route": "twin"
+  },
+  "H16.07": {
+   "kg_id": "MONDO:0001038",
+   "route": "twin"
+  },
+  "H16.10": {
+   "kg_id": "MONDO:0001465",
+   "route": "twin"
+  },
+  "H16.11": {
+   "kg_id": "MONDO:0001395",
+   "route": "twin"
+  },
+  "H16.12": {
+   "kg_id": "MONDO:0003082",
+   "route": "twin"
+  },
+  "H16.13": {
+   "kg_id": "MONDO:0001760",
+   "route": "twin"
+  },
+  "H16.14": {
+   "kg_id": "MONDO:0001466",
+   "route": "twin"
+  },
+  "H16.2": {
+   "kg_id": "MONDO:0004768",
+   "route": "twin"
+  },
+  "H16.21": {
+   "kg_id": "MONDO:0004794",
+   "route": "twin"
+  },
+  "H16.23": {
+   "kg_id": "MONDO:0001440",
+   "route": "twin"
+  },
+  "H16.24": {
+   "kg_id": "MONDO:0004861",
+   "route": "twin"
+  },
+  "H16.25": {
+   "kg_id": "MONDO:0001317",
+   "route": "twin"
+  },
+  "H16.3": {
+   "kg_id": "MONDO:0004903",
+   "route": "twin"
+  },
+  "H16.30": {
+   "kg_id": "MONDO:0004902",
+   "route": "twin"
+  },
+  "H16.31": {
+   "kg_id": "MONDO:0001307",
+   "route": "twin"
+  },
+  "H16.32": {
+   "kg_id": "MONDO:0015453",
+   "route": "twin"
+  },
+  "H16.33": {
+   "kg_id": "MONDO:0001965",
+   "route": "twin"
+  },
+  "H16.4": {
+   "kg_id": "MONDO:0006713",
+   "route": "twin"
+  },
+  "H16.44": {
+   "kg_id": "MONDO:0001430",
+   "route": "twin"
+  },
+  "H18.00": {
+   "kg_id": "MONDO:0001308",
+   "route": "twin"
+  },
+  "H18.01": {
+   "kg_id": "MONDO:0001488",
+   "route": "twin"
+  },
+  "H18.02": {
+   "kg_id": "MONDO:0001716",
+   "route": "twin"
+  },
+  "H18.05": {
+   "kg_id": "MONDO:0001717",
+   "route": "twin"
+  },
+  "H18.06": {
+   "kg_id": "MONDO:0006613",
+   "route": "twin"
+  },
+  "H18.1": {
+   "kg_id": "MONDO:0001180",
+   "route": "twin"
+  },
+  "H18.20": {
+   "kg_id": "MONDO:0006712",
+   "route": "twin"
+  },
+  "H18.22": {
+   "kg_id": "MONDO:0001182",
+   "route": "twin"
+  },
+  "H18.23": {
+   "kg_id": "MONDO:0001181",
+   "route": "twin"
+  },
+  "H18.31": {
+   "kg_id": "MONDO:0001310",
+   "route": "twin"
+  },
+  "H18.4": {
+   "kg_id": "MONDO:0001515",
+   "route": "twin"
+  },
+  "H18.41": {
+   "kg_id": "MONDO:0007150",
+   "route": "twin"
+  },
+  "H18.42": {
+   "kg_id": "MONDO:0009016",
+   "route": "twin"
+  },
+  "H18.44": {
+   "kg_id": "MONDO:0001250",
+   "route": "twin"
+  },
+  "H18.45": {
+   "kg_id": "MONDO:0002449",
+   "route": "twin"
+  },
+  "H18.46": {
+   "kg_id": "MONDO:0001983",
+   "route": "twin"
+  },
+  "H18.5": {
+   "kg_id": "MONDO:0012401",
+   "route": "twin"
+  },
+  "H18.50": {
+   "kg_id": "MONDO:0007378",
+   "route": "twin"
+  },
+  "H18.51": {
+   "kg_id": "MONDO:0005321",
+   "route": "twin"
+  },
+  "H18.52": {
+   "kg_id": "MONDO:0007379",
+   "route": "twin"
+  },
+  "H18.53": {
+   "kg_id": "MONDO:0001490",
+   "route": "twin"
+  },
+  "H18.55": {
+   "kg_id": "MONDO:0009020",
+   "route": "twin"
+  },
+  "H18.6": {
+   "kg_id": "MONDO:0015486",
+   "route": "twin"
+  },
+  "H18.61": {
+   "kg_id": "MONDO:0001030",
+   "route": "twin"
+  },
+  "H18.71": {
+   "kg_id": "MONDO:0001950",
+   "route": "twin"
+  },
+  "H18.72": {
+   "kg_id": "MONDO:0001579",
+   "route": "twin"
+  },
+  "H18.9": {
+   "kg_id": "MONDO:0000942",
+   "route": "twin"
+  },
+  "H20.01": {
+   "kg_id": "MONDO:0004773",
+   "route": "twin"
+  },
+  "H20.03": {
+   "kg_id": "MONDO:0017210",
+   "route": "twin"
+  },
+  "H20.05": {
+   "kg_id": "MONDO:0001036",
+   "route": "twin"
+  },
+  "H20.2": {
+   "kg_id": "MONDO:0004775",
+   "route": "twin"
+  },
+  "H20.81": {
+   "kg_id": "MONDO:0016989",
+   "route": "twin"
+  },
+  "H20.82": {
+   "kg_id": "MONDO:0018092",
+   "route": "twin"
+  },
+  "H20.9": {
+   "kg_id": "MONDO:0020283",
+   "route": "twin"
+  },
+  "H21.1": {
+   "kg_id": "MONDO:0001855",
+   "route": "twin"
+  },
+  "H25": {
+   "kg_id": "MONDO:0004847",
+   "route": "twin"
+  },
+  "H25.09": {
+   "kg_id": "MONDO:0001175",
+   "route": "twin"
+  },
+  "H26": {
+   "kg_id": "MONDO:0005129",
+   "route": "twin"
+  },
+  "H27.11": {
+   "kg_id": "MONDO:0001271",
+   "route": "twin"
+  },
+  "H27.12": {
+   "kg_id": "MONDO:0002310",
+   "route": "twin"
+  },
+  "H27.13": {
+   "kg_id": "MONDO:0001906",
+   "route": "twin"
+  },
+  "H27.9": {
+   "kg_id": "MONDO:0001176",
+   "route": "twin"
+  },
+  "H30.0": {
+   "kg_id": "MONDO:0002164",
+   "route": "twin"
+  },
+  "H30.1": {
+   "kg_id": "MONDO:0004657",
+   "route": "twin"
+  },
+  "H30.2": {
+   "kg_id": "MONDO:0011644",
+   "route": "twin"
+  },
+  "H30.9": {
+   "kg_id": "MONDO:0000958",
+   "route": "twin"
+  },
+  "H31.10": {
+   "kg_id": "MONDO:0004885",
+   "route": "twin"
+  },
+  "H31.12": {
+   "kg_id": "MONDO:0004886",
+   "route": "twin"
+  },
+  "H31.2": {
+   "kg_id": "MONDO:0004883",
+   "route": "twin"
+  },
+  "H31.21": {
+   "kg_id": "MONDO:0010557",
+   "route": "twin"
+  },
+  "H31.9": {
+   "kg_id": "MONDO:0001898",
+   "route": "twin"
+  },
+  "H33.10": {
+   "kg_id": "MONDO:0004579",
+   "route": "twin"
+  },
+  "H33.2": {
+   "kg_id": "MONDO:0008375",
+   "route": "twin"
+  },
+  "H34": {
+   "kg_id": "MONDO:0002089",
+   "route": "twin"
+  },
+  "H34.0": {
+   "kg_id": "MONDO:0004583",
+   "route": "twin"
+  },
+  "H34.1": {
+   "kg_id": "MONDO:0001633",
+   "route": "twin"
+  },
+  "H34.21": {
+   "kg_id": "MONDO:0001985",
+   "route": "twin"
+  },
+  "H34.23": {
+   "kg_id": "MONDO:0001630",
+   "route": "twin"
+  },
+  "H34.81": {
+   "kg_id": "MONDO:0002303",
+   "route": "twin"
+  },
+  "H34.82": {
+   "kg_id": "MONDO:0002088",
+   "route": "twin"
+  },
+  "H35.00": {
+   "kg_id": "MONDO:0019516",
+   "route": "twin"
+  },
+  "H35.02": {
+   "kg_id": "MONDO:0010269",
+   "route": "twin"
+  },
+  "H35.03": {
+   "kg_id": "MONDO:0006797",
+   "route": "twin"
+  },
+  "H35.06": {
+   "kg_id": "MONDO:0006950",
+   "route": "twin"
+  },
+  "H35.1": {
+   "kg_id": "MONDO:0006952",
+   "route": "twin"
+  },
+  "H35.3": {
+   "kg_id": "MONDO:0002175",
+   "route": "twin"
+  },
+  "H35.30": {
+   "kg_id": "MONDO:0005150",
+   "route": "twin"
+  },
+  "H35.32": {
+   "kg_id": "MONDO:0005417",
+   "route": "twin"
+  },
+  "H35.34": {
+   "kg_id": "MONDO:0001663",
+   "route": "twin"
+  },
+  "H35.35": {
+   "kg_id": "MONDO:0001919",
+   "route": "twin"
+  },
+  "H35.38": {
+   "kg_id": "MONDO:0004904",
+   "route": "twin"
+  },
+  "H35.4": {
+   "kg_id": "MONDO:0001451",
+   "route": "twin"
+  },
+  "H35.41": {
+   "kg_id": "MONDO:0001455",
+   "route": "twin"
+  },
+  "H35.42": {
+   "kg_id": "MONDO:0001454",
+   "route": "twin"
+  },
+  "H35.43": {
+   "kg_id": "MONDO:0001456",
+   "route": "twin"
+  },
+  "H35.45": {
+   "kg_id": "MONDO:0001452",
+   "route": "twin"
+  },
+  "H35.46": {
+   "kg_id": "MONDO:0001457",
+   "route": "twin"
+  },
+  "H35.5": {
+   "kg_id": "MONDO:0015993",
+   "route": "twin"
+  },
+  "H35.51": {
+   "kg_id": "MONDO:0001923",
+   "route": "twin"
+  },
+  "H35.52": {
+   "kg_id": "MONDO:0019200",
+   "route": "twin"
+  },
+  "H35.54": {
+   "kg_id": "MONDO:0001924",
+   "route": "twin"
+  },
+  "H35.81": {
+   "kg_id": "MONDO:0006879",
+   "route": "twin"
+  },
+  "H35.82": {
+   "kg_id": "MONDO:0001538",
+   "route": "twin"
+  },
+  "H35.9": {
+   "kg_id": "MONDO:0005283",
+   "route": "twin"
+  },
+  "H40": {
+   "kg_id": "MONDO:0005041",
+   "route": "twin"
+  },
+  "H40.00": {
+   "kg_id": "MONDO:0004744",
+   "route": "twin"
+  },
+  "H40.05": {
+   "kg_id": "MONDO:0006875",
+   "route": "twin"
+  },
+  "H40.1": {
+   "kg_id": "MONDO:0005338",
+   "route": "twin"
+  },
+  "H40.11": {
+   "kg_id": "MONDO:0005338",
+   "route": "twin"
+  },
+  "H40.12": {
+   "kg_id": "MONDO:0006837",
+   "route": "twin"
+  },
+  "H40.15": {
+   "kg_id": "MONDO:0001094",
+   "route": "twin"
+  },
+  "H40.2": {
+   "kg_id": "MONDO:0001868",
+   "route": "twin"
+  },
+  "H40.21": {
+   "kg_id": "MONDO:0001817",
+   "route": "twin"
+  },
+  "H40.22": {
+   "kg_id": "MONDO:0001966",
+   "route": "twin"
+  },
+  "H40.23": {
+   "kg_id": "MONDO:0001742",
+   "route": "twin"
+  },
+  "H40.24": {
+   "kg_id": "MONDO:0001864",
+   "route": "twin"
+  },
+  "H40.82": {
+   "kg_id": "MONDO:0001205",
+   "route": "twin"
+  },
+  "H40.83": {
+   "kg_id": "MONDO:0001206",
+   "route": "twin"
+  },
+  "H40.84": {
+   "kg_id": "MONDO:0019783",
+   "route": "twin"
+  },
+  "H43.0": {
+   "kg_id": "MEDDRA:10047661",
+   "route": "twin"
+  },
+  "H43.39": {
+   "kg_id": "MONDO:0004860",
+   "route": "twin"
+  },
+  "H43.81": {
+   "kg_id": "MONDO:0001377",
+   "route": "twin"
+  },
+  "H44": {
+   "kg_id": "MONDO:0005328",
+   "route": "twin"
+  },
+  "H44.0": {
+   "kg_id": "MONDO:0004863",
+   "route": "twin"
+  },
+  "H44.11": {
+   "kg_id": "MONDO:0017255",
+   "route": "twin"
+  },
+  "H44.12": {
+   "kg_id": "MONDO:0005135",
+   "route": "twin"
+  },
+  "H44.13": {
+   "kg_id": "MONDO:0019198",
+   "route": "twin"
+  },
+  "H44.2": {
+   "kg_id": "MONDO:0001383",
+   "route": "twin"
+  },
+  "H44.32": {
+   "kg_id": "MONDO:0001355",
+   "route": "twin"
+  },
+  "H44.39": {
+   "kg_id": "MONDO:0005328",
+   "route": "twin"
+  },
+  "H44.4": {
+   "kg_id": "MONDO:0004390",
+   "route": "twin"
+  },
+  "H44.44": {
+   "kg_id": "MONDO:0001503",
+   "route": "twin"
+  },
+  "H44.5": {
+   "kg_id": "MONDO:0004884",
+   "route": "twin"
+  },
+  "H44.82": {
+   "kg_id": "MONDO:0001523",
+   "route": "twin"
+  },
+  "H46": {
+   "kg_id": "MONDO:0005885",
+   "route": "twin"
+  },
+  "H46.2": {
+   "kg_id": "MONDO:0001431",
+   "route": "twin"
+  },
+  "H46.3": {
+   "kg_id": "MONDO:0001688",
+   "route": "twin"
+  },
+  "H47.01": {
+   "kg_id": "MONDO:0006649",
+   "route": "twin"
+  },
+  "H47.03": {
+   "kg_id": "MONDO:0008136",
+   "route": "twin"
+  },
+  "H47.1": {
+   "kg_id": "MONDO:0006879",
+   "route": "twin"
+  },
+  "H47.11": {
+   "kg_id": "MONDO:0006879",
+   "route": "twin"
+  },
+  "H47.14": {
+   "kg_id": "MONDO:0001998",
+   "route": "twin"
+  },
+  "H47.2": {
+   "kg_id": "MONDO:0003608",
+   "route": "twin"
+  },
+  "H47.21": {
+   "kg_id": "MONDO:0001084",
+   "route": "twin"
+  },
+  "H47.22": {
+   "kg_id": "MONDO:0010788",
+   "route": "twin"
+  },
+  "H47.23": {
+   "kg_id": "MONDO:0001006",
+   "route": "twin"
+  },
+  "H47.32": {
+   "kg_id": "MONDO:0001746",
+   "route": "twin"
+  },
+  "H47.4": {
+   "kg_id": "MONDO:0003568",
+   "route": "twin"
+  },
+  "H47.6": {
+   "kg_id": "MONDO:0003584",
+   "route": "twin"
+  },
+  "H47.61": {
+   "kg_id": "MONDO:0001385",
+   "route": "twin"
+  },
+  "H47.9": {
+   "kg_id": "MONDO:0001834",
+   "route": "twin"
+  },
+  "H49": {
+   "kg_id": "MONDO:0001143",
+   "route": "twin"
+  },
+  "H49.0": {
+   "kg_id": "MONDO:0001309",
+   "route": "twin"
+  },
+  "H49.1": {
+   "kg_id": "MONDO:0007002",
+   "route": "twin"
+  },
+  "H49.4": {
+   "kg_id": "MONDO:0005181",
+   "route": "twin"
+  },
+  "H49.81": {
+   "kg_id": "MONDO:0010787",
+   "route": "twin"
+  },
+  "H50.0": {
+   "kg_id": "MONDO:0004896",
+   "route": "twin"
+  },
+  "H50.01": {
+   "kg_id": "MONDO:0000997",
+   "route": "twin"
+  },
+  "H50.05": {
+   "kg_id": "MONDO:0004913",
+   "route": "twin"
+  },
+  "H50.1": {
+   "kg_id": "MONDO:0001286",
+   "route": "twin"
+  },
+  "H50.11": {
+   "kg_id": "MONDO:0001392",
+   "route": "twin"
+  },
+  "H50.15": {
+   "kg_id": "MONDO:0001281",
+   "route": "twin"
+  },
+  "H50.2": {
+   "kg_id": "MONDO:0004893",
+   "route": "twin"
+  },
+  "H50.3": {
+   "kg_id": "MONDO:0002152",
+   "route": "twin"
+  },
+  "H50.41": {
+   "kg_id": "MONDO:0004894",
+   "route": "twin"
+  },
+  "H50.42": {
+   "kg_id": "MONDO:0004899",
+   "route": "twin"
+  },
+  "H50.43": {
+   "kg_id": "MONDO:0004895",
+   "route": "twin"
+  },
+  "H50.6": {
+   "kg_id": "MONDO:0004753",
+   "route": "twin"
+  },
+  "H50.61": {
+   "kg_id": "MONDO:0014624",
+   "route": "twin"
+  },
+  "H50.8": {
+   "kg_id": "MONDO:0003432",
+   "route": "twin"
+  },
+  "H50.81": {
+   "kg_id": "MONDO:0007473",
+   "route": "twin"
+  },
+  "H51.2": {
+   "kg_id": "MONDO:0003417",
+   "route": "twin"
+  },
+  "H52.0": {
+   "kg_id": "MONDO:0004891",
+   "route": "twin"
+  },
+  "H52.1": {
+   "kg_id": "MONDO:0001384",
+   "route": "twin"
+  },
+  "H52.2": {
+   "kg_id": "MONDO:0011284",
+   "route": "twin"
+  },
+  "H52.21": {
+   "kg_id": "MONDO:0001831",
+   "route": "twin"
+  },
+  "H52.22": {
+   "kg_id": "MONDO:0001364",
+   "route": "twin"
+  },
+  "H52.31": {
+   "kg_id": "MONDO:0001478",
+   "route": "twin"
+  },
+  "H52.4": {
+   "kg_id": "MONDO:0001330",
+   "route": "twin"
+  },
+  "H52.5": {
+   "kg_id": "MONDO:0000926",
+   "route": "twin"
+  },
+  "H52.52": {
+   "kg_id": "MONDO:0005555",
+   "route": "twin"
+  },
+  "H52.53": {
+   "kg_id": "MONDO:0001329",
+   "route": "twin"
+  },
+  "H52.7": {
+   "kg_id": "MONDO:0004892",
+   "route": "twin"
+  },
+  "H53.00": {
+   "kg_id": "MONDO:0001020",
+   "route": "twin"
+  },
+  "H53.01": {
+   "kg_id": "MONDO:0001022",
+   "route": "twin"
+  },
+  "H53.02": {
+   "kg_id": "MONDO:0001021",
+   "route": "twin"
+  },
+  "H53.03": {
+   "kg_id": "MONDO:0001019",
+   "route": "twin"
+  },
+  "H53.30": {
+   "kg_id": "MONDO:0001564",
+   "route": "twin"
+  },
+  "H53.31": {
+   "kg_id": "MONDO:0001565",
+   "route": "twin"
+  },
+  "H53.42": {
+   "kg_id": "MONDO:0004758",
+   "route": "twin"
+  },
+  "H53.45": {
+   "kg_id": "MONDO:0004758",
+   "route": "twin"
+  },
+  "H53.5": {
+   "kg_id": "MONDO:0001703",
+   "route": "twin"
+  },
+  "H53.51": {
+   "kg_id": "MONDO:0018852",
+   "route": "twin"
+  },
+  "H53.52": {
+   "kg_id": "MONDO:0001828",
+   "route": "twin"
+  },
+  "H53.55": {
+   "kg_id": "MONDO:0008610",
+   "route": "twin"
+  },
+  "H53.6": {
+   "kg_id": "MONDO:0004588",
+   "route": "twin"
+  },
+  "H53.61": {
+   "kg_id": "MONDO:0001396",
+   "route": "twin"
+  },
+  "H53.62": {
+   "kg_id": "MONDO:0001296",
+   "route": "twin"
+  },
+  "H53.63": {
+   "kg_id": "MONDO:0016293",
+   "route": "twin"
+  },
+  "H54": {
+   "kg_id": "MONDO:0001941",
+   "route": "twin"
+  },
+  "H55.0": {
+   "kg_id": "MONDO:0004843",
+   "route": "twin"
+  },
+  "H55.01": {
+   "kg_id": "MONDO:0005712",
+   "route": "twin"
+  },
+  "H55.03": {
+   "kg_id": "MONDO:0001361",
+   "route": "twin"
+  },
+  "H55.04": {
+   "kg_id": "MONDO:0001655",
+   "route": "twin"
+  },
+  "H57.01": {
+   "kg_id": "MONDO:0001986",
+   "route": "twin"
+  },
+  "H57.09": {
+   "kg_id": "MONDO:0001303",
+   "route": "twin"
+  },
+  "H60.2": {
+   "kg_id": "MONDO:0001050",
+   "route": "twin"
+  },
+  "H60.4": {
+   "kg_id": "MONDO:0006532",
+   "route": "twin"
+  },
+  "H61.0": {
+   "kg_id": "MONDO:0002246",
+   "route": "twin"
+  },
+  "H61.9": {
+   "kg_id": "MONDO:0002776",
+   "route": "twin"
+  },
+  "H65": {
+   "kg_id": "MONDO:0001212",
+   "route": "twin"
+  },
+  "H65.0": {
+   "kg_id": "MONDO:0001312",
+   "route": "twin"
+  },
+  "H65.2": {
+   "kg_id": "MONDO:0001213",
+   "route": "twin"
+  },
+  "H66.1": {
+   "kg_id": "MONDO:0001964",
+   "route": "twin"
+  },
+  "H66.2": {
+   "kg_id": "MONDO:0001921",
+   "route": "twin"
+  },
+  "H66.3": {
+   "kg_id": "MONDO:0001920",
+   "route": "twin"
+  },
+  "H66.4": {
+   "kg_id": "MONDO:0005975",
+   "route": "twin"
+  },
+  "H66.9": {
+   "kg_id": "MONDO:0005441",
+   "route": "twin"
+  },
+  "H68.0": {
+   "kg_id": "MONDO:0002172",
+   "route": "twin"
+  },
+  "H68.01": {
+   "kg_id": "MONDO:0001064",
+   "route": "twin"
+  },
+  "H68.02": {
+   "kg_id": "MONDO:0002170",
+   "route": "twin"
+  },
+  "H69.0": {
+   "kg_id": "MONDO:0001508",
+   "route": "twin"
+  },
+  "H70.2": {
+   "kg_id": "MONDO:0001109",
+   "route": "twin"
+  },
+  "H70.21": {
+   "kg_id": "MONDO:0001109",
+   "route": "twin"
+  },
+  "H70.22": {
+   "kg_id": "MONDO:0001109",
+   "route": "twin"
+  },
+  "H70.9": {
+   "kg_id": "MONDO:0000748",
+   "route": "twin"
+  },
+  "H71": {
+   "kg_id": "MONDO:0006533",
+   "route": "twin"
+  },
+  "H71.0": {
+   "kg_id": "MONDO:0006531",
+   "route": "twin"
+  },
+  "H71.9": {
+   "kg_id": "MONDO:0006530",
+   "route": "twin"
+  },
+  "H72": {
+   "kg_id": "MESH:D018058",
+   "route": "twin"
+  },
+  "H73.0": {
+   "kg_id": "MONDO:0001802",
+   "route": "twin"
+  },
+  "H73.01": {
+   "kg_id": "MONDO:0001803",
+   "route": "twin"
+  },
+  "H73.1": {
+   "kg_id": "MONDO:0001227",
+   "route": "twin"
+  },
+  "H73.81": {
+   "kg_id": "MONDO:0003647",
+   "route": "twin"
+  },
+  "H73.82": {
+   "kg_id": "MONDO:0001547",
+   "route": "twin"
+  },
+  "H73.9": {
+   "kg_id": "MONDO:0003648",
+   "route": "twin"
+  },
+  "H74.1": {
+   "kg_id": "MONDO:0001234",
+   "route": "twin"
+  },
+  "H74.4": {
+   "kg_id": "MONDO:0004223",
+   "route": "twin"
+  },
+  "H80.80": {
+   "kg_id": "MONDO:0005349",
+   "route": "twin"
+  },
+  "H81.0": {
+   "kg_id": "MONDO:0006744",
+   "route": "twin"
+  },
+  "H81.2": {
+   "kg_id": "MONDO:0006008",
+   "route": "twin"
+  },
+  "H81.399": {
+   "kg_id": "MONDO:0004900",
+   "route": "twin"
+  },
+  "H81.4": {
+   "kg_id": "MONDO:0002317",
+   "route": "twin"
+  },
+  "H81.9": {
+   "kg_id": "MONDO:0002643",
+   "route": "twin"
+  },
+  "H83.0": {
+   "kg_id": "MONDO:0002008",
+   "route": "twin"
+  },
+  "H83.2": {
+   "kg_id": "DOID:566",
+   "route": "twin"
+  },
+  "H83.9": {
+   "kg_id": "MONDO:0002467",
+   "route": "twin"
+  },
+  "H90.3": {
+   "kg_id": "MONDO:0019587",
+   "route": "twin"
+  },
+  "H90.5": {
+   "kg_id": "MONDO:0020678",
+   "route": "twin"
+  },
+  "H92.1": {
+   "kg_id": "DOID:10261",
+   "route": "twin"
+  },
+  "H93.3": {
+   "kg_id": "MONDO:0001563",
+   "route": "twin"
+  },
+  "H93.9": {
+   "kg_id": "MONDO:0002409",
+   "route": "twin"
+  },
+  "I00": {
+   "kg_id": "MONDO:0017767",
+   "route": "twin"
+  },
+  "I01.9": {
+   "kg_id": "MONDO:0004582",
+   "route": "twin"
+  },
+  "I05": {
+   "kg_id": "MONDO:0003767",
+   "route": "twin"
+  },
+  "I05.1": {
+   "kg_id": "MONDO:0003767",
+   "route": "twin"
+  },
+  "I06.0": {
+   "kg_id": "MONDO:0042981",
+   "route": "twin"
+  },
+  "I06.1": {
+   "kg_id": "MONDO:0005648",
+   "route": "twin"
+  },
+  "I07": {
+   "kg_id": "MONDO:0000471",
+   "route": "twin"
+  },
+  "I09.2": {
+   "kg_id": "MONDO:0002133",
+   "route": "twin"
+  },
+  "I09.81": {
+   "kg_id": "MONDO:0001899",
+   "route": "twin"
+  },
+  "I09.89": {
+   "kg_id": "MONDO:0003627",
+   "route": "twin"
+  },
+  "I10": {
+   "kg_id": "MONDO:0005044",
+   "route": "twin"
+  },
+  "I11": {
+   "kg_id": "MONDO:0001302",
+   "route": "twin"
+  },
+  "I12": {
+   "kg_id": "MONDO:0006044",
+   "route": "twin"
+  },
+  "I15": {
+   "kg_id": "MONDO:0001200",
+   "route": "twin"
+  },
+  "I15.0": {
+   "kg_id": "MONDO:0006947",
+   "route": "twin"
+  },
+  "I20.0": {
+   "kg_id": "MONDO:0006805",
+   "route": "twin"
+  },
+  "I21": {
+   "kg_id": "MONDO:0005068",
+   "route": "twin"
+  },
+  "I22": {
+   "kg_id": "MONDO:0006716",
+   "route": "twin"
+  },
+  "I24.1": {
+   "kg_id": "MONDO:0001049",
+   "route": "twin"
+  },
+  "I25": {
+   "kg_id": "MONDO:0005010",
+   "route": "twin"
+  },
+  "I25.10": {
+   "kg_id": "MONDO:0005010",
+   "route": "twin"
+  },
+  "I25.3": {
+   "kg_id": "MONDO:0006779",
+   "route": "twin"
+  },
+  "I25.41": {
+   "kg_id": "MONDO:0006714",
+   "route": "twin"
+  },
+  "I26": {
+   "kg_id": "MONDO:0005279",
+   "route": "twin"
+  },
+  "I26.09": {
+   "kg_id": "MONDO:0004598",
+   "route": "twin"
+  },
+  "I27.0": {
+   "kg_id": "MONDO:0001999",
+   "route": "twin"
+  },
+  "I27.1": {
+   "kg_id": "MONDO:0001492",
+   "route": "twin"
+  },
+  "I27.20": {
+   "kg_id": "MONDO:0005149",
+   "route": "twin"
+  },
+  "I27.81": {
+   "kg_id": "MONDO:0004596",
+   "route": "twin"
+  },
+  "I31.4": {
+   "kg_id": "MONDO:0001297",
+   "route": "twin"
+  },
+  "I33.9": {
+   "kg_id": "MONDO:0005025",
+   "route": "twin"
+  },
+  "I40": {
+   "kg_id": "MONDO:0002815",
+   "route": "twin"
+  },
+  "I40.0": {
+   "kg_id": "MONDO:0001114",
+   "route": "twin"
+  },
+  "I40.1": {
+   "kg_id": "MONDO:0001113",
+   "route": "twin"
+  },
+  "I42": {
+   "kg_id": "MONDO:0004994",
+   "route": "twin"
+  },
+  "I42.0": {
+   "kg_id": "MONDO:0011094",
+   "route": "twin"
+  },
+  "I42.3": {
+   "kg_id": "MONDO:0019159",
+   "route": "twin"
+  },
+  "I42.4": {
+   "kg_id": "MONDO:0009169",
+   "route": "twin"
+  },
+  "I42.5": {
+   "kg_id": "MONDO:0005201",
+   "route": "twin"
+  },
+  "I42.6": {
+   "kg_id": "MONDO:0006643",
+   "route": "twin"
+  },
+  "I42.8": {
+   "kg_id": "MONDO:0011484",
+   "route": "twin"
+  },
+  "I44": {
+   "kg_id": "MONDO:0007240",
+   "route": "twin"
+  },
+  "I44.3": {
+   "kg_id": "MONDO:0000465",
+   "route": "twin"
+  },
+  "I44.60": {
+   "kg_id": "DOID:10272",
+   "route": "twin"
+  },
+  "I45.6": {
+   "kg_id": "MONDO:0007174",
+   "route": "twin"
+  },
+  "I45.8": {
+   "kg_id": "MONDO:0100316",
+   "route": "twin"
+  },
+  "I45.81": {
+   "kg_id": "MONDO:0002442",
+   "route": "twin"
+  },
+  "I46": {
+   "kg_id": "MONDO:0000745",
+   "route": "twin"
+  },
+  "I47.2": {
+   "kg_id": "MONDO:0017990",
+   "route": "twin"
+  },
+  "I49": {
+   "kg_id": "MONDO:0007263",
+   "route": "twin"
+  },
+  "I49.5": {
+   "kg_id": "MONDO:0001823",
+   "route": "twin"
+  },
+  "I49.8": {
+   "kg_id": "MONDO:0015263",
+   "route": "twin"
+  },
+  "I50": {
+   "kg_id": "MONDO:0005009",
+   "route": "twin"
+  },
+  "I50.20": {
+   "kg_id": "MONDO:0006993",
+   "route": "twin"
+  },
+  "I50.30": {
+   "kg_id": "MONDO:0006727",
+   "route": "twin"
+  },
+  "I50.9": {
+   "kg_id": "MONDO:0005009",
+   "route": "twin"
+  },
+  "I51.4": {
+   "kg_id": "MONDO:0004496",
+   "route": "twin"
+  },
+  "I51.9": {
+   "kg_id": "MONDO:0005267",
+   "route": "twin"
+  },
+  "I63": {
+   "kg_id": "MONDO:0002679",
+   "route": "twin"
+  },
+  "I65.0": {
+   "kg_id": "MONDO:0001258",
+   "route": "twin"
+  },
+  "I65.1": {
+   "kg_id": "MONDO:0001715",
+   "route": "twin"
+  },
+  "I65.9": {
+   "kg_id": "MONDO:0003718",
+   "route": "twin"
+  },
+  "I66": {
+   "kg_id": "MONDO:0006809",
+   "route": "twin"
+  },
+  "I67.2": {
+   "kg_id": "MONDO:0006694",
+   "route": "twin"
+  },
+  "I67.4": {
+   "kg_id": "MONDO:0006796",
+   "route": "twin"
+  },
+  "I67.5": {
+   "kg_id": "MONDO:0016820",
+   "route": "twin"
+  },
+  "I67.850": {
+   "kg_id": "MONDO:0007432",
+   "route": "twin"
+  },
+  "I67.9": {
+   "kg_id": "MONDO:0011057",
+   "route": "twin"
+  },
+  "I70": {
+   "kg_id": "MONDO:0005311",
+   "route": "twin"
+  },
+  "I70.0": {
+   "kg_id": "MONDO:0000980",
+   "route": "twin"
+  },
+  "I70.1": {
+   "kg_id": "MONDO:0001876",
+   "route": "twin"
+  },
+  "I70.91": {
+   "kg_id": "MONDO:0002275",
+   "route": "twin"
+  },
+  "I71.1": {
+   "kg_id": "MONDO:0005160",
+   "route": "twin"
+  },
+  "I71.3": {
+   "kg_id": "MONDO:0005160",
+   "route": "twin"
+  },
+  "I71.5": {
+   "kg_id": "MONDO:0005160",
+   "route": "twin"
+  },
+  "I71.8": {
+   "kg_id": "MONDO:0005160",
+   "route": "twin"
+  },
+  "I71.9": {
+   "kg_id": "MONDO:0005160",
+   "route": "twin"
+  },
+  "I72": {
+   "kg_id": "MONDO:0005385",
+   "route": "twin"
+  },
+  "I72.9": {
+   "kg_id": "MONDO:0005385",
+   "route": "twin"
+  },
+  "I73.0": {
+   "kg_id": "MONDO:0008364",
+   "route": "twin"
+  },
+  "I73.1": {
+   "kg_id": "MONDO:0008889",
+   "route": "twin"
+  },
+  "I73.81": {
+   "kg_id": "MONDO:0016028",
+   "route": "twin"
+  },
+  "I73.9": {
+   "kg_id": "MONDO:0005295",
+   "route": "twin"
+  },
+  "I75": {
+   "kg_id": "MONDO:0005568",
+   "route": "twin"
+  },
+  "I77.0": {
+   "kg_id": "MONDO:0001256",
+   "route": "twin"
+  },
+  "I77.4": {
+   "kg_id": "MONDO:0017388",
+   "route": "twin"
+  },
+  "I77.6": {
+   "kg_id": "MONDO:0006656",
+   "route": "twin"
+  },
+  "I77.71": {
+   "kg_id": "MONDO:0004763",
+   "route": "twin"
+  },
+  "I78": {
+   "kg_id": "MONDO:0001574",
+   "route": "twin"
+  },
+  "I78.0": {
+   "kg_id": "MONDO:0019180",
+   "route": "twin"
+  },
+  "I80": {
+   "kg_id": "MONDO:0004625",
+   "route": "twin"
+  },
+  "I80.0": {
+   "kg_id": "MONDO:0002800",
+   "route": "twin"
+  },
+  "I80.1": {
+   "kg_id": "MONDO:0001481",
+   "route": "twin"
+  },
+  "I80.21": {
+   "kg_id": "MONDO:0001148",
+   "route": "twin"
+  },
+  "I81": {
+   "kg_id": "MONDO:0001339",
+   "route": "twin"
+  },
+  "I82": {
+   "kg_id": "MONDO:0004634",
+   "route": "twin"
+  },
+  "I82.0": {
+   "kg_id": "MONDO:0006786",
+   "route": "twin"
+  },
+  "I82.1": {
+   "kg_id": "MONDO:0001954",
+   "route": "twin"
+  },
+  "I83.90": {
+   "kg_id": "MONDO:0008638",
+   "route": "twin"
+  },
+  "I85.01": {
+   "kg_id": "MONDO:0001221",
+   "route": "twin"
+  },
+  "I86.1": {
+   "kg_id": "MONDO:0001498",
+   "route": "twin"
+  },
+  "I86.2": {
+   "kg_id": "MONDO:0004869",
+   "route": "twin"
+  },
+  "I87.0": {
+   "kg_id": "MONDO:0005928",
+   "route": "twin"
+  },
+  "I88.0": {
+   "kg_id": "MONDO:0001116",
+   "route": "twin"
+  },
+  "I88.1": {
+   "kg_id": "MONDO:0002052",
+   "route": "twin"
+  },
+  "I89.0": {
+   "kg_id": "MONDO:0007920",
+   "route": "twin"
+  },
+  "I89.1": {
+   "kg_id": "MONDO:0005832",
+   "route": "twin"
+  },
+  "I95.1": {
+   "kg_id": "MONDO:0011479",
+   "route": "twin"
+  },
+  "J00": {
+   "kg_id": "MONDO:0005709",
+   "route": "twin"
+  },
+  "J01": {
+   "kg_id": "MONDO:0005961",
+   "route": "twin"
+  },
+  "J01.0": {
+   "kg_id": "MONDO:0002186",
+   "route": "twin"
+  },
+  "J01.1": {
+   "kg_id": "MONDO:0001912",
+   "route": "twin"
+  },
+  "J01.2": {
+   "kg_id": "MONDO:0004810",
+   "route": "twin"
+  },
+  "J01.3": {
+   "kg_id": "MONDO:0001624",
+   "route": "twin"
+  },
+  "J02": {
+   "kg_id": "MONDO:0002258",
+   "route": "twin"
+  },
+  "J04": {
+   "kg_id": "MONDO:0000263",
+   "route": "twin"
+  },
+  "J04.0": {
+   "kg_id": "MONDO:0004777",
+   "route": "twin"
+  },
+  "J04.1": {
+   "kg_id": "MONDO:0005990",
+   "route": "twin"
+  },
+  "J05.0": {
+   "kg_id": "MONDO:0005722",
+   "route": "twin"
+  },
+  "J05.1": {
+   "kg_id": "MONDO:0005753",
+   "route": "twin"
+  },
+  "J05.10": {
+   "kg_id": "MONDO:0005753",
+   "route": "twin"
+  },
+  "J06.0": {
+   "kg_id": "MONDO:0001218",
+   "route": "twin"
+  },
+  "J09.X": {
+   "kg_id": "MONDO:0018695",
+   "route": "twin"
+  },
+  "J11.1": {
+   "kg_id": "MONDO:0005812",
+   "route": "twin"
+  },
+  "J12.81": {
+   "kg_id": "MONDO:0005091",
+   "route": "twin"
+  },
+  "J12.9": {
+   "kg_id": "MONDO:0006012",
+   "route": "twin"
+  },
+  "J13": {
+   "kg_id": "MONDO:0005972",
+   "route": "twin"
+  },
+  "J15.0": {
+   "kg_id": "MONDO:0030602",
+   "route": "twin"
+  },
+  "J15.7": {
+   "kg_id": "MONDO:0005867",
+   "route": "twin"
+  },
+  "J15.9": {
+   "kg_id": "MONDO:0004652",
+   "route": "twin"
+  },
+  "J16.0": {
+   "kg_id": "MONDO:0025598",
+   "route": "twin"
+  },
+  "J18.0": {
+   "kg_id": "MONDO:0005682",
+   "route": "twin"
+  },
+  "J20": {
+   "kg_id": "MONDO:0003781",
+   "route": "twin"
+  },
+  "J30.0": {
+   "kg_id": "MONDO:0006004",
+   "route": "twin"
+  },
+  "J31.0": {
+   "kg_id": "MONDO:0004514",
+   "route": "twin"
+  },
+  "J31.1": {
+   "kg_id": "MONDO:0001040",
+   "route": "twin"
+  },
+  "J32.0": {
+   "kg_id": "MONDO:0001122",
+   "route": "twin"
+  },
+  "J32.1": {
+   "kg_id": "MONDO:0001120",
+   "route": "twin"
+  },
+  "J32.2": {
+   "kg_id": "MONDO:0004757",
+   "route": "twin"
+  },
+  "J32.3": {
+   "kg_id": "MONDO:0001123",
+   "route": "twin"
+  },
+  "J35.01": {
+   "kg_id": "MONDO:0001039",
+   "route": "twin"
+  },
+  "J35.02": {
+   "kg_id": "MONDO:0000261",
+   "route": "twin"
+  },
+  "J35.2": {
+   "kg_id": "MONDO:0000740",
+   "route": "twin"
+  },
+  "J37.0": {
+   "kg_id": "MONDO:0001369",
+   "route": "twin"
+  },
+  "J37.1": {
+   "kg_id": "MONDO:0000263",
+   "route": "twin"
+  },
+  "J38.6": {
+   "kg_id": "MONDO:0001305",
+   "route": "twin"
+  },
+  "J38.7": {
+   "kg_id": "MONDO:0004382",
+   "route": "twin"
+  },
+  "J40": {
+   "kg_id": "MONDO:0003781",
+   "route": "twin"
+  },
+  "J42": {
+   "kg_id": "MONDO:0003781",
+   "route": "twin"
+  },
+  "J43.8": {
+   "kg_id": "MONDO:0004849",
+   "route": "twin"
+  },
+  "J44.81": {
+   "kg_id": "MONDO:0015265",
+   "route": "twin"
+  },
+  "J44.9": {
+   "kg_id": "MONDO:0005002",
+   "route": "twin"
+  },
+  "J45": {
+   "kg_id": "MONDO:0004979",
+   "route": "twin"
+  },
+  "J45.991": {
+   "kg_id": "MONDO:0001491",
+   "route": "twin"
+  },
+  "J47": {
+   "kg_id": "MONDO:0004822",
+   "route": "twin"
+  },
+  "J60": {
+   "kg_id": "MONDO:0006653",
+   "route": "twin"
+  },
+  "J61": {
+   "kg_id": "MONDO:0016466",
+   "route": "twin"
+  },
+  "J62.0": {
+   "kg_id": "MONDO:0001003",
+   "route": "twin"
+  },
+  "J62.8": {
+   "kg_id": "MONDO:0005960",
+   "route": "twin"
+  },
+  "J63.2": {
+   "kg_id": "MONDO:0015274",
+   "route": "twin"
+  },
+  "J63.4": {
+   "kg_id": "MONDO:0008346",
+   "route": "twin"
+  },
+  "J64": {
+   "kg_id": "MONDO:0015926",
+   "route": "twin"
+  },
+  "J66.0": {
+   "kg_id": "MONDO:0006688",
+   "route": "twin"
+  },
+  "J67.0": {
+   "kg_id": "MONDO:0001971",
+   "route": "twin"
+  },
+  "J67.1": {
+   "kg_id": "MONDO:0001540",
+   "route": "twin"
+  },
+  "J67.2": {
+   "kg_id": "MONDO:0005668",
+   "route": "twin"
+  },
+  "J67.3": {
+   "kg_id": "MONDO:0004549",
+   "route": "twin"
+  },
+  "J67.4": {
+   "kg_id": "MONDO:0002266",
+   "route": "twin"
+  },
+  "J67.5": {
+   "kg_id": "MONDO:0005865",
+   "route": "twin"
+  },
+  "J67.6": {
+   "kg_id": "MONDO:0004584",
+   "route": "twin"
+  },
+  "J67.7": {
+   "kg_id": "MONDO:0001255",
+   "route": "twin"
+  },
+  "J67.9": {
+   "kg_id": "MONDO:0017853",
+   "route": "twin"
+  },
+  "J69.0": {
+   "kg_id": "MONDO:0000265",
+   "route": "twin"
+  },
+  "J69.1": {
+   "kg_id": "MONDO:0005826",
+   "route": "twin"
+  },
+  "J80": {
+   "kg_id": "MONDO:0100130",
+   "route": "twin"
+  },
+  "J81": {
+   "kg_id": "MONDO:0006932",
+   "route": "twin"
+  },
+  "J82.81": {
+   "kg_id": "MONDO:0005749",
+   "route": "twin"
+  },
+  "J82.82": {
+   "kg_id": "MONDO:0019122",
+   "route": "twin"
+  },
+  "J82.89": {
+   "kg_id": "MONDO:0019122",
+   "route": "twin"
+  },
+  "J84.01": {
+   "kg_id": "MONDO:0001437",
+   "route": "twin"
+  },
+  "J84.02": {
+   "kg_id": "MONDO:0009928",
+   "route": "twin"
+  },
+  "J84.03": {
+   "kg_id": "MONDO:0008346",
+   "route": "twin"
+  },
+  "J84.10": {
+   "kg_id": "MONDO:0001438",
+   "route": "twin"
+  },
+  "J84.112": {
+   "kg_id": "MONDO:0800504",
+   "route": "twin"
+  },
+  "J84.114": {
+   "kg_id": "MONDO:0002429",
+   "route": "twin"
+  },
+  "J84.116": {
+   "kg_id": "MONDO:0015264",
+   "route": "twin"
+  },
+  "J84.117": {
+   "kg_id": "MONDO:0009887",
+   "route": "twin"
+  },
+  "J84.9": {
+   "kg_id": "MONDO:0015925",
+   "route": "twin"
+  },
+  "J85.2": {
+   "kg_id": "MONDO:0000744",
+   "route": "twin"
+  },
+  "J86": {
+   "kg_id": "MONDO:0018667",
+   "route": "twin"
+  },
+  "J93.0": {
+   "kg_id": "MONDO:0002075",
+   "route": "twin"
+  },
+  "J93.1": {
+   "kg_id": "MONDO:0002076",
+   "route": "twin"
+  },
+  "J94.2": {
+   "kg_id": "MONDO:0006783",
+   "route": "twin"
+  },
+  "J96.0": {
+   "kg_id": "MONDO:0021113",
+   "route": "twin"
+  },
+  "J98": {
+   "kg_id": "MONDO:0005087",
+   "route": "twin"
+  },
+  "J98.2": {
+   "kg_id": "MONDO:0000923",
+   "route": "twin"
+  },
+  "J98.3": {
+   "kg_id": "MONDO:0000924",
+   "route": "twin"
+  },
+  "J98.4": {
+   "kg_id": "MONDO:0005275",
+   "route": "twin"
+  },
+  "J98.51": {
+   "kg_id": "MONDO:0004492",
+   "route": "twin"
+  },
+  "J98.6": {
+   "kg_id": "MONDO:0005728",
+   "route": "twin"
+  },
+  "K00.0": {
+   "kg_id": "MONDO:0005486",
+   "route": "twin"
+  },
+  "K00.3": {
+   "kg_id": "MONDO:0006722",
+   "route": "twin"
+  },
+  "K00.5": {
+   "kg_id": "MONDO:0007092",
+   "route": "twin"
+  },
+  "K02": {
+   "kg_id": "MONDO:0001041",
+   "route": "twin"
+  },
+  "K02.6": {
+   "kg_id": "MONDO:0005276",
+   "route": "twin"
+  },
+  "K03.2": {
+   "kg_id": "MONDO:0002325",
+   "route": "twin"
+  },
+  "K03.3": {
+   "kg_id": "MONDO:0001670",
+   "route": "twin"
+  },
+  "K03.4": {
+   "kg_id": "MONDO:0006790",
+   "route": "twin"
+  },
+  "K03.5": {
+   "kg_id": "MONDO:0008007",
+   "route": "twin"
+  },
+  "K03.8": {
+   "kg_id": "MONDO:0002220",
+   "route": "twin"
+  },
+  "K04.0": {
+   "kg_id": "MONDO:0006937",
+   "route": "twin"
+  },
+  "K04.1": {
+   "kg_id": "MONDO:0001326",
+   "route": "twin"
+  },
+  "K04.2": {
+   "kg_id": "MONDO:0001216",
+   "route": "twin"
+  },
+  "K04.4": {
+   "kg_id": "MONDO:0001338",
+   "route": "twin"
+  },
+  "K04.5": {
+   "kg_id": "MONDO:0001251",
+   "route": "twin"
+  },
+  "K04.6": {
+   "kg_id": "MONDO:0000750",
+   "route": "twin"
+  },
+  "K05.0": {
+   "kg_id": "MONDO:0002508",
+   "route": "twin"
+  },
+  "K05.1": {
+   "kg_id": "MONDO:0002508",
+   "route": "twin"
+  },
+  "K05.10": {
+   "kg_id": "MONDO:0002508",
+   "route": "twin"
+  },
+  "K05.2": {
+   "kg_id": "MONDO:0008226",
+   "route": "twin"
+  },
+  "K05.3": {
+   "kg_id": "MONDO:0005076",
+   "route": "twin"
+  },
+  "K05.4": {
+   "kg_id": "MONDO:0005076",
+   "route": "twin"
+  },
+  "K05.6": {
+   "kg_id": "MONDO:0002635",
+   "route": "twin"
+  },
+  "K06.0": {
+   "kg_id": "MONDO:0001268",
+   "route": "twin"
+  },
+  "K06.01": {
+   "kg_id": "MONDO:0001268",
+   "route": "twin"
+  },
+  "K06.1": {
+   "kg_id": "MONDO:0002507",
+   "route": "twin"
+  },
+  "K09.8": {
+   "kg_id": "MONDO:0002378",
+   "route": "twin"
+  },
+  "K11.2": {
+   "kg_id": "MONDO:0005900",
+   "route": "twin"
+  },
+  "K11.5": {
+   "kg_id": "MONDO:0006970",
+   "route": "twin"
+  },
+  "K11.6": {
+   "kg_id": "MONDO:0001600",
+   "route": "twin"
+  },
+  "K11.8": {
+   "kg_id": "MONDO:0001598",
+   "route": "twin"
+  },
+  "K12.1": {
+   "kg_id": "MONDO:0006723",
+   "route": "twin"
+  },
+  "K12.2": {
+   "kg_id": "MONDO:0000739",
+   "route": "twin"
+  },
+  "K13.0": {
+   "kg_id": "MONDO:0000741",
+   "route": "twin"
+  },
+  "K13.21": {
+   "kg_id": "MONDO:0004844",
+   "route": "twin"
+  },
+  "K13.3": {
+   "kg_id": "MONDO:0000743",
+   "route": "twin"
+  },
+  "K13.5": {
+   "kg_id": "MONDO:0018166",
+   "route": "twin"
+  },
+  "K14": {
+   "kg_id": "MONDO:0001165",
+   "route": "twin"
+  },
+  "K14.0": {
+   "kg_id": "MONDO:0006771",
+   "route": "twin"
+  },
+  "K14.1": {
+   "kg_id": "MONDO:0005771",
+   "route": "twin"
+  },
+  "K14.2": {
+   "kg_id": "MONDO:0001880",
+   "route": "twin"
+  },
+  "K14.3": {
+   "kg_id": "MONDO:0001689",
+   "route": "twin"
+  },
+  "K14.4": {
+   "kg_id": "MONDO:0001989",
+   "route": "twin"
+  },
+  "K14.5": {
+   "kg_id": "MONDO:0007655",
+   "route": "twin"
+  },
+  "K20": {
+   "kg_id": "MONDO:0001409",
+   "route": "twin"
+  },
+  "K20.0": {
+   "kg_id": "MONDO:0005361",
+   "route": "twin"
+  },
+  "K21.9": {
+   "kg_id": "MONDO:0007186",
+   "route": "twin"
+  },
+  "K22.0": {
+   "kg_id": "MONDO:0008698",
+   "route": "twin"
+  },
+  "K22.4": {
+   "kg_id": "MONDO:0004729",
+   "route": "twin"
+  },
+  "K22.7": {
+   "kg_id": "MONDO:0013662",
+   "route": "twin"
+  },
+  "K22.9": {
+   "kg_id": "MONDO:0003749",
+   "route": "twin"
+  },
+  "K25": {
+   "kg_id": "MONDO:0001126",
+   "route": "twin"
+  },
+  "K26": {
+   "kg_id": "MONDO:0005412",
+   "route": "twin"
+  },
+  "K27": {
+   "kg_id": "MONDO:0004247",
+   "route": "twin"
+  },
+  "K28.0": {
+   "kg_id": "MONDO:0001155",
+   "route": "twin"
+  },
+  "K29.2": {
+   "kg_id": "MONDO:0004640",
+   "route": "twin"
+  },
+  "K29.4": {
+   "kg_id": "MONDO:0006665",
+   "route": "twin"
+  },
+  "K29.6": {
+   "kg_id": "MONDO:0002846",
+   "route": "twin"
+  },
+  "K29.7": {
+   "kg_id": "MONDO:0004966",
+   "route": "twin"
+  },
+  "K29.8": {
+   "kg_id": "MONDO:0004627",
+   "route": "twin"
+  },
+  "K31.1": {
+   "kg_id": "MONDO:0001561",
+   "route": "twin"
+  },
+  "K31.2": {
+   "kg_id": "MONDO:0001469",
+   "route": "twin"
+  },
+  "K31.5": {
+   "kg_id": "MONDO:0001775",
+   "route": "twin"
+  },
+  "K31.82": {
+   "kg_id": "MONDO:0001427",
+   "route": "twin"
+  },
+  "K31.84": {
+   "kg_id": "MONDO:0006769",
+   "route": "twin"
+  },
+  "K37": {
+   "kg_id": "MONDO:0005649",
+   "route": "twin"
+  },
+  "K44": {
+   "kg_id": "MONDO:0007721",
+   "route": "twin"
+  },
+  "K50.0": {
+   "kg_id": "MONDO:0000708",
+   "route": "twin"
+  },
+  "K50.1": {
+   "kg_id": "MONDO:0005532",
+   "route": "twin"
+  },
+  "K51": {
+   "kg_id": "MONDO:0005101",
+   "route": "twin"
+  },
+  "K52": {
+   "kg_id": "MONDO:0000706",
+   "route": "twin"
+  },
+  "K52.83": {
+   "kg_id": "MONDO:0000702",
+   "route": "twin"
+  },
+  "K52.831": {
+   "kg_id": "MONDO:0000703",
+   "route": "twin"
+  },
+  "K52.832": {
+   "kg_id": "MONDO:0000704",
+   "route": "twin"
+  },
+  "K52.9": {
+   "kg_id": "MONDO:0005292",
+   "route": "twin"
+  },
+  "K55.3": {
+   "kg_id": "MONDO:0004639",
+   "route": "twin"
+  },
+  "K55.9": {
+   "kg_id": "MONDO:0000701",
+   "route": "twin"
+  },
+  "K56.0": {
+   "kg_id": "MONDO:0004568",
+   "route": "twin"
+  },
+  "K56.1": {
+   "kg_id": "MONDO:0007835",
+   "route": "twin"
+  },
+  "K56.2": {
+   "kg_id": "MONDO:0004570",
+   "route": "twin"
+  },
+  "K56.4": {
+   "kg_id": "MONDO:0004571",
+   "route": "twin"
+  },
+  "K56.609": {
+   "kg_id": "MONDO:0004565",
+   "route": "twin"
+  },
+  "K58": {
+   "kg_id": "MONDO:0005052",
+   "route": "twin"
+  },
+  "K59.1": {
+   "kg_id": "MONDO:0001272",
+   "route": "twin"
+  },
+  "K59.31": {
+   "kg_id": "MONDO:0002105",
+   "route": "twin"
+  },
+  "K59.39": {
+   "kg_id": "MONDO:0001273",
+   "route": "twin"
+  },
+  "K59.4": {
+   "kg_id": "MONDO:0001274",
+   "route": "twin"
+  },
+  "K59.9": {
+   "kg_id": "MONDO:0004880",
+   "route": "twin"
+  },
+  "K60.3": {
+   "kg_id": "MONDO:0000754",
+   "route": "twin"
+  },
+  "K62.3": {
+   "kg_id": "MONDO:0004754",
+   "route": "twin"
+  },
+  "K62.6": {
+   "kg_id": "MONDO:0001772",
+   "route": "twin"
+  },
+  "K62.89": {
+   "kg_id": "MONDO:0005538",
+   "route": "twin"
+  },
+  "K63.9": {
+   "kg_id": "MONDO:0005020",
+   "route": "twin"
+  },
+  "K64": {
+   "kg_id": "MONDO:0004872",
+   "route": "twin"
+  },
+  "K64.5": {
+   "kg_id": "MONDO:0004871",
+   "route": "twin"
+  },
+  "K66": {
+   "kg_id": "MONDO:0020591",
+   "route": "twin"
+  },
+  "K68.12": {
+   "kg_id": "MESH:D016659",
+   "route": "twin"
+  },
+  "K70": {
+   "kg_id": "MONDO:0043693",
+   "route": "twin"
+  },
+  "K70.0": {
+   "kg_id": "MONDO:0004790",
+   "route": "twin"
+  },
+  "K70.3": {
+   "kg_id": "MONDO:0006644",
+   "route": "twin"
+  },
+  "K72.91": {
+   "kg_id": "MONDO:0001548",
+   "route": "twin"
+  },
+  "K73.9": {
+   "kg_id": "MONDO:0002251",
+   "route": "twin"
+  },
+  "K74.3": {
+   "kg_id": "MONDO:0005388",
+   "route": "twin"
+  },
+  "K74.4": {
+   "kg_id": "NCIT:C173119",
+   "route": "twin"
+  },
+  "K74.5": {
+   "kg_id": "MONDO:0005388",
+   "route": "twin"
+  },
+  "K74.60": {
+   "kg_id": "MONDO:0005155",
+   "route": "twin"
+  },
+  "K76.1": {
+   "kg_id": "MONDO:0001788",
+   "route": "twin"
+  },
+  "K76.3": {
+   "kg_id": "MONDO:0001787",
+   "route": "twin"
+  },
+  "K76.4": {
+   "kg_id": "MONDO:0004717",
+   "route": "twin"
+  },
+  "K76.5": {
+   "kg_id": "MONDO:0019514",
+   "route": "twin"
+  },
+  "K76.6": {
+   "kg_id": "MONDO:0005080",
+   "route": "twin"
+  },
+  "K76.7": {
+   "kg_id": "MONDO:0001382",
+   "route": "twin"
+  },
+  "K76.8": {
+   "kg_id": "MONDO:0018841",
+   "route": "twin"
+  },
+  "K76.81": {
+   "kg_id": "MONDO:0004694",
+   "route": "twin"
+  },
+  "K76.82": {
+   "kg_id": "MONDO:0001711",
+   "route": "twin"
+  },
+  "K76.9": {
+   "kg_id": "MONDO:0005154",
+   "route": "twin"
+  },
+  "K81": {
+   "kg_id": "MONDO:0002155",
+   "route": "twin"
+  },
+  "K82.0": {
+   "kg_id": "MONDO:0004858",
+   "route": "twin"
+  },
+  "K82.1": {
+   "kg_id": "MONDO:0004859",
+   "route": "twin"
+  },
+  "K82.4": {
+   "kg_id": "MONDO:0000987",
+   "route": "twin"
+  },
+  "K82.9": {
+   "kg_id": "MONDO:0005281",
+   "route": "twin"
+  },
+  "K83.0": {
+   "kg_id": "MONDO:0004789",
+   "route": "twin"
+  },
+  "K83.01": {
+   "kg_id": "MONDO:0013433",
+   "route": "twin"
+  },
+  "K83.09": {
+   "kg_id": "MONDO:0018646",
+   "route": "twin"
+  },
+  "K83.1": {
+   "kg_id": "MONDO:0001751",
+   "route": "twin"
+  },
+  "K83.2": {
+   "kg_id": "MONDO:0001710",
+   "route": "twin"
+  },
+  "K83.9": {
+   "kg_id": "MONDO:0004868",
+   "route": "twin"
+  },
+  "K85": {
+   "kg_id": "MONDO:0006515",
+   "route": "twin"
+  },
+  "K85.9": {
+   "kg_id": "MONDO:0004982",
+   "route": "twin"
+  },
+  "K86.8": {
+   "kg_id": "MONDO:0002356",
+   "route": "twin"
+  },
+  "K86.81": {
+   "kg_id": "MONDO:0001684",
+   "route": "twin"
+  },
+  "K90.0": {
+   "kg_id": "MONDO:0005130",
+   "route": "twin"
+  },
+  "K90.1": {
+   "kg_id": "MONDO:0001078",
+   "route": "twin"
+  },
+  "K90.2": {
+   "kg_id": "MONDO:0005673",
+   "route": "twin"
+  },
+  "K90.3": {
+   "kg_id": "MONDO:0001079",
+   "route": "twin"
+  },
+  "K90.81": {
+   "kg_id": "MONDO:0005116",
+   "route": "twin"
+  },
+  "K90.82": {
+   "kg_id": "MONDO:0015183",
+   "route": "twin"
+  },
+  "K91.1": {
+   "kg_id": "MONDO:0001979",
+   "route": "twin"
+  },
+  "K91.5": {
+   "kg_id": "MONDO:0006916",
+   "route": "twin"
+  },
+  "K92.9": {
+   "kg_id": "MONDO:0004335",
+   "route": "twin"
+  },
+  "L00": {
+   "kg_id": "MONDO:0018181",
+   "route": "twin"
+  },
+  "L01": {
+   "kg_id": "MONDO:0004592",
+   "route": "twin"
+  },
+  "L01.0": {
+   "kg_id": "MONDO:0004592",
+   "route": "twin"
+  },
+  "L03.0": {
+   "kg_id": "MONDO:0005898",
+   "route": "twin"
+  },
+  "L03.90": {
+   "kg_id": "MONDO:0005230",
+   "route": "twin"
+  },
+  "L04": {
+   "kg_id": "MONDO:0002052",
+   "route": "twin"
+  },
+  "L08.0": {
+   "kg_id": "MONDO:0002922",
+   "route": "twin"
+  },
+  "L08.1": {
+   "kg_id": "MONDO:0002885",
+   "route": "twin"
+  },
+  "L10": {
+   "kg_id": "MONDO:0006594",
+   "route": "twin"
+  },
+  "L10.0": {
+   "kg_id": "MONDO:0008219",
+   "route": "twin"
+  },
+  "L10.2": {
+   "kg_id": "MONDO:0019324",
+   "route": "twin"
+  },
+  "L10.81": {
+   "kg_id": "MONDO:0018974",
+   "route": "twin"
+  },
+  "L12.0": {
+   "kg_id": "MONDO:0019082",
+   "route": "twin"
+  },
+  "L12.1": {
+   "kg_id": "MONDO:0018746",
+   "route": "twin"
+  },
+  "L12.2": {
+   "kg_id": "MONDO:0006565",
+   "route": "twin"
+  },
+  "L12.3": {
+   "kg_id": "MONDO:0018747",
+   "route": "twin"
+  },
+  "L13.0": {
+   "kg_id": "MONDO:0015614",
+   "route": "twin"
+  },
+  "L13.1": {
+   "kg_id": "MONDO:0006614",
+   "route": "twin"
+  },
+  "L20": {
+   "kg_id": "MONDO:0004980",
+   "route": "twin"
+  },
+  "L21": {
+   "kg_id": "MONDO:0006608",
+   "route": "twin"
+  },
+  "L21.0": {
+   "kg_id": "MONDO:0006609",
+   "route": "twin"
+  },
+  "L23": {
+   "kg_id": "MONDO:0006525",
+   "route": "twin"
+  },
+  "L23.0": {
+   "kg_id": "DOID:0040046",
+   "route": "twin"
+  },
+  "L24.9": {
+   "kg_id": "MONDO:0006564",
+   "route": "twin"
+  },
+  "L25.9": {
+   "kg_id": "MONDO:0005480",
+   "route": "twin"
+  },
+  "L28.0": {
+   "kg_id": "MONDO:0006570",
+   "route": "twin"
+  },
+  "L30.9": {
+   "kg_id": "MONDO:0002406",
+   "route": "twin"
+  },
+  "L40": {
+   "kg_id": "MONDO:0005083",
+   "route": "twin"
+  },
+  "L40.0": {
+   "kg_id": "MEDDRA:10050576",
+   "route": "twin"
+  },
+  "L40.1": {
+   "kg_id": "MONDO:0013626",
+   "route": "twin"
+  },
+  "L40.3": {
+   "kg_id": "MONDO:0015597",
+   "route": "twin"
+  },
+  "L40.5": {
+   "kg_id": "MONDO:0011849",
+   "route": "twin"
+  },
+  "L41": {
+   "kg_id": "MONDO:0006592",
+   "route": "twin"
+  },
+  "L42": {
+   "kg_id": "MONDO:0006601",
+   "route": "twin"
+  },
+  "L43": {
+   "kg_id": "MONDO:0006572",
+   "route": "twin"
+  },
+  "L44.0": {
+   "kg_id": "MONDO:0100017",
+   "route": "twin"
+  },
+  "L44.1": {
+   "kg_id": "MONDO:0006571",
+   "route": "twin"
+  },
+  "L50.0": {
+   "kg_id": "MONDO:0006526",
+   "route": "twin"
+  },
+  "L50.2": {
+   "kg_id": "MONDO:0018768",
+   "route": "twin"
+  },
+  "L50.3": {
+   "kg_id": "MONDO:0007448",
+   "route": "twin"
+  },
+  "L50.4": {
+   "kg_id": "MONDO:0006618",
+   "route": "twin"
+  },
+  "L50.5": {
+   "kg_id": "MONDO:0006534",
+   "route": "twin"
+  },
+  "L51.1": {
+   "kg_id": "MONDO:0018229",
+   "route": "twin"
+  },
+  "L56.5": {
+   "kg_id": "MONDO:0006602",
+   "route": "twin"
+  },
+  "L57.0": {
+   "kg_id": "MONDO:0005173",
+   "route": "twin"
+  },
+  "L60": {
+   "kg_id": "MONDO:0002884",
+   "route": "twin"
+  },
+  "L60.5": {
+   "kg_id": "MONDO:0007921",
+   "route": "twin"
+  },
+  "L63": {
+   "kg_id": "MONDO:0005340",
+   "route": "twin"
+  },
+  "L65.0": {
+   "kg_id": "MONDO:0002153",
+   "route": "twin"
+  },
+  "L65.2": {
+   "kg_id": "MONDO:0006551",
+   "route": "twin"
+  },
+  "L65.8": {
+   "kg_id": "MONDO:0008847",
+   "route": "twin"
+  },
+  "L65.9": {
+   "kg_id": "MONDO:0004907",
+   "route": "twin"
+  },
+  "L66": {
+   "kg_id": "MONDO:0015261",
+   "route": "twin"
+  },
+  "L68": {
+   "kg_id": "MONDO:0019280",
+   "route": "twin"
+  },
+  "L70": {
+   "kg_id": "MONDO:0011438",
+   "route": "twin"
+  },
+  "L70.2": {
+   "kg_id": "MONDO:0011438",
+   "route": "twin"
+  },
+  "L70.8": {
+   "kg_id": "MONDO:0006607",
+   "route": "twin"
+  },
+  "L71": {
+   "kg_id": "MONDO:0006604",
+   "route": "twin"
+  },
+  "L71.0": {
+   "kg_id": "MONDO:0000741",
+   "route": "twin"
+  },
+  "L72": {
+   "kg_id": "MESH:D005497",
+   "route": "twin"
+  },
+  "L73.2": {
+   "kg_id": "MONDO:0006559",
+   "route": "twin"
+  },
+  "L74.0": {
+   "kg_id": "MONDO:0006581",
+   "route": "twin"
+  },
+  "L74.1": {
+   "kg_id": "MONDO:0024229",
+   "route": "twin"
+  },
+  "L74.2": {
+   "kg_id": "MONDO:0024228",
+   "route": "twin"
+  },
+  "L74.3": {
+   "kg_id": "MONDO:0006580",
+   "route": "twin"
+  },
+  "L74.9": {
+   "kg_id": "MONDO:0006615",
+   "route": "twin"
+  },
+  "L75.2": {
+   "kg_id": "MONDO:0006553",
+   "route": "twin"
+  },
+  "L80": {
+   "kg_id": "MONDO:0008661",
+   "route": "twin"
+  },
+  "L81": {
+   "kg_id": "MONDO:0019288",
+   "route": "twin"
+  },
+  "L81.7": {
+   "kg_id": "MONDO:0019803",
+   "route": "twin"
+  },
+  "L82": {
+   "kg_id": "MONDO:0007446",
+   "route": "twin"
+  },
+  "L82.0": {
+   "kg_id": "MONDO:0001337",
+   "route": "twin"
+  },
+  "L83": {
+   "kg_id": "MONDO:0007035",
+   "route": "twin"
+  },
+  "L85.2": {
+   "kg_id": "MONDO:0006590",
+   "route": "twin"
+  },
+  "L88": {
+   "kg_id": "MONDO:0018824",
+   "route": "twin"
+  },
+  "L89": {
+   "kg_id": "MONDO:0004646",
+   "route": "twin"
+  },
+  "L90": {
+   "kg_id": "MONDO:0006610",
+   "route": "twin"
+  },
+  "L92.0": {
+   "kg_id": "MONDO:0006554",
+   "route": "twin"
+  },
+  "L93": {
+   "kg_id": "MONDO:0004670",
+   "route": "twin"
+  },
+  "L94.0": {
+   "kg_id": "MONDO:0019562",
+   "route": "twin"
+  },
+  "L94.3": {
+   "kg_id": "MONDO:0016358",
+   "route": "twin"
+  },
+  "L94.6": {
+   "kg_id": "MONDO:0007074",
+   "route": "twin"
+  },
+  "L95.0": {
+   "kg_id": "MONDO:0025514",
+   "route": "twin"
+  },
+  "L95.1": {
+   "kg_id": "MONDO:0019526",
+   "route": "twin"
+  },
+  "L97": {
+   "kg_id": "MONDO:0004601",
+   "route": "twin"
+  },
+  "L98.1": {
+   "kg_id": "MONDO:0006586",
+   "route": "twin"
+  },
+  "L98.4": {
+   "kg_id": "MONDO:0004605",
+   "route": "twin"
+  },
+  "M00": {
+   "kg_id": "MONDO:0004471",
+   "route": "twin"
+  },
+  "M02.10": {
+   "kg_id": "MONDO:0017376",
+   "route": "twin"
+  },
+  "M02.3": {
+   "kg_id": "MONDO:0017376",
+   "route": "twin"
+  },
+  "M04.1": {
+   "kg_id": "MONDO:0012481",
+   "route": "twin"
+  },
+  "M04.2": {
+   "kg_id": "MONDO:0008633",
+   "route": "twin"
+  },
+  "M05.0": {
+   "kg_id": "MONDO:0007603",
+   "route": "twin"
+  },
+  "M05.3": {
+   "kg_id": "MONDO:0004582",
+   "route": "twin"
+  },
+  "M06.1": {
+   "kg_id": "MONDO:0019355",
+   "route": "twin"
+  },
+  "M06.9": {
+   "kg_id": "MONDO:0008383",
+   "route": "twin"
+  },
+  "M08.1": {
+   "kg_id": "MONDO:0020655",
+   "route": "twin"
+  },
+  "M08.4": {
+   "kg_id": "MONDO:0011429",
+   "route": "twin"
+  },
+  "M10": {
+   "kg_id": "MONDO:0005393",
+   "route": "twin"
+  },
+  "M11.2": {
+   "kg_id": "MONDO:0100251",
+   "route": "twin"
+  },
+  "M12.0": {
+   "kg_id": "MONDO:0001629",
+   "route": "twin"
+  },
+  "M12.2": {
+   "kg_id": "MONDO:0024686",
+   "route": "twin"
+  },
+  "M12.20": {
+   "kg_id": "MONDO:0024686",
+   "route": "twin"
+  },
+  "M12.3": {
+   "kg_id": "MONDO:0001332",
+   "route": "twin"
+  },
+  "M12.8": {
+   "kg_id": "MONDO:0002204",
+   "route": "twin"
+  },
+  "M12.9": {
+   "kg_id": "MONDO:0006816",
+   "route": "twin"
+  },
+  "M14.6": {
+   "kg_id": "MONDO:0001935",
+   "route": "twin"
+  },
+  "M19.90": {
+   "kg_id": "MONDO:0005578",
+   "route": "twin"
+  },
+  "M21.8": {
+   "kg_id": "MONDO:0017195",
+   "route": "twin"
+  },
+  "M22": {
+   "kg_id": "EFO:0009665",
+   "route": "twin"
+  },
+  "M22.4": {
+   "kg_id": "MONDO:0008207",
+   "route": "twin"
+  },
+  "M24.6": {
+   "kg_id": "MONDO:0002257",
+   "route": "twin"
+  },
+  "M25.0": {
+   "kg_id": "MONDO:0004431",
+   "route": "twin"
+  },
+  "M27.1": {
+   "kg_id": "MONDO:0006770",
+   "route": "twin"
+  },
+  "M27.3": {
+   "kg_id": "MONDO:0001752",
+   "route": "twin"
+  },
+  "M27.8": {
+   "kg_id": "MONDO:0002181",
+   "route": "twin"
+  },
+  "M30": {
+   "kg_id": "MONDO:0019170",
+   "route": "twin"
+  },
+  "M30.0": {
+   "kg_id": "MONDO:0019170",
+   "route": "twin"
+  },
+  "M30.1": {
+   "kg_id": "MONDO:0015943",
+   "route": "twin"
+  },
+  "M30.3": {
+   "kg_id": "MONDO:0012727",
+   "route": "twin"
+  },
+  "M31.0": {
+   "kg_id": "MONDO:0009303",
+   "route": "twin"
+  },
+  "M31.19": {
+   "kg_id": "MONDO:0018896",
+   "route": "twin"
+  },
+  "M31.2": {
+   "kg_id": "MONDO:0006828",
+   "route": "twin"
+  },
+  "M31.3": {
+   "kg_id": "MONDO:0012105",
+   "route": "twin"
+  },
+  "M31.4": {
+   "kg_id": "MONDO:0017991",
+   "route": "twin"
+  },
+  "M32.0": {
+   "kg_id": "MONDO:0016474",
+   "route": "twin"
+  },
+  "M32.11": {
+   "kg_id": "MONDO:0850223",
+   "route": "twin"
+  },
+  "M32.9": {
+   "kg_id": "MONDO:0007915",
+   "route": "twin"
+  },
+  "M33": {
+   "kg_id": "MONDO:0016367",
+   "route": "twin"
+  },
+  "M33.0": {
+   "kg_id": "MONDO:0008054",
+   "route": "twin"
+  },
+  "M34.0": {
+   "kg_id": "MONDO:0005100",
+   "route": "twin"
+  },
+  "M34.1": {
+   "kg_id": "MONDO:0019563",
+   "route": "twin"
+  },
+  "M34.81": {
+   "kg_id": "MONDO:0002047",
+   "route": "twin"
+  },
+  "M35.0": {
+   "kg_id": "MONDO:0010030",
+   "route": "twin"
+  },
+  "M35.1": {
+   "kg_id": "MONDO:0005854",
+   "route": "twin"
+  },
+  "M35.2": {
+   "kg_id": "MONDO:0007191",
+   "route": "twin"
+  },
+  "M35.3": {
+   "kg_id": "MONDO:0019735",
+   "route": "twin"
+  },
+  "M35.6": {
+   "kg_id": "MONDO:0018063",
+   "route": "twin"
+  },
+  "M35.7": {
+   "kg_id": "MONDO:0001798",
+   "route": "twin"
+  },
+  "M35.81": {
+   "kg_id": "MONDO:0100163",
+   "route": "twin"
+  },
+  "M41.9": {
+   "kg_id": "MONDO:0005392",
+   "route": "twin"
+  },
+  "M42": {
+   "kg_id": "MESH:D055035",
+   "route": "twin"
+  },
+  "M42.0": {
+   "kg_id": "MONDO:0008410",
+   "route": "twin"
+  },
+  "M43.0": {
+   "kg_id": "MONDO:0005541",
+   "route": "twin"
+  },
+  "M43.1": {
+   "kg_id": "MONDO:0008475",
+   "route": "twin"
+  },
+  "M45": {
+   "kg_id": "MONDO:0005306",
+   "route": "twin"
+  },
+  "M46": {
+   "kg_id": "MONDO:0003937",
+   "route": "twin"
+  },
+  "M47": {
+   "kg_id": "MONDO:0002253",
+   "route": "twin"
+  },
+  "M48.0": {
+   "kg_id": "MONDO:0005965",
+   "route": "twin"
+  },
+  "M48.02": {
+   "kg_id": "MONDO:0005965",
+   "route": "twin"
+  },
+  "M48.061": {
+   "kg_id": "MONDO:0005965",
+   "route": "twin"
+  },
+  "M48.1": {
+   "kg_id": "MONDO:0007127",
+   "route": "twin"
+  },
+  "M48.2": {
+   "kg_id": "MONDO:0003956",
+   "route": "twin"
+  },
+  "M48.3": {
+   "kg_id": "MONDO:0003940",
+   "route": "twin"
+  },
+  "M53.0": {
+   "kg_id": "MONDO:0005663",
+   "route": "twin"
+  },
+  "M54.1": {
+   "kg_id": "MONDO:0002959",
+   "route": "twin"
+  },
+  "M60": {
+   "kg_id": "MONDO:0021167",
+   "route": "twin"
+  },
+  "M60.0": {
+   "kg_id": "MONDO:0019168",
+   "route": "twin"
+  },
+  "M60.1": {
+   "kg_id": "MONDO:0004881",
+   "route": "twin"
+  },
+  "M61.1": {
+   "kg_id": "MONDO:0007606",
+   "route": "twin"
+  },
+  "M62": {
+   "kg_id": "MONDO:0003939",
+   "route": "twin"
+  },
+  "M65.4": {
+   "kg_id": "MONDO:0006721",
+   "route": "twin"
+  },
+  "M67.5": {
+   "kg_id": "MONDO:0001468",
+   "route": "twin"
+  },
+  "M70": {
+   "kg_id": "EFO:0009470",
+   "route": "twin"
+  },
+  "M70.2": {
+   "kg_id": "MONDO:0001557",
+   "route": "twin"
+  },
+  "M71.9": {
+   "kg_id": "MONDO:0002471",
+   "route": "twin"
+  },
+  "M72": {
+   "kg_id": "EFO:0009432",
+   "route": "twin"
+  },
+  "M72.2": {
+   "kg_id": "MONDO:0004684",
+   "route": "twin"
+  },
+  "M72.4": {
+   "kg_id": "MONDO:0004187",
+   "route": "twin"
+  },
+  "M72.6": {
+   "kg_id": "MONDO:0004835",
+   "route": "twin"
+  },
+  "M72.9": {
+   "kg_id": "MONDO:0004830",
+   "route": "twin"
+  },
+  "M75": {
+   "kg_id": "EFO:0009470",
+   "route": "twin"
+  },
+  "M75.0": {
+   "kg_id": "MONDO:0006763",
+   "route": "twin"
+  },
+  "M75.3": {
+   "kg_id": "MONDO:0001903",
+   "route": "twin"
+  },
+  "M75.4": {
+   "kg_id": "MONDO:0006968",
+   "route": "twin"
+  },
+  "M76.5": {
+   "kg_id": "MONDO:0001042",
+   "route": "twin"
+  },
+  "M76.6": {
+   "kg_id": "MONDO:0001594",
+   "route": "twin"
+  },
+  "M76.81": {
+   "kg_id": "MONDO:0006648",
+   "route": "twin"
+  },
+  "M77.1": {
+   "kg_id": "MONDO:0001875",
+   "route": "twin"
+  },
+  "M77.3": {
+   "kg_id": "MONDO:0002209",
+   "route": "twin"
+  },
+  "M77.9": {
+   "kg_id": "MONDO:0002183",
+   "route": "twin"
+  },
+  "M79": {
+   "kg_id": "EFO:0009470",
+   "route": "twin"
+  },
+  "M79.1": {
+   "kg_id": "MONDO:0006862",
+   "route": "twin"
+  },
+  "M79.3": {
+   "kg_id": "MONDO:0006591",
+   "route": "twin"
+  },
+  "M79.7": {
+   "kg_id": "MONDO:0005546",
+   "route": "twin"
+  },
+  "M81.0": {
+   "kg_id": "MONDO:0005298",
+   "route": "twin"
+  },
+  "M83": {
+   "kg_id": "MONDO:0001068",
+   "route": "twin"
+  },
+  "M85.2": {
+   "kg_id": "MONDO:0010016",
+   "route": "twin"
+  },
+  "M86.3": {
+   "kg_id": "MONDO:0009813",
+   "route": "twin"
+  },
+  "M87": {
+   "kg_id": "MONDO:0005380",
+   "route": "twin"
+  },
+  "M87.9": {
+   "kg_id": "MONDO:0005380",
+   "route": "twin"
+  },
+  "M88": {
+   "kg_id": "MONDO:0005382",
+   "route": "twin"
+  },
+  "M89.0": {
+   "kg_id": "MONDO:0019369",
+   "route": "twin"
+  },
+  "M89.3": {
+   "kg_id": "MONDO:0002185",
+   "route": "twin"
+  },
+  "M89.4": {
+   "kg_id": "MONDO:0006965",
+   "route": "twin"
+  },
+  "M89.8": {
+   "kg_id": "MONDO:0007244",
+   "route": "twin"
+  },
+  "M89.9": {
+   "kg_id": "MONDO:0005381",
+   "route": "twin"
+  },
+  "M91.1": {
+   "kg_id": "MONDO:0007885",
+   "route": "twin"
+  },
+  "M91.2": {
+   "kg_id": "MONDO:0007885",
+   "route": "twin"
+  },
+  "M92": {
+   "kg_id": "MONDO:0018381",
+   "route": "twin"
+  },
+  "M92.52": {
+   "kg_id": "MONDO:0004241",
+   "route": "twin"
+  },
+  "M93.2": {
+   "kg_id": "MONDO:0017178",
+   "route": "twin"
+  },
+  "M93.9": {
+   "kg_id": "MONDO:0018381",
+   "route": "twin"
+  },
+  "M94": {
+   "kg_id": "MONDO:0002342",
+   "route": "twin"
+  },
+  "M94.0": {
+   "kg_id": "MONDO:0001858",
+   "route": "twin"
+  },
+  "M94.1": {
+   "kg_id": "MONDO:0019125",
+   "route": "twin"
+  },
+  "M94.2": {
+   "kg_id": "MONDO:0002342",
+   "route": "twin"
+  },
+  "M94.9": {
+   "kg_id": "MONDO:0002342",
+   "route": "twin"
+  },
+  "N01": {
+   "kg_id": "MONDO:0017236",
+   "route": "twin"
+  },
+  "N03.2": {
+   "kg_id": "MONDO:0005376",
+   "route": "twin"
+  },
+  "N04": {
+   "kg_id": "MONDO:0006835",
+   "route": "twin"
+  },
+  "N04.1": {
+   "kg_id": "MONDO:0011303",
+   "route": "twin"
+  },
+  "N06.20": {
+   "kg_id": "MONDO:0005376",
+   "route": "twin"
+  },
+  "N08": {
+   "kg_id": "MONDO:0001166",
+   "route": "twin"
+  },
+  "N10": {
+   "kg_id": "MONDO:0003529",
+   "route": "twin"
+  },
+  "N11": {
+   "kg_id": "MONDO:0001110",
+   "route": "twin"
+  },
+  "N11.8": {
+   "kg_id": "MONDO:0013898",
+   "route": "twin"
+  },
+  "N12": {
+   "kg_id": "MONDO:0001085",
+   "route": "twin"
+  },
+  "N13.30": {
+   "kg_id": "MONDO:0005510",
+   "route": "twin"
+  },
+  "N13.7": {
+   "kg_id": "MONDO:0006007",
+   "route": "twin"
+  },
+  "N13.9": {
+   "kg_id": "MONDO:0003330",
+   "route": "twin"
+  },
+  "N15.0": {
+   "kg_id": "MONDO:0007416",
+   "route": "twin"
+  },
+  "N15.9": {
+   "kg_id": "MONDO:0004369",
+   "route": "twin"
+  },
+  "N16": {
+   "kg_id": "MONDO:0006939",
+   "route": "twin"
+  },
+  "N17.0": {
+   "kg_id": "MONDO:0006637",
+   "route": "twin"
+  },
+  "N17.1": {
+   "kg_id": "MONDO:0006820",
+   "route": "twin"
+  },
+  "N18.9": {
+   "kg_id": "MONDO:0005300",
+   "route": "twin"
+  },
+  "N19": {
+   "kg_id": "MONDO:0001106",
+   "route": "twin"
+  },
+  "N20": {
+   "kg_id": "MONDO:0008171",
+   "route": "twin"
+  },
+  "N20.1": {
+   "kg_id": "MONDO:0007009",
+   "route": "twin"
+  },
+  "N21": {
+   "kg_id": "MONDO:0004828",
+   "route": "twin"
+  },
+  "N21.0": {
+   "kg_id": "MONDO:0001270",
+   "route": "twin"
+  },
+  "N21.1": {
+   "kg_id": "MONDO:0004826",
+   "route": "twin"
+  },
+  "N25.0": {
+   "kg_id": "MONDO:0006946",
+   "route": "twin"
+  },
+  "N25.1": {
+   "kg_id": "MONDO:0016383",
+   "route": "twin"
+  },
+  "N25.8": {
+   "kg_id": "MONDO:0060564",
+   "route": "twin"
+  },
+  "N25.81": {
+   "kg_id": "MONDO:0001530",
+   "route": "twin"
+  },
+  "N25.89": {
+   "kg_id": "MONDO:0001909",
+   "route": "twin"
+  },
+  "N28.0": {
+   "kg_id": "MONDO:0006945",
+   "route": "twin"
+  },
+  "N28.1": {
+   "kg_id": "MONDO:0004840",
+   "route": "twin"
+  },
+  "N28.81": {
+   "kg_id": "MONDO:0004841",
+   "route": "twin"
+  },
+  "N28.85": {
+   "kg_id": "MONDO:0002410",
+   "route": "twin"
+  },
+  "N30": {
+   "kg_id": "MONDO:0006032",
+   "route": "twin"
+  },
+  "N30.0": {
+   "kg_id": "MONDO:0001650",
+   "route": "twin"
+  },
+  "N30.1": {
+   "kg_id": "MONDO:0018301",
+   "route": "twin"
+  },
+  "N30.2": {
+   "kg_id": "MONDO:0006030",
+   "route": "twin"
+  },
+  "N30.3": {
+   "kg_id": "MONDO:0001732",
+   "route": "twin"
+  },
+  "N30.4": {
+   "kg_id": "MONDO:0004112",
+   "route": "twin"
+  },
+  "N32.0": {
+   "kg_id": "MONDO:0006679",
+   "route": "twin"
+  },
+  "N32.3": {
+   "kg_id": "MONDO:0007197",
+   "route": "twin"
+  },
+  "N32.81": {
+   "kg_id": "MONDO:0006624",
+   "route": "twin"
+  },
+  "N32.9": {
+   "kg_id": "MONDO:0006026",
+   "route": "twin"
+  },
+  "N34.0": {
+   "kg_id": "MONDO:0004909",
+   "route": "twin"
+  },
+  "N34.2": {
+   "kg_id": "MONDO:0005297",
+   "route": "twin"
+  },
+  "N34.3": {
+   "kg_id": "MONDO:0001730",
+   "route": "twin"
+  },
+  "N36.42": {
+   "kg_id": "MONDO:0001721",
+   "route": "twin"
+  },
+  "N36.5": {
+   "kg_id": "MONDO:0004760",
+   "route": "twin"
+  },
+  "N36.9": {
+   "kg_id": "MONDO:0004184",
+   "route": "twin"
+  },
+  "N39.0": {
+   "kg_id": "MONDO:0100338",
+   "route": "twin"
+  },
+  "N40": {
+   "kg_id": "MONDO:0021259",
+   "route": "twin"
+  },
+  "N41.3": {
+   "kg_id": "MONDO:0001506",
+   "route": "twin"
+  },
+  "N41.9": {
+   "kg_id": "MONDO:0005280",
+   "route": "twin"
+  },
+  "N42.0": {
+   "kg_id": "MONDO:0001776",
+   "route": "twin"
+  },
+  "N42.83": {
+   "kg_id": "MONDO:0001202",
+   "route": "twin"
+  },
+  "N42.9": {
+   "kg_id": "MONDO:0003105",
+   "route": "twin"
+  },
+  "N43": {
+   "kg_id": "MONDO:0004920",
+   "route": "twin"
+  },
+  "N43.1": {
+   "kg_id": "MONDO:0004919",
+   "route": "twin"
+  },
+  "N43.4": {
+   "kg_id": "MONDO:0006977",
+   "route": "twin"
+  },
+  "N44.02": {
+   "kg_id": "MONDO:0008541",
+   "route": "twin"
+  },
+  "N45.1": {
+   "kg_id": "MONDO:0004779",
+   "route": "twin"
+  },
+  "N45.2": {
+   "kg_id": "MONDO:0006882",
+   "route": "twin"
+  },
+  "N45.3": {
+   "kg_id": "MONDO:0004778",
+   "route": "twin"
+  },
+  "N46": {
+   "kg_id": "MONDO:0005372",
+   "route": "twin"
+  },
+  "N46.0": {
+   "kg_id": "MONDO:0100459",
+   "route": "twin"
+  },
+  "N46.1": {
+   "kg_id": "MONDO:0001913",
+   "route": "twin"
+  },
+  "N47.1": {
+   "kg_id": "MONDO:0006904",
+   "route": "twin"
+  },
+  "N47.2": {
+   "kg_id": "MONDO:0006889",
+   "route": "twin"
+  },
+  "N47.6": {
+   "kg_id": "MONDO:0001618",
+   "route": "twin"
+  },
+  "N48.0": {
+   "kg_id": "MONDO:0006830",
+   "route": "twin"
+  },
+  "N48.1": {
+   "kg_id": "MONDO:0006672",
+   "route": "twin"
+  },
+  "N48.3": {
+   "kg_id": "MONDO:0004745",
+   "route": "twin"
+  },
+  "N48.6": {
+   "kg_id": "MONDO:0008231",
+   "route": "twin"
+  },
+  "N48.8": {
+   "kg_id": "MONDO:0002036",
+   "route": "twin"
+  },
+  "N49.0": {
+   "kg_id": "MONDO:0004767",
+   "route": "twin"
+  },
+  "N50.0": {
+   "kg_id": "MONDO:0001415",
+   "route": "twin"
+  },
+  "N50.1": {
+   "kg_id": "MONDO:0001497",
+   "route": "twin"
+  },
+  "N50.9": {
+   "kg_id": "MONDO:0003150",
+   "route": "twin"
+  },
+  "N60.0": {
+   "kg_id": "MONDO:0001009",
+   "route": "twin"
+  },
+  "N60.1": {
+   "kg_id": "MONDO:0005219",
+   "route": "twin"
+  },
+  "N60.2": {
+   "kg_id": "MONDO:0003725",
+   "route": "twin"
+  },
+  "N60.3": {
+   "kg_id": "MONDO:0006118",
+   "route": "twin"
+  },
+  "N62": {
+   "kg_id": "MONDO:0001100",
+   "route": "twin"
+  },
+  "N63": {
+   "kg_id": "MONDO:0001011",
+   "route": "twin"
+  },
+  "N64.1": {
+   "kg_id": "MONDO:0001101",
+   "route": "twin"
+  },
+  "N64.89": {
+   "kg_id": "MONDO:0001099",
+   "route": "twin"
+  },
+  "N64.9": {
+   "kg_id": "MONDO:0002657",
+   "route": "twin"
+  },
+  "N70": {
+   "kg_id": "MONDO:0001172",
+   "route": "twin"
+  },
+  "N70.01": {
+   "kg_id": "MONDO:0001173",
+   "route": "twin"
+  },
+  "N70.03": {
+   "kg_id": "MONDO:0001171",
+   "route": "twin"
+  },
+  "N70.1": {
+   "kg_id": "MONDO:0001474",
+   "route": "twin"
+  },
+  "N70.11": {
+   "kg_id": "MONDO:0003617",
+   "route": "twin"
+  },
+  "N70.91": {
+   "kg_id": "MONDO:0003619",
+   "route": "twin"
+  },
+  "N70.92": {
+   "kg_id": "MONDO:0006877",
+   "route": "twin"
+  },
+  "N71.9": {
+   "kg_id": "MONDO:0001786",
+   "route": "twin"
+  },
+  "N72": {
+   "kg_id": "MONDO:0002345",
+   "route": "twin"
+  },
+  "N73.3": {
+   "kg_id": "MONDO:0004940",
+   "route": "twin"
+  },
+  "N73.9": {
+   "kg_id": "MONDO:0000922",
+   "route": "twin"
+  },
+  "N75": {
+   "kg_id": "MONDO:0851103",
+   "route": "twin"
+  },
+  "N75.0": {
+   "kg_id": "MONDO:0004593",
+   "route": "twin"
+  },
+  "N76": {
+   "kg_id": "MONDO:0002234",
+   "route": "twin"
+  },
+  "N76.0": {
+   "kg_id": "MONDO:0007019",
+   "route": "twin"
+  },
+  "N76.2": {
+   "kg_id": "MONDO:0007018",
+   "route": "twin"
+  },
+  "N77.0": {
+   "kg_id": "MONDO:0001551",
+   "route": "twin"
+  },
+  "N80": {
+   "kg_id": "MONDO:0005133",
+   "route": "twin"
+  },
+  "N80.0": {
+   "kg_id": "MONDO:0010888",
+   "route": "twin"
+  },
+  "N80.1": {
+   "kg_id": "MONDO:0006337",
+   "route": "twin"
+  },
+  "N80.2": {
+   "kg_id": "MONDO:0001282",
+   "route": "twin"
+  },
+  "N80.3": {
+   "kg_id": "MONDO:0001285",
+   "route": "twin"
+  },
+  "N80.4": {
+   "kg_id": "MONDO:0001288",
+   "route": "twin"
+  },
+  "N80.5": {
+   "kg_id": "MONDO:0001284",
+   "route": "twin"
+  },
+  "N80.6": {
+   "kg_id": "MONDO:0001287",
+   "route": "twin"
+  },
+  "N81.0": {
+   "kg_id": "MONDO:0001514",
+   "route": "twin"
+  },
+  "N81.11": {
+   "kg_id": "MONDO:0001886",
+   "route": "twin"
+  },
+  "N81.12": {
+   "kg_id": "MONDO:0001885",
+   "route": "twin"
+  },
+  "N81.81": {
+   "kg_id": "MONDO:0001559",
+   "route": "twin"
+  },
+  "N81.84": {
+   "kg_id": "MONDO:0001327",
+   "route": "twin"
+  },
+  "N82": {
+   "kg_id": "NCIT:C78298",
+   "route": "twin"
+  },
+  "N83.2": {
+   "kg_id": "MONDO:0003282",
+   "route": "twin"
+  },
+  "N83.4": {
+   "kg_id": "DOID:12735",
+   "route": "twin"
+  },
+  "N84": {
+   "kg_id": "EFO:0008622",
+   "route": "twin"
+  },
+  "N84.0": {
+   "kg_id": "MONDO:0004701",
+   "route": "twin"
+  },
+  "N85.5": {
+   "kg_id": "MONDO:0004936",
+   "route": "twin"
+  },
+  "N85.7": {
+   "kg_id": "MONDO:0006782",
+   "route": "twin"
+  },
+  "N85.9": {
+   "kg_id": "MONDO:0002654",
+   "route": "twin"
+  },
+  "N88.0": {
+   "kg_id": "MONDO:0004702",
+   "route": "twin"
+  },
+  "N88.3": {
+   "kg_id": "MONDO:0005698",
+   "route": "twin"
+  },
+  "N88.4": {
+   "kg_id": "MONDO:0002255",
+   "route": "twin"
+  },
+  "N89.4": {
+   "kg_id": "MONDO:0004679",
+   "route": "twin"
+  },
+  "N89.8": {
+   "kg_id": "MONDO:0002769",
+   "route": "twin"
+  },
+  "N90.4": {
+   "kg_id": "MONDO:0001938",
+   "route": "twin"
+  },
+  "N90.5": {
+   "kg_id": "DOID:14275",
+   "route": "twin"
+  },
+  "N91.2": {
+   "kg_id": "MONDO:0001836",
+   "route": "twin"
+  },
+  "N94.3": {
+   "kg_id": "MONDO:0004169",
+   "route": "twin"
+  },
+  "N95.2": {
+   "kg_id": "MONDO:0001410",
+   "route": "twin"
+  },
+  "N97.2": {
+   "kg_id": "MONDO:0001753",
+   "route": "twin"
+  },
+  "N99": {
+   "kg_id": "MONDO:0021145",
+   "route": "twin"
+  },
+  "O00": {
+   "kg_id": "MONDO:0000755",
+   "route": "twin"
+  },
+  "O01": {
+   "kg_id": "MONDO:0018944",
+   "route": "twin"
+  },
+  "O03": {
+   "kg_id": "DOID:722",
+   "route": "twin"
+  },
+  "O04": {
+   "kg_id": "MONDO:0041526",
+   "route": "twin"
+  },
+  "O14": {
+   "kg_id": "MONDO:0005081",
+   "route": "twin"
+  },
+  "O14.2": {
+   "kg_id": "MONDO:0008585",
+   "route": "twin"
+  },
+  "O15": {
+   "kg_id": "MONDO:0001754",
+   "route": "twin"
+  },
+  "O20.0": {
+   "kg_id": "MONDO:0004846",
+   "route": "twin"
+  },
+  "O24.4": {
+   "kg_id": "MONDO:0005406",
+   "route": "twin"
+  },
+  "O26.4": {
+   "kg_id": "MONDO:0006558",
+   "route": "twin"
+  },
+  "O40": {
+   "kg_id": "MONDO:0004585",
+   "route": "twin"
+  },
+  "O41.0": {
+   "kg_id": "MONDO:0005881",
+   "route": "twin"
+  },
+  "O43": {
+   "kg_id": "MONDO:0005917",
+   "route": "twin"
+  },
+  "O43.01": {
+   "kg_id": "MESH:D005331",
+   "route": "twin"
+  },
+  "O43.02": {
+   "kg_id": "MONDO:0019805",
+   "route": "twin"
+  },
+  "O43.21": {
+   "kg_id": "MONDO:0005916",
+   "route": "twin"
+  },
+  "O44": {
+   "kg_id": "MONDO:0005918",
+   "route": "twin"
+  },
+  "O48": {
+   "kg_id": "HP:0031169",
+   "route": "twin"
+  },
+  "O73": {
+   "kg_id": "MESH:D018457",
+   "route": "twin"
+  },
+  "O88.21": {
+   "kg_id": "MONDO:0004594",
+   "route": "twin"
+  },
+  "O90.3": {
+   "kg_id": "MONDO:0018920",
+   "route": "twin"
+  },
+  "P22.0": {
+   "kg_id": "MONDO:0700081",
+   "route": "twin"
+  },
+  "P24.01": {
+   "kg_id": "MONDO:0006851",
+   "route": "twin"
+  },
+  "P27.1": {
+   "kg_id": "MONDO:0019091",
+   "route": "twin"
+  },
+  "P28.0": {
+   "kg_id": "MONDO:0002929",
+   "route": "twin"
+  },
+  "P28.5": {
+   "kg_id": "MONDO:0001207",
+   "route": "twin"
+  },
+  "P29.3": {
+   "kg_id": "MONDO:0009934",
+   "route": "twin"
+  },
+  "P37.1": {
+   "kg_id": "MONDO:0005715",
+   "route": "twin"
+  },
+  "P37.5": {
+   "kg_id": "MONDO:0004824",
+   "route": "twin"
+  },
+  "P39.0": {
+   "kg_id": "MONDO:0001736",
+   "route": "twin"
+  },
+  "P39.1": {
+   "kg_id": "MONDO:0004854",
+   "route": "twin"
+  },
+  "P39.3": {
+   "kg_id": "MONDO:0001791",
+   "route": "twin"
+  },
+  "P55": {
+   "kg_id": "MONDO:0006760",
+   "route": "twin"
+  },
+  "P57": {
+   "kg_id": "MONDO:0018477",
+   "route": "twin"
+  },
+  "P57.0": {
+   "kg_id": "MONDO:0006567",
+   "route": "twin"
+  },
+  "P60": {
+   "kg_id": "MONDO:0001242",
+   "route": "twin"
+  },
+  "P61.0": {
+   "kg_id": "MONDO:0004877",
+   "route": "twin"
+  },
+  "P61.1": {
+   "kg_id": "MONDO:0001238",
+   "route": "twin"
+  },
+  "P61.2": {
+   "kg_id": "MONDO:0001239",
+   "route": "twin"
+  },
+  "P61.5": {
+   "kg_id": "MONDO:0001241",
+   "route": "twin"
+  },
+  "P70.2": {
+   "kg_id": "MONDO:0020525",
+   "route": "twin"
+  },
+  "P72.1": {
+   "kg_id": "MONDO:0001555",
+   "route": "twin"
+  },
+  "P78.0": {
+   "kg_id": "MONDO:0002196",
+   "route": "twin"
+  },
+  "P78.3": {
+   "kg_id": "MONDO:0009635",
+   "route": "twin"
+  },
+  "P83.4": {
+   "kg_id": "MONDO:0001323",
+   "route": "twin"
+  },
+  "P84": {
+   "kg_id": "MONDO:0006663",
+   "route": "twin"
+  },
+  "P91.2": {
+   "kg_id": "MONDO:0015742",
+   "route": "twin"
+  },
+  "P96.1": {
+   "kg_id": "MONDO:0005566",
+   "route": "twin"
+  },
+  "Q00.0": {
+   "kg_id": "MONDO:0000819",
+   "route": "twin"
+  },
+  "Q02": {
+   "kg_id": "MONDO:0001149",
+   "route": "twin"
+  },
+  "Q03": {
+   "kg_id": "MONDO:0016349",
+   "route": "twin"
+  },
+  "Q03.1": {
+   "kg_id": "MONDO:0009072",
+   "route": "twin"
+  },
+  "Q04.2": {
+   "kg_id": "MONDO:0016296",
+   "route": "twin"
+  },
+  "Q04.3": {
+   "kg_id": "MONDO:0018838",
+   "route": "twin"
+  },
+  "Q04.6": {
+   "kg_id": "MONDO:0017410",
+   "route": "twin"
+  },
+  "Q04.8": {
+   "kg_id": "MONDO:0012400",
+   "route": "twin"
+  },
+  "Q05": {
+   "kg_id": "MONDO:0019773",
+   "route": "twin"
+  },
+  "Q07.8": {
+   "kg_id": "MONDO:0044696",
+   "route": "twin"
+  },
+  "Q10.0": {
+   "kg_id": "MONDO:0008340",
+   "route": "twin"
+  },
+  "Q11.0": {
+   "kg_id": "MONDO:0013293",
+   "route": "twin"
+  },
+  "Q11.2": {
+   "kg_id": "MONDO:0020153",
+   "route": "twin"
+  },
+  "Q12.0": {
+   "kg_id": "MONDO:0007278",
+   "route": "twin"
+  },
+  "Q12.1": {
+   "kg_id": "MONDO:0015998",
+   "route": "twin"
+  },
+  "Q12.3": {
+   "kg_id": "MONDO:0012456",
+   "route": "twin"
+  },
+  "Q13.0": {
+   "kg_id": "MONDO:0001476",
+   "route": "twin"
+  },
+  "Q13.1": {
+   "kg_id": "MONDO:0019172",
+   "route": "twin"
+  },
+  "Q13.4": {
+   "kg_id": "MONDO:0000733",
+   "route": "twin"
+  },
+  "Q13.8": {
+   "kg_id": "MONDO:0019503",
+   "route": "twin"
+  },
+  "Q13.81": {
+   "kg_id": "MONDO:0019187",
+   "route": "twin"
+  },
+  "Q14.1": {
+   "kg_id": "MONDO:0010725",
+   "route": "twin"
+  },
+  "Q14.2": {
+   "kg_id": "MONDO:0007354",
+   "route": "twin"
+  },
+  "Q15.0": {
+   "kg_id": "MONDO:0020366",
+   "route": "twin"
+  },
+  "Q15.8": {
+   "kg_id": "MONDO:0012605",
+   "route": "twin"
+  },
+  "Q18.2": {
+   "kg_id": "MONDO:0008740",
+   "route": "twin"
+  },
+  "Q20.0": {
+   "kg_id": "MONDO:0018072",
+   "route": "twin"
+  },
+  "Q20.1": {
+   "kg_id": "MONDO:0018089",
+   "route": "twin"
+  },
+  "Q20.2": {
+   "kg_id": "MONDO:0018090",
+   "route": "twin"
+  },
+  "Q20.3": {
+   "kg_id": "MONDO:0019443",
+   "route": "twin"
+  },
+  "Q20.5": {
+   "kg_id": "MONDO:0016301",
+   "route": "twin"
+  },
+  "Q21.0": {
+   "kg_id": "MONDO:0002070",
+   "route": "twin"
+  },
+  "Q21.1": {
+   "kg_id": "MONDO:0007172",
+   "route": "twin"
+  },
+  "Q21.12": {
+   "kg_id": "MONDO:0020439",
+   "route": "twin"
+  },
+  "Q21.3": {
+   "kg_id": "MONDO:0008542",
+   "route": "twin"
+  },
+  "Q21.9": {
+   "kg_id": "MONDO:0002078",
+   "route": "twin"
+  },
+  "Q22.5": {
+   "kg_id": "MONDO:0009144",
+   "route": "twin"
+  },
+  "Q22.6": {
+   "kg_id": "MONDO:0020291",
+   "route": "twin"
+  },
+  "Q23.0": {
+   "kg_id": "MONDO:0042981",
+   "route": "twin"
+  },
+  "Q23.3": {
+   "kg_id": "MONDO:1030008",
+   "route": "twin"
+  },
+  "Q23.4": {
+   "kg_id": "MONDO:0004933",
+   "route": "twin"
+  },
+  "Q24.0": {
+   "kg_id": "MONDO:0015661",
+   "route": "twin"
+  },
+  "Q24.2": {
+   "kg_id": "MONDO:0015450",
+   "route": "twin"
+  },
+  "Q24.3": {
+   "kg_id": "MONDO:0006935",
+   "route": "twin"
+  },
+  "Q24.6": {
+   "kg_id": "MONDO:0009326",
+   "route": "twin"
+  },
+  "Q24.8": {
+   "kg_id": "MONDO:0007152",
+   "route": "twin"
+  },
+  "Q24.9": {
+   "kg_id": "MONDO:0005453",
+   "route": "twin"
+  },
+  "Q25.0": {
+   "kg_id": "MONDO:0011827",
+   "route": "twin"
+  },
+  "Q25.3": {
+   "kg_id": "MONDO:0008504",
+   "route": "twin"
+  },
+  "Q26.8": {
+   "kg_id": "MONDO:0015987",
+   "route": "twin"
+  },
+  "Q28.2": {
+   "kg_id": "MONDO:0007154",
+   "route": "twin"
+  },
+  "Q28.3": {
+   "kg_id": "MONDO:0011304",
+   "route": "twin"
+  },
+  "Q30.0": {
+   "kg_id": "MONDO:0012155",
+   "route": "twin"
+  },
+  "Q31.5": {
+   "kg_id": "MONDO:0007878",
+   "route": "twin"
+  },
+  "Q32.0": {
+   "kg_id": "MONDO:0019804",
+   "route": "twin"
+  },
+  "Q34.8": {
+   "kg_id": "MONDO:0009484",
+   "route": "twin"
+  },
+  "Q35": {
+   "kg_id": "MONDO:0016064",
+   "route": "twin"
+  },
+  "Q35.1": {
+   "kg_id": "MONDO:0007336",
+   "route": "twin"
+  },
+  "Q35.3": {
+   "kg_id": "MONDO:0007336",
+   "route": "twin"
+  },
+  "Q35.5": {
+   "kg_id": "MONDO:0007336",
+   "route": "twin"
+  },
+  "Q35.7": {
+   "kg_id": "MONDO:0007336",
+   "route": "twin"
+  },
+  "Q35.9": {
+   "kg_id": "MONDO:0007336",
+   "route": "twin"
+  },
+  "Q36": {
+   "kg_id": "MONDO:0004747",
+   "route": "twin"
+  },
+  "Q38.0": {
+   "kg_id": "MONDO:0019508",
+   "route": "twin"
+  },
+  "Q38.1": {
+   "kg_id": "MONDO:0007125",
+   "route": "twin"
+  },
+  "Q39.0": {
+   "kg_id": "MONDO:0001044",
+   "route": "twin"
+  },
+  "Q40.0": {
+   "kg_id": "MONDO:0001560",
+   "route": "twin"
+  },
+  "Q40.1": {
+   "kg_id": "MONDO:0001562",
+   "route": "twin"
+  },
+  "Q41.1": {
+   "kg_id": "MONDO:0001045",
+   "route": "twin"
+  },
+  "Q42.3": {
+   "kg_id": "MONDO:0001046",
+   "route": "twin"
+  },
+  "Q43.0": {
+   "kg_id": "MONDO:0007955",
+   "route": "twin"
+  },
+  "Q43.1": {
+   "kg_id": "MONDO:0018309",
+   "route": "twin"
+  },
+  "Q44.2": {
+   "kg_id": "MONDO:0008867",
+   "route": "twin"
+  },
+  "Q44.4": {
+   "kg_id": "MONDO:0018805",
+   "route": "twin"
+  },
+  "Q44.7": {
+   "kg_id": "MONDO:0007318",
+   "route": "twin"
+  },
+  "Q44.71": {
+   "kg_id": "MONDO:0007318",
+   "route": "twin"
+  },
+  "Q45.1": {
+   "kg_id": "MONDO:0008183",
+   "route": "twin"
+  },
+  "Q50.5": {
+   "kg_id": "MONDO:0002965",
+   "route": "twin"
+  },
+  "Q51.2": {
+   "kg_id": "MONDO:0007698",
+   "route": "twin"
+  },
+  "Q53.9": {
+   "kg_id": "MONDO:0009047",
+   "route": "twin"
+  },
+  "Q54": {
+   "kg_id": "MONDO:0005345",
+   "route": "twin"
+  },
+  "Q56": {
+   "kg_id": "MONDO:0005518",
+   "route": "twin"
+  },
+  "Q56.1": {
+   "kg_id": "MONDO:0009223",
+   "route": "twin"
+  },
+  "Q56.3": {
+   "kg_id": "MONDO:0005518",
+   "route": "twin"
+  },
+  "Q60.4": {
+   "kg_id": "MONDO:0007352",
+   "route": "twin"
+  },
+  "Q60.6": {
+   "kg_id": "MONDO:0001558",
+   "route": "twin"
+  },
+  "Q61.1": {
+   "kg_id": "MONDO:0009889",
+   "route": "twin"
+  },
+  "Q61.3": {
+   "kg_id": "MONDO:0004691",
+   "route": "twin"
+  },
+  "Q61.5": {
+   "kg_id": "MONDO:0017842",
+   "route": "twin"
+  },
+  "Q61.9": {
+   "kg_id": "MONDO:0018921",
+   "route": "twin"
+  },
+  "Q64.10": {
+   "kg_id": "MONDO:0010805",
+   "route": "twin"
+  },
+  "Q66.89": {
+   "kg_id": "MONDO:0007342",
+   "route": "twin"
+  },
+  "Q68.8": {
+   "kg_id": "MONDO:0017436",
+   "route": "twin"
+  },
+  "Q69": {
+   "kg_id": "MONDO:0021003",
+   "route": "twin"
+  },
+  "Q70": {
+   "kg_id": "MONDO:0021002",
+   "route": "twin"
+  },
+  "Q71.6": {
+   "kg_id": "MONDO:0008464",
+   "route": "twin"
+  },
+  "Q73.8": {
+   "kg_id": "MONDO:0007214",
+   "route": "twin"
+  },
+  "Q74.0": {
+   "kg_id": "MONDO:0007340",
+   "route": "twin"
+  },
+  "Q74.8": {
+   "kg_id": "MONDO:0009232",
+   "route": "twin"
+  },
+  "Q75.0": {
+   "kg_id": "MONDO:0015469",
+   "route": "twin"
+  },
+  "Q75.1": {
+   "kg_id": "MONDO:0007405",
+   "route": "twin"
+  },
+  "Q75.4": {
+   "kg_id": "MONDO:0002457",
+   "route": "twin"
+  },
+  "Q76.1": {
+   "kg_id": "MONDO:0001029",
+   "route": "twin"
+  },
+  "Q76.3": {
+   "kg_id": "MONDO:0011018",
+   "route": "twin"
+  },
+  "Q76.4": {
+   "kg_id": "MONDO:0010094",
+   "route": "twin"
+  },
+  "Q77.1": {
+   "kg_id": "MONDO:0017042",
+   "route": "twin"
+  },
+  "Q77.2": {
+   "kg_id": "MONDO:0018770",
+   "route": "twin"
+  },
+  "Q77.3": {
+   "kg_id": "MONDO:0010556",
+   "route": "twin"
+  },
+  "Q77.4": {
+   "kg_id": "MONDO:0007793",
+   "route": "twin"
+  },
+  "Q77.5": {
+   "kg_id": "MONDO:0009107",
+   "route": "twin"
+  },
+  "Q77.6": {
+   "kg_id": "MONDO:0009162",
+   "route": "twin"
+  },
+  "Q77.7": {
+   "kg_id": "MONDO:0008827",
+   "route": "twin"
+  },
+  "Q78.0": {
+   "kg_id": "MONDO:0008149",
+   "route": "twin"
+  },
+  "Q78.1": {
+   "kg_id": "MONDO:0018919",
+   "route": "twin"
+  },
+  "Q78.2": {
+   "kg_id": "MONDO:0012859",
+   "route": "twin"
+  },
+  "Q78.3": {
+   "kg_id": "MONDO:0007542",
+   "route": "twin"
+  },
+  "Q78.4": {
+   "kg_id": "MONDO:0008931",
+   "route": "twin"
+  },
+  "Q78.8": {
+   "kg_id": "MONDO:0001414",
+   "route": "twin"
+  },
+  "Q78.9": {
+   "kg_id": "MONDO:0005516",
+   "route": "twin"
+  },
+  "Q79.1": {
+   "kg_id": "MONDO:0006726",
+   "route": "twin"
+  },
+  "Q79.2": {
+   "kg_id": "MONDO:0019015",
+   "route": "twin"
+  },
+  "Q79.3": {
+   "kg_id": "MONDO:0009264",
+   "route": "twin"
+  },
+  "Q79.4": {
+   "kg_id": "MONDO:0007032",
+   "route": "twin"
+  },
+  "Q79.6": {
+   "kg_id": "MONDO:0020066",
+   "route": "twin"
+  },
+  "Q79.62": {
+   "kg_id": "MONDO:0007523",
+   "route": "twin"
+  },
+  "Q79.8": {
+   "kg_id": "MONDO:0008262",
+   "route": "twin"
+  },
+  "Q80.0": {
+   "kg_id": "MONDO:0007810",
+   "route": "twin"
+  },
+  "Q80.1": {
+   "kg_id": "MONDO:0010622",
+   "route": "twin"
+  },
+  "Q80.2": {
+   "kg_id": "MONDO:0009441",
+   "route": "twin"
+  },
+  "Q80.3": {
+   "kg_id": "MONDO:0007239",
+   "route": "twin"
+  },
+  "Q80.4": {
+   "kg_id": "MONDO:0009443",
+   "route": "twin"
+  },
+  "Q80.8": {
+   "kg_id": "MONDO:0011218",
+   "route": "twin"
+  },
+  "Q81": {
+   "kg_id": "MONDO:0006541",
+   "route": "twin"
+  },
+  "Q81.0": {
+   "kg_id": "MONDO:0007550",
+   "route": "twin"
+  },
+  "Q81.1": {
+   "kg_id": "MONDO:0009182",
+   "route": "twin"
+  },
+  "Q81.2": {
+   "kg_id": "MONDO:0009179",
+   "route": "twin"
+  },
+  "Q81.8": {
+   "kg_id": "MONDO:0009183",
+   "route": "twin"
+  },
+  "Q82.0": {
+   "kg_id": "MONDO:0007919",
+   "route": "twin"
+  },
+  "Q82.1": {
+   "kg_id": "MONDO:0019600",
+   "route": "twin"
+  },
+  "Q82.3": {
+   "kg_id": "MONDO:0010631",
+   "route": "twin"
+  },
+  "Q82.5": {
+   "kg_id": "MONDO:0002407",
+   "route": "twin"
+  },
+  "Q82.8": {
+   "kg_id": "MONDO:0008218",
+   "route": "twin"
+  },
+  "Q84.1": {
+   "kg_id": "MONDO:0008009",
+   "route": "twin"
+  },
+  "Q84.2": {
+   "kg_id": "MONDO:0007787",
+   "route": "twin"
+  },
+  "Q85.0": {
+   "kg_id": "MONDO:0016755",
+   "route": "twin"
+  },
+  "Q85.00": {
+   "kg_id": "MONDO:0016755",
+   "route": "twin"
+  },
+  "Q85.01": {
+   "kg_id": "DOID:0111253",
+   "route": "twin"
+  },
+  "Q85.02": {
+   "kg_id": "DOID:0111252",
+   "route": "twin"
+  },
+  "Q85.03": {
+   "kg_id": "MONDO:0008075",
+   "route": "twin"
+  },
+  "Q85.1": {
+   "kg_id": "MONDO:0010029",
+   "route": "twin"
+  },
+  "Q85.81": {
+   "kg_id": "MONDO:0016063",
+   "route": "twin"
+  },
+  "Q85.83": {
+   "kg_id": "MONDO:0008667",
+   "route": "twin"
+  },
+  "Q85.89": {
+   "kg_id": "MONDO:0008501",
+   "route": "twin"
+  },
+  "Q86.0": {
+   "kg_id": "MONDO:0016011",
+   "route": "twin"
+  },
+  "Q86.8": {
+   "kg_id": "MONDO:0016012",
+   "route": "twin"
+  },
+  "Q87.0": {
+   "kg_id": "MONDO:0010702",
+   "route": "twin"
+  },
+  "Q87.1": {
+   "kg_id": "MONDO:0019342",
+   "route": "twin"
+  },
+  "Q87.11": {
+   "kg_id": "MONDO:0008300",
+   "route": "twin"
+  },
+  "Q87.19": {
+   "kg_id": "MONDO:0019978",
+   "route": "twin"
+  },
+  "Q87.2": {
+   "kg_id": "MONDO:0007732",
+   "route": "twin"
+  },
+  "Q87.3": {
+   "kg_id": "MONDO:0009965",
+   "route": "twin"
+  },
+  "Q87.4": {
+   "kg_id": "MONDO:0007947",
+   "route": "twin"
+  },
+  "Q87.5": {
+   "kg_id": "MONDO:0010653",
+   "route": "twin"
+  },
+  "Q87.8": {
+   "kg_id": "MONDO:0010284",
+   "route": "twin"
+  },
+  "Q87.83": {
+   "kg_id": "MONDO:0015229",
+   "route": "twin"
+  },
+  "Q87.84": {
+   "kg_id": "MONDO:0009514",
+   "route": "twin"
+  },
+  "Q87.85": {
+   "kg_id": "MONDO:0014773",
+   "route": "twin"
+  },
+  "Q87.86": {
+   "kg_id": "MONDO:0027407",
+   "route": "twin"
+  },
+  "Q87.89": {
+   "kg_id": "MONDO:0008854",
+   "route": "twin"
+  },
+  "Q89.81": {
+   "kg_id": "MONDO:0016512",
+   "route": "twin"
+  },
+  "Q90": {
+   "kg_id": "MONDO:0008608",
+   "route": "twin"
+  },
+  "Q91.7": {
+   "kg_id": "MONDO:0018068",
+   "route": "twin"
+  },
+  "Q93.2": {
+   "kg_id": "MONDO:0700091",
+   "route": "twin"
+  },
+  "Q93.3": {
+   "kg_id": "MONDO:0008684",
+   "route": "twin"
+  },
+  "Q93.4": {
+   "kg_id": "MONDO:0007404",
+   "route": "twin"
+  },
+  "Q93.5": {
+   "kg_id": "MONDO:0012315",
+   "route": "twin"
+  },
+  "Q93.51": {
+   "kg_id": "MONDO:0007113",
+   "route": "twin"
+  },
+  "Q93.81": {
+   "kg_id": "MONDO:0008644",
+   "route": "twin"
+  },
+  "Q93.82": {
+   "kg_id": "MONDO:0008678",
+   "route": "twin"
+  },
+  "Q93.88": {
+   "kg_id": "MONDO:0009532",
+   "route": "twin"
+  },
+  "Q96": {
+   "kg_id": "MONDO:0019499",
+   "route": "twin"
+  },
+  "Q98.0": {
+   "kg_id": "MONDO:0006823",
+   "route": "twin"
+  },
+  "Q99.2": {
+   "kg_id": "MONDO:0010383",
+   "route": "twin"
+  },
+  "Q99.8": {
+   "kg_id": "MONDO:0010399",
+   "route": "twin"
+  },
+  "Q99.81": {
+   "kg_id": "MONDO:0019501",
+   "route": "twin"
+  },
+  "Q99.811": {
+   "kg_id": "MONDO:0010168",
+   "route": "twin"
+  },
+  "Q99.813": {
+   "kg_id": "MONDO:0019501",
+   "route": "twin"
+  },
+  "QA0.0151": {
+   "kg_id": "MONDO:0100040",
+   "route": "twin"
+  },
+  "R00": {
+   "kg_id": "MONDO:0007263",
+   "route": "twin"
+  },
+  "R21": {
+   "kg_id": "MONDO:0006547",
+   "route": "twin"
+  },
+  "R41.1": {
+   "kg_id": "MONDO:0003398",
+   "route": "twin"
+  },
+  "R41.2": {
+   "kg_id": "MONDO:0003040",
+   "route": "twin"
+  },
+  "R41.3": {
+   "kg_id": "MONDO:0001152",
+   "route": "twin"
+  },
+  "R48.1": {
+   "kg_id": "MONDO:0005638",
+   "route": "twin"
+  },
+  "R48.2": {
+   "kg_id": "MONDO:0000665",
+   "route": "twin"
+  },
+  "R48.3": {
+   "kg_id": "MONDO:0003227",
+   "route": "twin"
+  },
+  "R48.8": {
+   "kg_id": "MONDO:0000716",
+   "route": "twin"
+  },
+  "R69": {
+   "kg_id": "MONDO:0000001",
+   "route": "twin"
+  },
+  "R73.03": {
+   "kg_id": "MONDO:0001076",
+   "route": "twin"
+  },
+  "R73.9": {
+   "kg_id": "MONDO:0002909",
+   "route": "twin"
+  },
+  "R80": {
+   "kg_id": "MONDO:0003634",
+   "route": "twin"
+  },
+  "R80.2": {
+   "kg_id": "MONDO:0004838",
+   "route": "twin"
+  },
+  "R82.3": {
+   "kg_id": "MONDO:0003656",
+   "route": "twin"
+  },
+  "R82.71": {
+   "kg_id": "MONDO:0001882",
+   "route": "twin"
+  },
+  "R82.81": {
+   "kg_id": "MONDO:0001953",
+   "route": "twin"
+  },
+  "R82.992": {
+   "kg_id": "MONDO:0002474",
+   "route": "twin"
+  },
+  "R91.1": {
+   "kg_id": "MONDO:0006931",
+   "route": "twin"
+  },
+  "R99": {
+   "kg_id": "NCIT:C82466",
+   "route": "twin"
+  },
+  "S12.8": {
+   "kg_id": "MONDO:0002567",
+   "route": "twin"
+  },
+  "S15": {
+   "kg_id": "EFO:0009886",
+   "route": "twin"
+  },
+  "S52.27": {
+   "kg_id": "MONDO:0043723",
+   "route": "twin"
+  },
+  "S62": {
+   "kg_id": "MESH:D000092503",
+   "route": "twin"
+  },
+  "S74": {
+   "kg_id": "MESH:D059348",
+   "route": "twin"
+  },
+  "S84": {
+   "kg_id": "MESH:D059348",
+   "route": "twin"
+  },
+  "S93": {
+   "kg_id": "MONDO:0043895",
+   "route": "twin"
+  },
+  "T18": {
+   "kg_id": "NCIT:C34622",
+   "route": "twin"
+  },
+  "T67": {
+   "kg_id": "MESH:D018883",
+   "route": "twin"
+  },
+  "T75.3": {
+   "kg_id": "MONDO:0008015",
+   "route": "twin"
+  },
+  "T75.830": {
+   "kg_id": "MONDO:0005907",
+   "route": "twin"
+  },
+  "T78": {
+   "kg_id": "NCIT:C41331",
+   "route": "twin"
+  },
+  "T78.3": {
+   "kg_id": "MONDO:0010481",
+   "route": "twin"
+  },
+  "T78.40": {
+   "kg_id": "MONDO:0005271",
+   "route": "twin"
+  },
+  "T78.41": {
+   "kg_id": "MONDO:0006660",
+   "route": "twin"
+  },
+  "T79.6": {
+   "kg_id": "MONDO:0003528",
+   "route": "twin"
+  },
+  "T79.A0": {
+   "kg_id": "MONDO:0004001",
+   "route": "twin"
+  },
+  "T80": {
+   "kg_id": "NCIT:C2959",
+   "route": "twin"
+  },
+  "T81": {
+   "kg_id": "NCIT:C2959",
+   "route": "twin"
+  },
+  "T87": {
+   "kg_id": "NCIT:C2959",
+   "route": "twin"
+  },
+  "T88": {
+   "kg_id": "NCIT:C2959",
+   "route": "twin"
+  },
+  "T88.3": {
+   "kg_id": "MONDO:0018493",
+   "route": "twin"
+  },
+  "U07.1": {
+   "kg_id": "MONDO:0100096",
+   "route": "twin"
+  },
+  "Z88.1": {
+   "kg_id": "DOID:0040008",
+   "route": "twin"
+  },
+  "Z88.4": {
+   "kg_id": "DOID:0040010",
+   "route": "twin"
+  },
+  "Z91.014": {
+   "kg_id": "MONDO:0100001",
+   "route": "twin"
+  }
+ },
+ "success_criteria_routes": {
+  "E75.21": {
+   "twin_node": "MONDO:0010526",
+   "in_cdc_order_file": true,
+   "route": "twin"
+  },
+  "E83.01": {
+   "twin_node": "MONDO:0010200",
+   "in_cdc_order_file": true,
+   "route": "twin"
+  },
+  "F40.0": {
+   "twin_node": "MONDO:0003709",
+   "in_cdc_order_file": true,
+   "route": "twin"
+  },
+  "I10": {
+   "twin_node": "MONDO:0005044",
+   "in_cdc_order_file": true,
+   "route": "twin"
+  },
+  "E11": {
+   "twin_node": "MONDO:0005148",
+   "in_cdc_order_file": true,
+   "route": "twin"
+  },
+  "E11.65": {
+   "twin_node": null,
+   "in_cdc_order_file": true,
+   "route": "twin_miss"
+  },
+  "F32.9": {
+   "twin_node": null,
+   "in_cdc_order_file": true,
+   "route": "twin_miss"
+  }
+ }
+}
