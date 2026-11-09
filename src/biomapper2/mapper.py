@@ -138,6 +138,10 @@ class Mapper:
             linker=self.linker, biolink_client=self.biolink_client, lipid_resolver=self.lipid_resolver
         )
         self.tier_b = self._build_tier_b(self.lipid_resolver)
+        # Fail loud at init: an enabled ICD-10-CM fallback with a missing or malformed twin denylist
+        # would otherwise label every denylisted twin hit with the (possibly exact) gate relation.
+        if config.ICD10CM_FALLBACK_ENABLED:
+            icd10cm_fallback.twin_denylist()
 
     @staticmethod
     def _tier_b_active() -> bool:

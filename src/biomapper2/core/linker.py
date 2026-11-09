@@ -5,13 +5,15 @@ Queries the knowledge graph API to find canonical node IDs for normalized curies
 """
 
 import logging
-from collections import defaultdict
+from collections import ChainMap, defaultdict
+from collections.abc import Mapping
 from typing import Any
 
 import pandas as pd
 
 from ..config import KESTREL_BATCH_SIZE_CANONICALIZE
-from ..utils import kestrel_request
+from ..utils import BisectBudget, kestrel_request
+from . import icd10cm_fallback
 
 
 class Linker:
@@ -50,18 +52,37 @@ class Linker:
         for curies_list in df["curies"]:
             all_curies.update(curies_list)
 
-        # Single bulk request for all curies
-        curie_to_kg_id_cache = self.get_kg_ids(list(all_curies))
+        # Single bulk request for all curies (plus ICD-10-CM twin candidates, in the same batch)
+        curie_to_kg_id_cache, isolated = self._fetch_with_fallback_candidates(list(all_curies))
 
-        # Apply per-entity processing using the shared cache
+        # Apply per-entity processing using the shared cache. The cache itself is never modified by
+        # the fallback (a per-row overlay is used), so results do not depend on row order.
         return df.apply(
-            lambda entity: self._link_entity(entity, curie_to_kg_id_cache=curie_to_kg_id_cache),
+            lambda entity: self._link_entity(entity, curie_to_kg_id_cache=curie_to_kg_id_cache, isolated=isolated),
             axis=1,
             result_type="expand",  # Expands Series into columns
         )
 
+    def _fetch_with_fallback_candidates(self, curies: list[str]) -> tuple[dict[str, str], frozenset[str]]:
+        """One batched /canonicalize for ``curies`` plus every ICD-10-CM twin candidate.
+
+        Returns ``(result, isolated)``; ``isolated`` holds curies bisect-on-5xx dropped (absent from the
+        result, so NOT a definite null). With the fallback disabled, or no ICD10CM curie present, this is
+        exactly the pre-fallback call.
+        """
+        candidates = icd10cm_fallback.expand_candidates(curies) if icd10cm_fallback.is_enabled() else []
+        has_icd = icd10cm_fallback.is_enabled() and any(c.startswith(icd10cm_fallback.ICD10CM_PREFIX) for c in curies)
+        if not has_icd:
+            return self.get_kg_ids(curies), frozenset()
+        budget = BisectBudget()
+        result = self.get_kg_ids(list(curies) + candidates, budget=budget)
+        return result, frozenset(str(item) for item in budget.isolated_items)
+
     def _link_entity(
-        self, entity: pd.Series | dict[str, Any], curie_to_kg_id_cache: dict[str, str] | None = None
+        self,
+        entity: pd.Series | dict[str, Any],
+        curie_to_kg_id_cache: dict[str, str] | None = None,
+        isolated: frozenset[str] = frozenset(),
     ) -> pd.Series:
         """
         Link a single entity's curies to knowledge graph node IDs.
@@ -76,29 +97,55 @@ class Linker:
         """
         # Use cache if provided, otherwise fetch KG IDs for this entity
         if curie_to_kg_id_cache is None:
-            curie_to_kg_id_cache = self.get_kg_ids(entity["curies"])
+            curie_to_kg_id_cache, isolated = self._fetch_with_fallback_candidates(list(entity["curies"]))
 
-        kg_ids, kg_ids_provided, kg_ids_assigned = self._format_kg_id_fields(entity, curie_to_kg_id_cache)
+        if not icd10cm_fallback.is_enabled():
+            kg_ids, kg_ids_provided, kg_ids_assigned = self._format_kg_id_fields(entity, curie_to_kg_id_cache)
+            return pd.Series({"kg_ids": kg_ids, "kg_ids_provided": kg_ids_provided, "kg_ids_assigned": kg_ids_assigned})
 
-        return pd.Series({"kg_ids": kg_ids, "kg_ids_provided": kg_ids_provided, "kg_ids_assigned": kg_ids_assigned})
+        # ICD-10-CM fallback: per-row selection against the UNMODIFIED batch result, written back under
+        # the original ICD10CM: key through a copy-on-write overlay (never into the shared cache).
+        overlay, side_map = icd10cm_fallback.select_for_row(list(entity["curies"]), curie_to_kg_id_cache, isolated)
+        curie_map: Mapping[str, str] = ChainMap(overlay, curie_to_kg_id_cache) if overlay else curie_to_kg_id_cache
+        kg_ids, kg_ids_provided, kg_ids_assigned = self._format_kg_id_fields(entity, curie_map)
+
+        return pd.Series(
+            {
+                "kg_ids": kg_ids,
+                "kg_ids_provided": kg_ids_provided,
+                "kg_ids_assigned": kg_ids_assigned,
+                icd10cm_fallback.SIDE_MAP_FIELD: side_map,
+            }
+        )
 
     @staticmethod
-    def get_kg_ids(curies: list[str]) -> dict[str, str]:
+    def get_kg_ids(curies: list[str], budget: BisectBudget | None = None) -> dict[str, str]:
         """
         Query knowledge graph API for canonical node IDs (in bulk, with batching).
 
         Args:
             curies: List of curies to look up
+            budget: Optional bisect budget; when bisect-on-5xx is enabled, the curies it isolated
+                (dropped from the result) are left in ``budget.isolated_items`` for the caller.
 
         Returns:
             Dictionary mapping curies to canonical KG node IDs
         """
+        if budget is None:
+            return kestrel_request(
+                method="POST",
+                endpoint="canonicalize",
+                batch_field="curies",
+                batch_items=curies,
+                batch_size=KESTREL_BATCH_SIZE_CANONICALIZE,
+            )
         return kestrel_request(
             method="POST",
             endpoint="canonicalize",
             batch_field="curies",
             batch_items=curies,
             batch_size=KESTREL_BATCH_SIZE_CANONICALIZE,
+            budget=budget,
         )
 
     @staticmethod
@@ -220,7 +267,7 @@ class Linker:
         return result, True
 
     def _format_kg_id_fields(
-        self, entity: pd.Series | dict[str, Any], curie_to_kg_id_map: dict[str, str]
+        self, entity: pd.Series | dict[str, Any], curie_to_kg_id_map: Mapping[str, str]
     ) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, dict[str, list[str]]]]:
         """
         Organize KG IDs by source (overall, provided, assigned) and record their corresponding curie 'votes'.
@@ -247,7 +294,7 @@ class Linker:
         return kg_ids, kg_ids_provided, kg_ids_assigned
 
     @staticmethod
-    def _reverse_curie_map(curie_map: dict[str, str], curie_subset: list[str]) -> dict[str, list[str]]:
+    def _reverse_curie_map(curie_map: Mapping[str, str], curie_subset: list[str]) -> dict[str, list[str]]:
         """
         Reverse curie-to-kg-id mapping for a subset of curies.
 
