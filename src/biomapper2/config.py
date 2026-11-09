@@ -405,6 +405,35 @@ HUMAN_MARKER_PREFIXES = {"HGNC"}
 # deterministic non-search fallback. Set False to disable the bridge without a code revert.
 GENE_SYMBOL_FALLBACK_ENABLED = True
 
+# ICD-10-CM provided-id fallback (see core/icd10cm_fallback.py). Since v1.3.0 a provided ``ICD10CM:<code>``
+# keeps its prefix, and the pinned KRAKEN build has no ICD10CM nodes, so such codes came back unresolved.
+# On a miss the Linker retries the same code as ``ICD10:<code>`` (the "twin") inside the batched
+# /canonicalize call that already runs, and only for rows where no curie linked directly.
+#
+# Env-driven like RERESOLUTION_ENABLED so ops can turn it off without a code change. Default ON;
+# BIOMAPPER2_ICD10CM_FALLBACK_ENABLED=0/false/no/off disables it (output identical to v1.3.0).
+ICD10CM_FALLBACK_ENABLED = os.getenv("BIOMAPPER2_ICD10CM_FALLBACK_ENABLED", "1").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
+
+# The SKOS relation a twin hit is emitted with: "exact" or "broad". Set FROM the committed gate artifact
+# studies/analysis/results/icd10cm_twin_control.json (fields ``gate.status`` / ``gate.reviewed``), never
+# by taste: exact only after Trent has reviewed a passing gate, broad otherwise. A unit test binds this
+# constant to the artifact. Codes in the twin denylist are emitted broad whatever this says.
+ICD10CM_TWIN_MAPPING_RELATION = "broad"
+
+# The KG build the gate ran on (artifact field ``kg_build``), as ``<kg_version>@<git_commit>``. A live
+# /health build that differs is warned about once per process; every fallback row carries its own
+# ``kg_build`` stamp so the mismatch is visible per row.
+ICD10CM_TWIN_GATE_KG_BUILD = "2.3.0@3dd08a5b7b17e320ceb0c0091e09b781d4d90242"
+
+# Packaged twin denylist (written by the gate study). Override with an explicit path for testing a
+# rebuilt list; a missing or malformed file fails Mapper init while the fallback is enabled.
+ICD10CM_TWIN_DENYLIST_PATH: str | None = os.getenv("BIOMAPPER2_ICD10CM_TWIN_DENYLIST_PATH") or None
+
 # Per-category preferred (canonical) namespace prefixes for the prefer_canonical re-ranking. Within a
 # Biolink category, hybrid-search ranks across all namespaces at once, so a non-canonical same-text node
 # (UMLS/ICD/KEGG/PANTHER) frequently outranks the canonical one. These prefixes mark the canonical node so

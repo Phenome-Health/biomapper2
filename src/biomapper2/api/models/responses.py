@@ -307,6 +307,28 @@ class EntityMappingResult(BaseModel):
         description="Version of the Tier B freeze that produced a frozen independent result for the "
         "row, mirrored from the certificate; None for a live (non-frozen) result.",
     )
+    mapping_relation: str | None = Field(
+        default=None,
+        description="Entity-general SKOS relation between the query and chosen_kg_id: 'exact' | 'broad' | "
+        "'narrow' | 'unknown'. Set for lipid rows (mirrors lipid_resolution.mapping_relation) and for rows "
+        "committed through the ICD-10-CM provided-id fallback; null otherwise. Treat 'broad' as a "
+        "less specific node than the input asked for, not as an exact match.",
+    )
+    mapping_predicate: str | None = Field(
+        default=None,
+        description="The SKOS predicate for mapping_relation ('skos:exactMatch' | 'skos:broadMatch' | "
+        "'skos:narrowMatch'); null when mapping_relation is null or 'unknown'.",
+    )
+    icd10cm_route: str | None = Field(
+        default=None,
+        description="How an ICD-10-CM fallback committed chosen_kg_id: 'twin' (the same code under the "
+        "ICD10: prefix, because KRAKEN has no ICD10CM: node for it). Null when no fallback was used.",
+    )
+    kg_build: str | None = Field(
+        default=None,
+        description="The KG build ('<kg_version>@<git_commit>') that served an ICD-10-CM fallback row; null "
+        "otherwise. Fallback hits exist only because of a specific KG build, so they carry it per row.",
+    )
     kg_equivalent_ids: dict[str, list[str]] = Field(
         default_factory=dict,
         description="Equivalent identifiers from the resolved KG node, grouped by CURIE prefix",
