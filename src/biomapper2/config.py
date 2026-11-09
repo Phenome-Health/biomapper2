@@ -434,6 +434,23 @@ ICD10CM_TWIN_GATE_KG_BUILD = "2.3.0@3dd08a5b7b17e320ceb0c0091e09b781d4d90242"
 # rebuilt list; a missing or malformed file fails Mapper init while the fallback is enabled.
 ICD10CM_TWIN_DENYLIST_PATH: str | None = os.getenv("BIOMAPPER2_ICD10CM_TWIN_DENYLIST_PATH") or None
 
+# Phase 1b: the parent walk-up (see core/icd10cm_fallback.py and core/icd10cm_hierarchy.py). When the twin
+# also misses, the fallback climbs to the most specific EXISTING ancestor in a pinned CDC snapshot and
+# emits it as ``broad``. A separate switch from ICD10CM_FALLBACK_ENABLED (which disables both twin and
+# walk-up): BIOMAPPER2_ICD10CM_WALKUP_ENABLED=0/false/no/off turns off the walk-up only, giving PR 1
+# (twin-only) behavior. Read at call time, so tests monkeypatch it.
+ICD10CM_WALKUP_ENABLED = os.getenv("BIOMAPPER2_ICD10CM_WALKUP_ENABLED", "1").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
+
+# Override for the packaged CDC hierarchy snapshot (biomapper2/data/icd10cm/icd10cm_order_FY2027.tsv,
+# read via importlib.resources so wheel installs find it). The ``<path>.version`` sidecar is required. A
+# missing or malformed snapshot fails Mapper init while the walk-up is enabled.
+ICD10CM_HIERARCHY_PATH: str | None = os.getenv("BIOMAPPER2_ICD10CM_HIERARCHY_PATH") or None
+
 # Per-category preferred (canonical) namespace prefixes for the prefer_canonical re-ranking. Within a
 # Biolink category, hybrid-search ranks across all namespaces at once, so a non-canonical same-text node
 # (UMLS/ICD/KEGG/PANTHER) frequently outranks the canonical one. These prefixes mark the canonical node so

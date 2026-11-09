@@ -318,7 +318,7 @@ If `X` itself is not in the snapshot, it gets the twin retry only, and `icd10cm_
 
 ### Phase 1b: walk-up (PR 2, after PR 1 merges)
 
-- [ ] **Unit 4: CDC hierarchy snapshot, build script and loader**
+- [x] **Unit 4: CDC hierarchy snapshot, build script and loader**
 
 **Goal:** A pinned, versioned ICD-10-CM code set with a parent lookup, which fails loudly when it is misconfigured.
 
@@ -359,7 +359,9 @@ A code absent from the snapshot returns no ancestors. If the walk-up is enabled 
 
 **Verification:** The committed snapshot loads, the version string includes FY and SHA, and all tests pass.
 
-- [ ] **Unit 5: Walk-up in the fallback**
+**Implementation note (2026-11-08):** the real CDC order file DOES list placeholder-X headers (e.g. `T36.0X`, 245 codes ending in `X`), each repeating its parent's title. They are skipped explicitly as ancestors rather than by absence; 9 of them carry a slightly different title (e.g. `H54.0X`, `J09.X`), so those codes walk up one level further than strictly necessary.
+
+- [x] **Unit 5: Walk-up in the fallback**
 
 **Goal:** When the twin misses, commit the most specific ancestor hit as `mapping_relation = broad`.
 

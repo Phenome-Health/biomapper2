@@ -73,3 +73,6 @@ reports/
 
 # memtrace runtime state (rewritten by the local daemon)
 .memdb/
+
+# ICD-10-CM hierarchy snapshot (packaged; written by scripts/build_icd10cm_hierarchy.py).
+!src/biomapper2/data/**/*.tsv

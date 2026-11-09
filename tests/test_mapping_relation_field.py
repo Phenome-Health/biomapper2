@@ -25,7 +25,8 @@ from biomapper2.mapper import Mapper
 
 pytestmark = pytest.mark.unit
 
-_NEW_KEYS = ("mapping_relation", "mapping_predicate", "icd10cm_route", "kg_build")
+# Phase 1b added icd10cm_snapshot_version (walk-up rows only); still additive and null elsewhere.
+_NEW_KEYS = ("mapping_relation", "mapping_predicate", "icd10cm_route", "kg_build", "icd10cm_snapshot_version")
 
 
 def test_mapping_fields_tuple_is_the_contract() -> None:
@@ -48,6 +49,7 @@ def test_lipid_row_lifts_relation_to_the_top_level() -> None:
         "mapping_predicate": "skos:broadMatch",
         "icd10cm_route": None,
         "kg_build": None,
+        "icd10cm_snapshot_version": None,
     }
     assert lipid == {"mapping_relation": "broad", "mapping_predicate": "skos:broadMatch", "ambiguous": False}
 
@@ -61,6 +63,7 @@ def test_icd10cm_fallback_row_carries_route_and_build() -> None:
         "mapping_predicate": "skos:broadMatch",
         "icd10cm_route": "twin",
         "kg_build": "2.3.0@abc",
+        "icd10cm_snapshot_version": None,
     }
 
 

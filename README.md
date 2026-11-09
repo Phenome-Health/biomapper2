@@ -138,6 +138,15 @@ For a local server, the API docs are available at:
 - **Provenance:** `curies_provided` holds the CURIEs from identifiers you supplied, and
   `curies_assigned` maps each annotator slug to the CURIEs it produced (`assigned_ids` keeps the raw
   per-annotator local IDs and scores).
+- **ICD-10-CM codes:** the knowledge graph has no `ICD10CM:` nodes yet, so a provided `ICD10CM:X` that
+  misses is retried as `ICD10:X` (`icd10cm_route = twin`), and if that also misses, climbs to the most
+  specific existing parent code in a pinned CDC FY2027 snapshot (`icd10cm_route = walkup:<parent>`,
+  e.g. `E11.65` resolves via `walkup:E11`). Both are fallbacks used only when no other identifier on the
+  row links. Read `mapping_relation`: `broad` means the node is less specific than the code you supplied
+  (every walk-up hit, and twin hits until the twin gate passes). Walk-up rows also carry
+  `icd10cm_snapshot_version`; fallback rows carry `kg_build`. `BIOMAPPER2_ICD10CM_FALLBACK_ENABLED=0`
+  turns off both; `BIOMAPPER2_ICD10CM_WALKUP_ENABLED=0` turns off the walk-up only. Refresh the snapshot
+  for a new fiscal year with `scripts/build_icd10cm_hierarchy.py` (pinned URL + SHA-256).
 
 ### Raw Kestrel passthrough (`kestrel_top_n`)
 
