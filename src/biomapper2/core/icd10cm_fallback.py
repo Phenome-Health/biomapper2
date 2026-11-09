@@ -182,7 +182,13 @@ def _walkup_for_row(
                         f"/canonicalize gave no definite answer for {form} (isolated by bisect-on-5xx) while "
                         f"walking up from {curie}; refusing to commit a broader ancestor"
                     )
-                if canonical.get(form):
+                if form not in canonical:
+                    # R7a: a successful response that omits a requested key is not a definite null.
+                    raise Icd10cmFallbackLookupError(
+                        f"/canonicalize returned no answer for {form} while walking up from {curie}; "
+                        f"refusing to read the gap as a miss or to commit a broader ancestor"
+                    )
+                if canonical[form]:
                     hit = canonical[form]
                     break
             if hit:

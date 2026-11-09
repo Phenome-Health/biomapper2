@@ -612,6 +612,21 @@ def test_isolated_ancestor_is_irrelevant_when_the_twin_hit(monkeypatch) -> None:
     assert linked["kg_ids"] == {FABRY: ["ICD10CM:E75.21"]}
 
 
+def test_omitted_more_specific_ancestor_raises_instead_of_falling_through(monkeypatch) -> None:
+    # A successful /canonicalize that omits ICD10CM:E11.6 (no key, not an explicit null) must not let
+    # the walk-up commit the broader ICD10:E11 hit.
+    omitted = "ICD10CM:E11.6"
+
+    def partial(**kw: Any) -> dict[str, Any]:
+        if kw.get("endpoint") != "canonicalize":
+            return {}
+        return {c: ({"ICD10:E11": T2DM}.get(c)) for c in kw["batch_items"] if c != omitted}
+
+    monkeypatch.setattr("biomapper2.core.linker.kestrel_request", partial)
+    with pytest.raises(icd10cm_fallback.Icd10cmFallbackLookupError, match="ICD10CM:E11.6"):
+        Linker().link(_entity("E11.65"))
+
+
 def test_walkup_enabled_with_a_missing_snapshot_raises_at_link_time(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(config, "ICD10CM_HIERARCHY_PATH", str(tmp_path / "gone.tsv"))
     fake = _kestrel_from(_live_like_answers())
