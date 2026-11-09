@@ -363,6 +363,26 @@ def test_kg_build_mismatch_with_the_gate_build_warns_once(monkeypatch, caplog) -
     assert sum("ICD10CM twin gate" in r.getMessage() for r in caplog.records) == 1
 
 
+def test_failed_kg_build_lookup_is_retried_not_cached_forever(monkeypatch) -> None:
+    calls = {"n": 0}
+    answers = [KgBuildInfo(), BUILD]
+
+    def fetch(url):
+        calls["n"] += 1
+        return "0.5.0", answers[min(calls["n"] - 1, 1)]
+
+    clock = {"t": 1000.0}
+    monkeypatch.setattr("biomapper2.provenance.fetch_kg_build_info", fetch)
+    monkeypatch.setattr(icd10cm_fallback.time, "monotonic", lambda: clock["t"])
+    assert icd10cm_fallback.kg_build_stamp() == "unknown@unknown"
+    assert icd10cm_fallback.kg_build_stamp() == "unknown@unknown"  # within the retry window: no refetch
+    assert calls["n"] == 1
+    clock["t"] += icd10cm_fallback._KG_BUILD_RETRY_SECONDS
+    assert icd10cm_fallback.kg_build_stamp() == f"{BUILD.kg_version}@{BUILD.git_commit}"
+    assert icd10cm_fallback.kg_build_stamp() == f"{BUILD.kg_version}@{BUILD.git_commit}"
+    assert calls["n"] == 2
+
+
 # ------------------------------------------------------------------------------------------------
 # Row fields follow the COMMITTED node (re-resolution swaps recompute them)
 # ------------------------------------------------------------------------------------------------

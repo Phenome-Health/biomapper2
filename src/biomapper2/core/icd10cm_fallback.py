@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import Iterable, Mapping
 from importlib import resources
 from pathlib import Path
@@ -44,6 +45,10 @@ SIDE_MAP_FIELD = "_icd10cm_fallback"
 _PACKAGED_DENYLIST = ("data", "icd10cm", "twin_denylist.json")
 
 _KG_BUILD_CACHE: dict[str, str] = {}
+# A failed /health lookup is NOT cached for the process: it is retried once this many seconds have
+# passed, so a brief outage on the first fallback row does not pin ``unknown@unknown`` forever.
+_KG_BUILD_RETRY_SECONDS = 60.0
+_KG_BUILD_FAILED: dict[str, tuple[float, str]] = {}  # {"last": (monotonic time of the failure, its stamp)}
 _DENYLIST_CACHE: dict[str, frozenset[str]] = {}
 
 
@@ -113,23 +118,34 @@ def select_for_row(
 def kg_build_stamp() -> str:
     """``<kg_version>@<git_commit>`` from Kestrel /health, fetched once per process and cached.
 
-    Warns once when it differs from the build the twin gate ran on (``config.ICD10CM_TWIN_GATE_KG_BUILD``).
+    A lookup that degrades to ``unknown`` is not cached: it is reused for ``_KG_BUILD_RETRY_SECONDS``
+    (so a down /health is not hit per row) and then retried. Warns once when a resolved build differs
+    from the build the twin gate ran on (``config.ICD10CM_TWIN_GATE_KG_BUILD``).
     """
-    if "stamp" not in _KG_BUILD_CACHE:
-        from ..config import get_kestrel_api_url
-        from ..provenance import fetch_kg_build_info
+    if "stamp" in _KG_BUILD_CACHE:
+        return _KG_BUILD_CACHE["stamp"]
+    last_failure = _KG_BUILD_FAILED.get("last")
+    if last_failure is not None and time.monotonic() - last_failure[0] < _KG_BUILD_RETRY_SECONDS:
+        return last_failure[1]
 
-        _, info = fetch_kg_build_info(get_kestrel_api_url())
-        stamp = f"{info.kg_version}@{info.git_commit}"
-        _KG_BUILD_CACHE["stamp"] = stamp
-        if stamp != config.ICD10CM_TWIN_GATE_KG_BUILD:
-            logger.warning(
-                "ICD10CM twin gate ran on KG build %s but Kestrel serves %s; twin relations were not "
-                "re-validated for this build (see studies/analysis/icd10cm_twin_control.py)",
-                config.ICD10CM_TWIN_GATE_KG_BUILD,
-                stamp,
-            )
-    return _KG_BUILD_CACHE["stamp"]
+    from ..config import get_kestrel_api_url
+    from ..provenance import fetch_kg_build_info
+
+    _, info = fetch_kg_build_info(get_kestrel_api_url())
+    stamp = f"{info.kg_version}@{info.git_commit}"
+    if "unknown" in (info.kg_version, info.git_commit):
+        _KG_BUILD_FAILED["last"] = (time.monotonic(), stamp)
+        return stamp
+    _KG_BUILD_FAILED.clear()
+    _KG_BUILD_CACHE["stamp"] = stamp
+    if stamp != config.ICD10CM_TWIN_GATE_KG_BUILD:
+        logger.warning(
+            "ICD10CM twin gate ran on KG build %s but Kestrel serves %s; twin relations were not "
+            "re-validated for this build (see studies/analysis/icd10cm_twin_control.py)",
+            config.ICD10CM_TWIN_GATE_KG_BUILD,
+            stamp,
+        )
+    return stamp
 
 
 def load_twin_denylist(path: Path | str) -> frozenset[str]:
@@ -159,4 +175,5 @@ def twin_denylist() -> frozenset[str]:
 def reset() -> None:
     """Clear process-level caches (tests)."""
     _KG_BUILD_CACHE.clear()
+    _KG_BUILD_FAILED.clear()
     _DENYLIST_CACHE.clear()

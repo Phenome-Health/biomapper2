@@ -172,6 +172,37 @@ def test_dataset_tsv_gains_empty_new_columns_on_a_non_icd_row(tmp_path, monkeypa
     assert out.loc[0, "chosen_kg_id"] == "MONDO:0010526"
 
 
+def test_dataset_preserves_input_columns_that_share_an_output_name(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("biomapper2.core.linker.kestrel_request", lambda **kw: {c: c for c in kw["batch_items"]})
+    from biomapper2.provenance import KgBuildInfo
+
+    monkeypatch.setattr("biomapper2.provenance.fetch_kg_build_info", lambda url: ("unknown", KgBuildInfo()))
+    df = pd.DataFrame(
+        {"name": ["Fabry disease"], "mondo": ["MONDO:0010526"], "kg_build": ["mine"], "mapping_relation": ["x"]}
+    )
+    out_path, _ = Mapper().map_dataset_to_kg(
+        df.copy(),
+        entity_type="disease",
+        name_column="name",
+        provided_id_columns=["mondo"],
+        output_dir=tmp_path,
+        annotation_mode="none",
+    )
+    out = pd.read_csv(out_path, sep="\t")
+    assert out.loc[0, "kg_build_input"] == "mine"
+    assert out.loc[0, "mapping_relation_input"] == "x"
+    assert out["kg_build"].isna().all()
+    assert out["mapping_relation"].isna().all()
+
+
+def test_preserve_input_columns_refuses_to_clobber_an_existing_input_copy() -> None:
+    from biomapper2.mapper import _preserve_input_columns
+
+    df = pd.DataFrame({"kg_build": ["a"], "kg_build_input": ["b"]})
+    with pytest.raises(ValueError, match="kg_build_input"):
+        _preserve_input_columns(df, ("kg_build",))
+
+
 @pytest.fixture
 def stream_client() -> Iterator[TestClient]:
     with TestClient(app) as c:

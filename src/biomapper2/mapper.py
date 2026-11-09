@@ -36,6 +36,7 @@ from .core.certificate import (
 from .core.linker import Linker
 from .core.normalizer import Normalizer
 from .core.resolver import (
+    MAPPING_FIELDS,
     MAPPING_RELATION_BROAD,
     MAPPING_RELATION_EXACT,
     MAPPING_RELATION_UNKNOWN,
@@ -78,6 +79,28 @@ def _refmet_snapshot_version_for(refmet_source: str) -> str | None:
     if refmet_source in _SNAPSHOT_ATTRIBUTABLE_SOURCES:
         return refmet_snapshot.version()
     return None
+
+
+def _preserve_input_columns(df: pd.DataFrame, output_columns: tuple[str, ...]) -> pd.DataFrame:
+    """Rename any input column that an output column is about to claim to ``<name>_input``.
+
+    Raises when the ``<name>_input`` name is itself already taken, rather than silently dropping data.
+    """
+    renames: dict[str, str] = {}
+    for column in output_columns:
+        if column not in df.columns:
+            continue
+        preserved = f"{column}_input"
+        if preserved in df.columns:
+            raise ValueError(
+                f"Input dataset has both {column!r} and {preserved!r} columns; biomapper2 emits {column!r} "
+                f"as an output field and preserves an input {column!r} as {preserved!r}. Rename one of them."
+            )
+        renames[column] = preserved
+    if renames:
+        logging.warning(f"Input columns {sorted(renames)} collide with output fields; preserved as {renames}")
+        df = df.rename(columns=renames)
+    return df
 
 
 def _icd10cm_fields_for(
@@ -903,7 +926,10 @@ class Mapper:
         df = df.join(pd.DataFrame([c.to_flat_columns() for c in certificate_rows], index=df.index))
         # Unit 5: lipid_-prefixed flat columns, one column set for every row (null off the lipid path).
         df = df.join(pd.DataFrame(lipid_column_rows, index=df.index))
-        # Entity-general relation + ICD-10-CM fallback route/build columns (null off both paths).
+        # Entity-general relation + ICD-10-CM fallback route/build columns (null off both paths). These are
+        # plain names an input dataset may already carry as its own metadata: keep the input's values
+        # under ``<name>_input`` rather than letting the join abort the run on overlapping columns.
+        df = _preserve_input_columns(df, MAPPING_FIELDS)
         df = df.join(pd.DataFrame(mapping_column_rows, index=df.index, dtype=object))
         # The legacy flag is now DERIVED from the certificate (C4/L20) rather than passed through,
         # so the two can never disagree. Identical for one release; deprecation is a follow-up.
