@@ -66,6 +66,9 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
 
     slug = "metabolomics-workbench"
     BASE_URL = "https://www.metabolomicsworkbench.org/rest/refmet/match"
+    # /match stopped returning refmet_id (observed 2026-11-10; it still returns refmet_name). The
+    # /name endpoint keyed by that refmet_name still returns the id, so it backfills the id.
+    NAME_URL = "https://www.metabolomicsworkbench.org/rest/refmet/name"
 
     # Only extract refmet_id - KRAKEN has all RefMet equivalencies
     API_FIELDS = ["refmet_id"]
@@ -383,6 +386,10 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             # unwritable / full / corrupt / locked store must NEVER abort a valid live resolution (or
             # the surrounding mapping). On any store error, log and return the live result unchanged.
             refmet_id = live.data.get("refmet_id") if live.data else None
+            if live.status == AVAILABILITY_VOTED and not refmet_id:
+                # Never overwrite a last-known-good id with a vote that carries none.
+                logging.warning("RefMet live vote for %r has no refmet_id; backup store not updated", metabolite_name)
+                return live
             try:
                 hit = refmet_store.get(metabolite_name)
                 if hit is None or hit.status != live.status or hit.refmet_id != refmet_id:
@@ -502,6 +509,23 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
                 self._sleep(self.RETRY_BACKOFF_S)
         return None  # unreachable: the loop returns or raises
 
+    def _lookup_refmet_id(self, refmet_name: Any, timeout: float) -> str:  # noqa: ANN401 — raw JSON value
+        """The RefMet id for a ``refmet_name`` /match returned, via ``/refmet/name/{name}/refmet_id``.
+
+        /match said this name matched, so a missing id here is a degraded answer, not a no-match: it
+        raises (UNAVAILABLE, counted by the breaker) rather than recording a vote with no id.
+        """
+        if not isinstance(refmet_name, str) or not refmet_name.strip():
+            raise requests.RequestException("RefMet /match matched without a refmet_name or refmet_id")
+        url = f"{self.NAME_URL}/{quote_name_path_segment(refmet_name)}/refmet_id"
+        response = self._session.get(url, timeout=timeout)
+        response.raise_for_status()
+        body = response.json()
+        refmet_id = body.get("refmet_id") if isinstance(body, dict) else None
+        if not isinstance(refmet_id, str) or not refmet_id.strip() or refmet_id == "-":
+            raise requests.RequestException(f"RefMet /name returned no refmet_id for {refmet_name!r}")
+        return refmet_id
+
     def _request_once(self, metabolite_name: str) -> dict[str, Any] | None:
         """One HTTP attempt. Returns the data dict, or None for a genuine no-match.
 
@@ -533,9 +557,13 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         data = response.json()
 
         if isinstance(data, dict):
-            if data.get("refmet_id") == "-":
-                # /match endpoint returns dict with "-" values when no match found
+            # /match answers a no-match with "-" values. It used to carry refmet_id == "-"; since
+            # 2026-11-10 it omits refmet_id entirely, so refmet_name == "-" marks the negative too.
+            if data.get("refmet_id") == "-" or data.get("refmet_name") == "-":
                 return None
+            if not data.get("refmet_id"):
+                # A match without its id: backfill it from /name, keyed by the matched refmet_name.
+                return {**data, "refmet_id": self._lookup_refmet_id(data.get("refmet_name"), timeout)}
             return data
 
         # A 200 whose body is not a dict (null, an array, a proxy-injected blob) is a DEGRADED

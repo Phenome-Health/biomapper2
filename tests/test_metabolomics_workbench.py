@@ -1,6 +1,6 @@
 """Unit tests for MetabolomicsWorkbenchAnnotator.
 
-Test suite (8 tests) covering:
+Test suite covering:
 - Basic annotator structure (1 test)
 - Core annotation behavior with /match endpoint (1 test)
 - Edge cases: no match, missing input (2 tests)
@@ -10,13 +10,46 @@ Test suite (8 tests) covering:
 - Full Mapper pipeline (1 end-to-end test)
 """
 
-from unittest.mock import MagicMock, patch
-
 import pandas as pd
 import pytest
 
 from biomapper2.core.annotators.base import BaseAnnotator
 from biomapper2.core.annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
+
+
+class _Resp:
+    def __init__(self, body, status_code=200):
+        self._body = body
+        self.status_code = status_code
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return self._body
+
+
+class _RoutedSession:
+    """Stands in for the annotator's cached session (it never uses ``requests.get``).
+
+    Routes by URL prefix: ``/refmet/match/...`` and ``/refmet/name/...``. Records every URL.
+    """
+
+    def __init__(self, match_body, name_body=None):
+        self.match_body = match_body
+        self.name_body = name_body
+        self.urls: list[str] = []
+
+    def get(self, url, timeout=None):
+        self.urls.append(url)
+        if url.startswith(MetabolomicsWorkbenchAnnotator.NAME_URL):
+            return _Resp(self.name_body)
+        return _Resp(self.match_body)
+
+
+def _offline(annotator, match_body, name_body=None):
+    annotator._session = _RoutedSession(match_body, name_body)  # type: ignore[assignment]
+    return annotator._session
 
 
 class TestMetabolomicsWorkbenchAnnotator:
@@ -35,30 +68,28 @@ class TestMetabolomicsWorkbenchAnnotator:
     # =========================================================================
     # Test 2: Core annotation behavior
     # =========================================================================
-    @patch("biomapper2.core.annotators.metabolomics_workbench.requests.get")
     @pytest.mark.unit
-    def test_get_annotations_returns_refmet_id(self, mock_get: MagicMock):
+    def test_get_annotations_returns_refmet_id(self):
         """Test that annotations return refmet_id (KRAKEN has all equivalencies)."""
-        # Arrange - /match endpoint response format
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "refmet_name": "Carnitine",
-            "formula": "C7H15NO3",
-            "exactmass": "161.1052",
-            "super_class": "Fatty Acyls",
-            "main_class": "Fatty acyl carnitines",
-            "sub_class": "Acyl carnitines",
-            "refmet_id": "RM0008606",
-        }
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
-
         annotator = MetabolomicsWorkbenchAnnotator()
+        # The pre-2026-11-10 /match shape, which still carried refmet_id: no /name call is needed.
+        session = _offline(
+            annotator,
+            {
+                "refmet_name": "Carnitine",
+                "formula": "C7H15NO3",
+                "exactmass": "161.1052",
+                "super_class": "Fatty Acyls",
+                "main_class": "Fatty acyl carnitines",
+                "sub_class": "Acyl carnitines",
+                "refmet_id": "RM0008606",
+            },
+        )
         entity = {"name": "Carnitine"}
 
         # Act
         result = annotator.get_annotations(entity, name_field="name", category="biolink:SmallMolecule")
+        assert not any(u.startswith(MetabolomicsWorkbenchAnnotator.NAME_URL) for u in session.urls)
 
         # Assert - only refmet_id is extracted (KRAKEN has all equivalencies)
         annotations = result["metabolomics-workbench"]
@@ -71,30 +102,27 @@ class TestMetabolomicsWorkbenchAnnotator:
     # Test 3: Edge case - not found
     # =========================================================================
     @pytest.mark.unit
-    @patch("biomapper2.core.annotators.metabolomics_workbench.requests.get")
-    def test_no_match_response(self, mock_get: MagicMock):
-        """Test that /match 'no match' response (dash values) returns empty annotations."""
-        # /match endpoint returns dashes when no match found
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+    @pytest.mark.parametrize("with_id_field", [True, False], ids=["legacy-dash-id", "no-id-field"])
+    def test_no_match_response(self, with_id_field):
+        """A /match no-match (dash values) is an empty vote, with or without the refmet_id field."""
+        body = {
             "refmet_name": "-",
             "formula": "-",
             "exactmass": "-",
             "super_class": "-",
             "main_class": "-",
             "sub_class": "-",
-            "refmet_id": "-",
         }
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
-
+        if with_id_field:
+            body["refmet_id"] = "-"
         annotator = MetabolomicsWorkbenchAnnotator()
+        session = _offline(annotator, body)
         entity = {"name": "NonexistentMetabolite"}
 
         result = annotator.get_annotations(entity, name_field="name", category="biolink:SmallMolecule")
 
         assert result == {"metabolomics-workbench": {}}
+        assert not any(u.startswith(MetabolomicsWorkbenchAnnotator.NAME_URL) for u in session.urls)
 
     # =========================================================================
     # Test 4: Edge case - missing input
@@ -113,20 +141,10 @@ class TestMetabolomicsWorkbenchAnnotator:
     # Test 5: Bulk operations
     # =========================================================================
     @pytest.mark.unit
-    @patch("biomapper2.core.annotators.metabolomics_workbench.requests.get")
-    def test_bulk_returns_series(self, mock_get: MagicMock):
+    def test_bulk_returns_series(self):
         """Test that get_annotations_bulk returns Series with matching index."""
-        # /match endpoint response format
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "refmet_name": "Carnitine",
-            "refmet_id": "RM0008606",
-        }
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
-
         annotator = MetabolomicsWorkbenchAnnotator()
+        _offline(annotator, {"refmet_name": "Carnitine", "refmet_id": "RM0008606"})
         entities = pd.DataFrame(
             {"name": ["Carnitine", "Glucose", "Alanine"]},
             index=[10, 20, 30],
