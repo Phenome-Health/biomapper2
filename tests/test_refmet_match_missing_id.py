@@ -127,7 +127,37 @@ def test_live_backup_never_overwrites_a_stored_id_with_an_id_less_vote(monkeypat
 def test_canary_live_refmet_still_yields_ids_for_known_names() -> None:
     """Fails loudly if RefMet stops supplying ids through both /match and /name."""
     ann = MetabolomicsWorkbenchAnnotator(freeze_mode="off")
+    # Bypass the 7-day HTTP cache (no reads, no writes) so this checks the live service.
+    with ann._session.cache_disabled():
+        _assert_live_ids(ann)
+
+
+def _assert_live_ids(ann: MetabolomicsWorkbenchAnnotator) -> None:
     for name, expected in (("Carnitine", "RM0008606"), ("acetylcarnitine (C2)", "RM0154009")):
         result = ann._fetch_live(name)
         assert result.status == AVAILABILITY_VOTED, (name, result)
         assert result.data is not None and result.data.get("refmet_id") == expected, (name, result.data)
+
+
+@pytest.mark.unit
+def test_the_id_backfill_respects_the_batch_deadline() -> None:
+    clock = {"t": 0.0}
+    ann = MetabolomicsWorkbenchAnnotator(max_retries=0, freeze_mode="off", clock=lambda: clock["t"])
+    timeouts: list[float | None] = []
+
+    class _SlowMatchSession(_Session):
+        def get(self, url, timeout=None):
+            timeouts.append(timeout)
+            if not url.startswith(MetabolomicsWorkbenchAnnotator.NAME_URL):
+                clock["t"] += 7.0  # /match takes 7 s of an 8 s budget
+            return super().get(url, timeout)
+
+    ann._session = _SlowMatchSession(MATCH_NO_ID, {"name": "CAR 2:0", "refmet_id": "RM0154009"})  # type: ignore[assignment]
+    ann._batch_deadline = 8.0
+    assert ann._fetch_live("acetylcarnitine (C2)").data["refmet_id"] == "RM0154009"  # type: ignore[index]
+    assert timeouts[1] is not None and timeouts[1] <= 1.0 + 1e-9  # /name gets only what is left
+
+    clock["t"] = 0.0
+    ann._batch_deadline = 7.0  # /match uses the whole budget
+    result = ann._fetch_live("acetylcarnitine (C2)")
+    assert result.status == AVAILABILITY_UNAVAILABLE

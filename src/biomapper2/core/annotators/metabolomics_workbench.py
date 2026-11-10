@@ -509,7 +509,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
                 self._sleep(self.RETRY_BACKOFF_S)
         return None  # unreachable: the loop returns or raises
 
-    def _lookup_refmet_id(self, refmet_name: Any, timeout: float) -> str:  # noqa: ANN401 — raw JSON value
+    def _lookup_refmet_id(self, refmet_name: Any) -> str:  # noqa: ANN401 — raw JSON value
         """The RefMet id for a ``refmet_name`` /match returned, via ``/refmet/name/{name}/refmet_id``.
 
         /match said this name matched, so a missing id here is a degraded answer, not a no-match: it
@@ -517,6 +517,14 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         """
         if not isinstance(refmet_name, str) or not refmet_name.strip():
             raise requests.RequestException("RefMet /match matched without a refmet_name or refmet_id")
+        # Its own timeout, re-capped by what is left of the batch deadline after /match answered, so
+        # the backfill can never run past BATCH_DEADLINE_S.
+        timeout = self.REQUEST_TIMEOUT_S
+        if self._batch_deadline is not None:
+            remaining = self._batch_deadline - self._clock()
+            if remaining <= 0:
+                raise requests.Timeout(f"batch deadline reached before the RefMet id lookup for {refmet_name!r}")
+            timeout = max(0.1, min(timeout, remaining))
         url = f"{self.NAME_URL}/{quote_name_path_segment(refmet_name)}/refmet_id"
         response = self._session.get(url, timeout=timeout)
         response.raise_for_status()
@@ -563,7 +571,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
                 return None
             if not data.get("refmet_id"):
                 # A match without its id: backfill it from /name, keyed by the matched refmet_name.
-                return {**data, "refmet_id": self._lookup_refmet_id(data.get("refmet_name"), timeout)}
+                return {**data, "refmet_id": self._lookup_refmet_id(data.get("refmet_name"))}
             return data
 
         # A 200 whose body is not a dict (null, an array, a proxy-injected blob) is a DEGRADED
