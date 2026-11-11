@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.4.0](https://github.com/Phenome-Health/biomapper2/compare/v1.3.1...v1.4.0) (2026-11-11)
+
+
+### Features
+
+* **icd10cm:** packaged CDC FY2027 hierarchy snapshot, build script and loader (Unit 4) ([f5b2bb8](https://github.com/Phenome-Health/biomapper2/commit/f5b2bb8cf7263f5178acf80f854262dd7b583b7a))
+* **icd10cm:** parent walk-up when the ICD10: twin misses (Unit 5) ([3135284](https://github.com/Phenome-Health/biomapper2/commit/31352845aff06fa2fd85ddad0197e59aa9705d19))
+* **linker:** ICD-10-CM same-code ICD10: twin retry (Unit 3) ([af51193](https://github.com/Phenome-Health/biomapper2/commit/af511938e2fc62305ed53e76abcb465fcd2d899e))
+* **mapping:** entity-general mapping_relation, mapping_predicate, icd10cm_route, kg_build (Unit 2) ([27b3de3](https://github.com/Phenome-Health/biomapper2/commit/27b3de34f179553a6e0266884cabe9cc01f09333))
+* **study:** ICD-10-CM twin control gate, regression list and denylist (Unit 1) ([9e0f40c](https://github.com/Phenome-Health/biomapper2/commit/9e0f40c545dfa0be2210cfa280b11b25eedd90f5))
+
+
+### Bug Fixes
+
+* **icd10cm:** preserve colliding input columns; retry failed KG build lookup ([e62ad65](https://github.com/Phenome-Health/biomapper2/commit/e62ad654281c09a74e578ddea4dba98e5e86c7d6))
+* **icd10cm:** treat an omitted twin as a lookup error before the walk-up ([ba35e04](https://github.com/Phenome-Health/biomapper2/commit/ba35e04972aeb21c18721b8e7ae735b4fb72cda9))
+* **icd10cm:** treat an omitted walk-up candidate as a lookup error, not a miss ([ae6138d](https://github.com/Phenome-Health/biomapper2/commit/ae6138d78af226287a4d1ed73887d1f659a57a62))
+* **mapper:** fail fast on unresolvable input/output column collision ([ebd73b8](https://github.com/Phenome-Health/biomapper2/commit/ebd73b8a88b25d6832d4d468300ac8fb3a791676))
+* **refmet:** backfill refmet_id from /name when /match omits it ([dd191d4](https://github.com/Phenome-Health/biomapper2/commit/dd191d4dd4884670c5de58e00e058644817ce972))
+* **refmet:** cap the id backfill by the batch deadline; canary bypasses the HTTP cache ([829c8d3](https://github.com/Phenome-Health/biomapper2/commit/829c8d3fb361b33a43026ba3da28a44915b544a1))
+
 ## [1.3.1](https://github.com/Phenome-Health/biomapper2/compare/v1.3.0...v1.3.1) (2026-11-06)
 
 
