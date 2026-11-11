@@ -719,7 +719,8 @@ class Resolver:
             # majority does (bare RM twin): KRAKEN holds bare RM twins (one equivalent id, no InChIKey) whose
             # connectivity resolves only by NAME. Committing one loses every xref and leaves the
             # certificate 'unavailable', for the same molecule.
-            if not self._kg_asserts_structure(refmet_node) and self._kg_asserts_structure(majority):
+            structured = self._kg_structured_nodes(refmet_node, majority)
+            if refmet_node not in structured and majority in structured:
                 return majority, None
             return refmet_node, None
         if same is False:
@@ -843,11 +844,14 @@ class Resolver:
                 preferred |= prefixes
         return preferred
 
-    def _kg_asserts_structure(self, node_id: str) -> bool:
-        """True if the node's own KG record lists an InChIKey (no name hop). False when unknown."""
+    def _kg_structured_nodes(self, node_a: str, node_b: str) -> set[str]:
+        """Nodes whose own KG record lists an InChIKey (no name hop); empty when unknown.
+
+        Same argument order as ``_connectivity_match`` so the node-record read is a cache hit.
+        """
         if self.structure_resolver is None:
-            return False
-        return bool(self.structure_resolver.kg_asserts_structure(node_id))
+            return set()
+        return set(self.structure_resolver.kg_structured_nodes([node_a, node_b]))
 
     def _connectivity_match(self, node_a: str, node_b: str) -> bool | None:
         """Delegate the InChIKey-connectivity test to the StructureResolver (None if unavailable)."""

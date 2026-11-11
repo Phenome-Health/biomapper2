@@ -18,7 +18,7 @@ def _resolver(conn_result, structured: set[str]):
     r = Resolver(linker=MagicMock(), biolink_client=MagicMock())
     r.structure_resolver = MagicMock()
     r.structure_resolver.connectivity_match.return_value = conn_result
-    r.structure_resolver.kg_asserts_structure.side_effect = lambda node: node in structured
+    r.structure_resolver.kg_structured_nodes.side_effect = lambda nodes: {n for n in nodes if n in structured}
     r._is_small_molecule = lambda category: category == SM
     r._preferred_prefixes = lambda category: {"RM", "CHEBI", "HMDB"}
     return r
@@ -97,3 +97,18 @@ def test_strict_count_winner_ignores_agreement():
     kg_ids = {"RM:1": ["a", "b"], "RM:2": ["c"]}
     assigned = {MW: {"RM:2": ["c"]}, KESTREL: {"RM:2": ["c"]}, GOSLIN: {"RM:1": ["a", "b"]}}
     assert r._stable_majority(kg_ids, SM, kg_ids_assigned=assigned) == "RM:1"
+
+
+def test_structure_check_reuses_the_connectivity_read():
+    """One node-record read, same order as connectivity_match, so the HTTP cache serves it."""
+    from biomapper2.core.structure_resolver import StructureResolver
+
+    linker = MagicMock()
+    linker.get_node_records.return_value = {
+        "RM:0005375": {"equivalent_ids": {"INCHIKEY": ["HXACOUQIXZGNBF-UHFFFAOYSA-N"]}},
+        "RM:0030084": {"equivalent_ids": {"RM": ["RM:0030084"]}},
+    }
+    sr = StructureResolver.__new__(StructureResolver)
+    sr.linker = linker
+    assert sr.kg_structured_nodes(["RM:0030084", "RM:0005375"]) == {"RM:0005375"}
+    linker.get_node_records.assert_called_once_with(["RM:0030084", "RM:0005375"])
