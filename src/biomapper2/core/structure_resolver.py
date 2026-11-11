@@ -69,6 +69,12 @@ class StructureResolver:
             return None
         return bool(blocks_a & blocks_b)
 
+    def kg_asserts_structure(self, node_id: str) -> bool:
+        """True if the node's KG record itself lists an InChIKey (no MW/PubChem/freeze name hop)."""
+        records = self.linker.get_node_records([node_id])
+        keys = ((records.get(node_id) or {}).get("equivalent_ids") or {}).get("INCHIKEY") or []
+        return any(keys)
+
     def inchikey_block(self, node_id: str, node_name: str | None, records: dict[str, Any] | None = None) -> str | None:
         """First InChIKey block for a node: KG record -> MW by name -> PubChem by name -> lipid."""
         records = records if records is not None else self.linker.get_node_records([node_id])
