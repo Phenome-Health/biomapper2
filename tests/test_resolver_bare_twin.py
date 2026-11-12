@@ -68,7 +68,7 @@ CHOL_ASSIGNED = {
 
 def test_count_tie_goes_to_the_node_two_annotators_agree_on():
     r = _resolver(None, structured={"RM:0135639"})
-    r.node_lipid_readings = lambda ids: {i: (None, None) for i in ids}
+    r.node_lipid_readings = lambda node_ids: {i: (None, None) for i in node_ids}
     chosen, flag = r._choose_best_kg_id(
         CHOL_KG_IDS,
         CHOL_ASSIGNED,
