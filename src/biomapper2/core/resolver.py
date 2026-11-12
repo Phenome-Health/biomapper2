@@ -537,11 +537,16 @@ class Resolver:
         category: str | None,
         lipid_levels: dict[str, str] | None = None,
         effective_level: str | None = None,
+        kg_ids_assigned: dict[str, dict[str, list[str]]] | None = None,
     ) -> str:
         """Majority vote by supporting-curie count with a DETERMINISTIC tie-break.
 
         A strict count winner is returned unchanged (byte-identical to the old
-        ``max(kg_ids_dict, key=len)``). On a genuine 2+ count tie the pick is (1) for a lipid tie whose
+        ``max(kg_ids_dict, key=len)``). On a genuine 2+ count tie the pool is first narrowed (0) to the
+        node(s) the MOST annotators voted for, when ``kg_ids_assigned`` is supplied: curie counts dedupe,
+        so two annotators naming the same node score 1, the same as one annotator naming a structure-less
+        twin (the bare-RM-twin case, e.g. cholesterol). Agreement is evidence, so it outranks the level and namespace
+        preferences below. Then the pick is (1) for a lipid tie whose
         candidates carry known levels, the node whose matched level EQUALS the effective query level
         (Unit 4), then (2) a category-preferred namespace when one is configured, then (3)
         ``_curie_sort_key`` as a total-order fallback, and a WARNING is logged so a coin-flip resolution
@@ -556,6 +561,14 @@ class Resolver:
         tied = [kg_id for kg_id, curies in kg_ids_dict.items() if len(curies) == max_count]
         if len(tied) == 1:
             return tied[0]
+        if kg_ids_assigned:
+            support = {kg_id: sum(1 for votes in kg_ids_assigned.values() if kg_id in votes) for kg_id in tied}
+            top = max(support.values())
+            agreed = [kg_id for kg_id in tied if support[kg_id] == top]
+            if len(agreed) == 1:
+                logging.info("majority tie among %s broken by annotator agreement: %s", sorted(tied), agreed[0])
+                return agreed[0]
+            tied = agreed
         # Unit 4: for a lipid tie, prefer the node whose matched level equals the EFFECTIVE query level
         # before today's namespace/numeric tie-break. Only narrows the pool when at least one tied node
         # matches exactly; otherwise (and for every non-lipid tie, where lipid_levels is empty) the pool
@@ -634,7 +647,7 @@ class Resolver:
 
         # Deterministic majority vote (stable tie-break on count ties; warning logged on a genuine tie).
         # Lipid level context, when supplied, makes the tie-break prefer the effective-query-level node.
-        majority = self._stable_majority(kg_ids_dict, category, lipid_levels, effective_level)
+        majority = self._stable_majority(kg_ids_dict, category, lipid_levels, effective_level, kg_ids_assigned)
 
         # Source-weighting applies ONLY to small-molecule ChEBI conflicts.
         if not (kg_ids_assigned and category and self._is_small_molecule(category)):
@@ -685,7 +698,9 @@ class Resolver:
                     )
                     if not compatible:
                         return None, None
-                    majority = self._stable_majority(compatible, category, lipid_levels, effective_level)
+                    majority = self._stable_majority(
+                        compatible, category, lipid_levels, effective_level, kg_ids_assigned
+                    )
                     guard_fired = True
 
         if not refmet_nodes or majority in refmet_nodes:
@@ -700,7 +715,14 @@ class Resolver:
             return refmet_node, None  # (c): a capped/generalized Goslin vote never overrides RefMet
         same = self._connectivity_match(refmet_node, majority)
         if same is True:
-            return refmet_node, None  # same molecule -> RefMet, silent
+            # Same molecule -> RefMet, silent; UNLESS RefMet's node carries no KG-asserted structure and the
+            # majority does (bare RM twin): KRAKEN holds bare RM twins (one equivalent id, no InChIKey) whose
+            # connectivity resolves only by NAME. Committing one loses every xref and leaves the
+            # certificate 'unavailable', for the same molecule.
+            structured = self._kg_structured_nodes(refmet_node, majority)
+            if refmet_node not in structured and majority in structured:
+                return majority, None
+            return refmet_node, None
         if same is False:
             return refmet_node, "divergent_refmet"  # different molecule -> RefMet, FLAG
         return majority, "conflict_no_structure"  # no InChIKey -> majority, FLAG
@@ -821,6 +843,15 @@ class Resolver:
             if category in self.biolink_client.get_descendants(configured):
                 preferred |= prefixes
         return preferred
+
+    def _kg_structured_nodes(self, node_a: str, node_b: str) -> set[str]:
+        """Nodes whose own KG record lists an InChIKey (no name hop); empty when unknown.
+
+        Same argument order as ``_connectivity_match`` so the node-record read is a cache hit.
+        """
+        if self.structure_resolver is None:
+            return set()
+        return set(self.structure_resolver.kg_structured_nodes([node_a, node_b]))
 
     def _connectivity_match(self, node_a: str, node_b: str) -> bool | None:
         """Delegate the InChIKey-connectivity test to the StructureResolver (None if unavailable)."""
