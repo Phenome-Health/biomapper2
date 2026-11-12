@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.1](https://github.com/Phenome-Health/biomapper2/compare/v1.4.0...v1.4.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* **resolver:** don't commit a structure-less RefMet twin over its annotated node ([19010b2](https://github.com/Phenome-Health/biomapper2/commit/19010b2a64e76eb235f3d839ee0a0d9f3b320e1f))
+
+
+### Performance Improvements
+
+* **resolver:** read both nodes' structure in the connectivity check's cached request ([5940e29](https://github.com/Phenome-Health/biomapper2/commit/5940e292f027a9a8de2b46c697fee08984c1ada6))
+
 ## [1.4.0](https://github.com/Phenome-Health/biomapper2/compare/v1.3.1...v1.4.0) (2026-11-11)
 
 
