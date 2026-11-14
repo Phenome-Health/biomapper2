@@ -83,7 +83,7 @@ STATIC_FALLBACK: dict[str, list[str]] = {
 
 def fetch_categories() -> list[str]:
     """Fetch all Kestrel knowledge graph categories."""
-    result = bulk_kestrel_request("GET", "categories", auth_required=False, timeout=PER_REQUEST_TIMEOUT)
+    result = bulk_kestrel_request("GET", "categories", timeout=PER_REQUEST_TIMEOUT)
     if isinstance(result, list):
         return [str(c) for c in result]
     return []

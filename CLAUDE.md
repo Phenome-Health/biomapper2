@@ -84,7 +84,8 @@ To add a new annotator (e.g., for Metabolomics Workbench API):
 `src/biomapper2/config.py` contains:
 - `KESTREL_API_URL`: Knowledge graph API endpoint
 - `BIOLINK_VERSION_DEFAULT`: Biolink model version
-- `KESTREL_API_KEY`: Required environment variable (from `.env`)
+- `PUBLIC_KESTREL_KEY_PREFIX`: Prefix (`kp_`) of keys the public endpoint issues; only those are sent to it
+- `KESTREL_API_KEY`: Optional (from `.env`). A `kp_` key is sent to the public host over https; any other key is sent only to non-public hosts and withheld from the public one
 
 ## Commit Convention
 

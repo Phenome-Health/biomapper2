@@ -43,14 +43,19 @@ CACHE_IGNORED_PARAMETERS = [
 ]
 
 # KG API configuration — override via KESTREL_API_URL in .env.
-# Defaults to the PUBLIC Kestrel, which needs no API key and serves the KRAKEN build the
-# published benchmarks pin. The internal endpoint (kestrel.nathanpricelab.com/api) is a
+# Defaults to the PUBLIC Kestrel, which serves the KRAKEN build the published benchmarks pin. It
+# issues its own keys (PUBLIC_KESTREL_KEY_PREFIX below); GET /health reports ``auth_required``.
+# The internal endpoint (kestrel.nathanpricelab.com/api) is a
 # different, older build — GET /metagraph on each reports the graph and version it serves.
 #
 # Named separately so request construction can refuse to send credentials here: an environment
 # that set KESTREL_API_KEY for the internal endpoint and never set KESTREL_API_URL would
 # otherwise start leaking that key to a third-party host the moment this default changed.
 PUBLIC_KESTREL_API_URL = "https://kestrel.krakenkg.com/api"
+# Keys issued BY the public Kestrel carry this prefix. It is what binds a key to that host: a
+# KESTREL_API_KEY with the prefix is sent to the public endpoint, any other key (an internal-endpoint
+# credential left in an old .env or a CI secret) is still withheld from it.
+PUBLIC_KESTREL_KEY_PREFIX = "kp_"
 KESTREL_API_URL = os.getenv("KESTREL_API_URL", PUBLIC_KESTREL_API_URL)
 
 
@@ -83,9 +88,10 @@ LOG_LEVEL = "INFO"
 def get_kestrel_api_key() -> str | None:
     """The Kestrel API key, or None when unset.
 
-    An unset key is not an error: the default (public) endpoint requires no authentication, so
-    requests simply go out without the header. Endpoints that do require it answer 401, which
-    ``kestrel_request`` surfaces with a pointer back to ``KESTREL_API_KEY``.
+    An unset key is not an error here: requests simply go out without the header, and an endpoint
+    that requires authentication answers 401, which ``kestrel_request`` surfaces with a pointer back
+    to ``KESTREL_API_KEY``. Whether a set key is actually SENT is decided per destination by
+    ``utils.kestrel_host_accepts_credentials``.
 
     Deliberately not memoized. ``os.getenv`` is a dict lookup, and the previous cache keyed on
     ``is None`` — which, once an unset key started returning None, only ever took effect when a key
