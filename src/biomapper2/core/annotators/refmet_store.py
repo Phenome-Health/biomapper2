@@ -636,9 +636,10 @@ def store_info(*, path: Path | None = None) -> tuple[Path, int]:
 def _read_freeze_votes(tsv_path: Path) -> dict[str, dict[str, str | None]]:
     """Freeze rows that are a vote with an id, keyed by the exact ``query_name``.
 
-    Reads the TSV directly, the way ``seed_from_tsv`` does (first valid occurrence of a query wins),
-    and never through ``refmet_snapshot.lookup``, which falls back to a case-folded key. Surrounding
-    spaces in ``query_name`` are kept: a padded query is a different query from the unpadded one.
+    Reads the TSV directly, like ``seed_from_tsv`` (first valid occurrence of a query wins), and never
+    through ``refmet_snapshot.lookup``, which falls back to a case-folded key. Unlike ``seed_from_tsv``,
+    surrounding spaces in ``query_name`` are kept: a padded query is a different query from the
+    unpadded one.
     """
     try:
         handle = tsv_path.open("r", encoding="utf-8", newline="")
@@ -651,7 +652,9 @@ def _read_freeze_votes(tsv_path: Path) -> dict[str, dict[str, str | None]]:
             raise StoreAdminError(f"freeze {tsv_path} has no query_name/status header")
         for row in reader:
             # The key is the query exactly as written: no strip, so " dha" never stands in for "dha".
-            # (seed_from_tsv does strip its keys; a padded freeze row then simply has no repair match.)
+            # seed_from_tsv DOES strip its keys, so the two disagree on a padded freeze row: the seed puts
+            # its vote on the store row "dha", while repair matches it only to a store row " dha" (one a
+            # live write-back created) and never restores the seeded "dha" row.
             query_name = row.get("query_name") or ""
             status = (row.get("status") or "").strip()
             if not query_name.strip() or query_name in first:
