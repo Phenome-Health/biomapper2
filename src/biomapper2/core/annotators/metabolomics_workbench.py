@@ -23,6 +23,7 @@ from .base import (
     AVAILABILITY_UNAVAILABLE,
     AVAILABILITY_VOTED,
     REFMET_SOURCE_FREEZE_BACKUP,
+    REFMET_SOURCE_KEPT_LIVE_NO_MATCH,
     REFMET_SOURCE_LIVE,
     REFMET_SOURCE_LOCAL,
     REFMET_SOURCE_NOT_IN_SNAPSHOT,
@@ -145,7 +146,12 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             if refmet_store.is_configured():
                 snapshot_path = config.get_refmet_snapshot_path()
                 if snapshot_path is not None:
-                    refmet_store.seed_from_tsv(snapshot_path)
+                    # Best-effort like every other store call: a store or migration error here must
+                    # not fail mapper start-up for this worker.
+                    try:
+                        refmet_store.seed_from_tsv(snapshot_path)
+                    except Exception as e:  # noqa: BLE001 — backup store is best-effort
+                        logging.warning("RefMet backup store seed failed (ignored): %s", e)
             else:
                 # Selected live_backup but no REFMET_STORE_PATH: the store no-ops, so there is NO outage
                 # fallback and behavior collapses to live-only. Surface it loudly rather than silently.
@@ -355,7 +361,8 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         - ``off``         : live ``/match`` only (breaker+retry+deadline), source=live_api/unavailable.
         - ``frozen``      : the immutable freeze served first (deterministic; breaker out of the path);
                             a miss is not_in_snapshot NO_MATCH unless ``LIVE_API_FALLBACK`` is on.
-        - ``live_backup`` : live-first + write-through store served as backup when live is down.
+        - ``live_backup`` : live-first + write-through store served as backup when live is down; a
+                            stored vote is kept against a live no-match (source=kept_live_no_match).
         - ``None`` (legacy, direct construction): the historical snapshot-first-if-present dispatch,
           preserved byte-for-byte so a caller that only sets ``REFMET_SNAPSHOT_PATH`` is unchanged.
         """
@@ -373,18 +380,22 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
     def _fetch_live_backup(self, metabolite_name: str) -> RefMetResult:
         """Live-first with a write-through store as an outage backup (mode ``live_backup``, D3/D6/D7).
 
-        Try live ``/match`` first. An authoritative live answer (VOTED or NO_MATCH — NO_MATCH is a
-        real negative, cached too) is returned as source=live_api and written back to the store when
-        the stored ``(status, refmet_id)`` is absent OR different (D7 — no write on an identical hit,
-        avoiding write amplification). When live is DOWN (breaker open / timeout / transport →
-        UNAVAILABLE), serve the store's last-known-good value as source=freeze_backup (D3: any age);
-        on a store miss, UNAVAILABLE.
+        Try live ``/match`` first. A live answer (VOTED or NO_MATCH) is returned as source=live_api
+        and written back to the store when it differs from what is stored (D7 — no write on an
+        identical hit, avoiding write amplification), with ONE exception (see refmet_store): a live NO_MATCH
+        for a query whose stored row is a vote with an id. RefMet ``/match`` has stopped matching names
+        it used to match, so that vote is kept: it is returned as source=kept_live_no_match, the store
+        row is not overwritten, and the change in the live answer is recorded once in the store's
+        change log. A live NO_MATCH with no stored vote is still a real negative and is written back
+        (D6). A live match with a different id still wins.
+
+        When live is DOWN (breaker open / timeout / transport → UNAVAILABLE), serve the store's
+        last-known-good value as source=freeze_backup (D3: any age); on a store miss, UNAVAILABLE.
         """
         live = self._fetch_live(metabolite_name)
         if live.status in (AVAILABILITY_VOTED, AVAILABILITY_NO_MATCH):
-            # Write-back is BEST-EFFORT: the store is a backup, never a source of truth, so an
-            # unwritable / full / corrupt / locked store must NEVER abort a valid live resolution (or
-            # the surrounding mapping). On any store error, log and return the live result unchanged.
+            # Every store call here is BEST-EFFORT: an unreadable / unwritable / full / corrupt /
+            # locked store must NEVER abort a valid live resolution (or the surrounding mapping).
             refmet_id = live.data.get("refmet_id") if live.data else None
             if live.status == AVAILABILITY_VOTED and not refmet_id:
                 # Never overwrite a last-known-good id with a vote that carries none.
@@ -392,15 +403,38 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
                 return live
             try:
                 hit = refmet_store.get(metabolite_name)
-                if hit is None or hit.status != live.status or hit.refmet_id != refmet_id:
-                    refmet_store.upsert(
-                        metabolite_name,
-                        status=live.status,
-                        refmet_id=refmet_id,
-                        source=REFMET_SOURCE_LIVE,
-                    )
             except Exception as e:  # noqa: BLE001 — backup store is best-effort; a failure is not fatal
-                logging.warning("RefMet backup store write failed for %r (ignored): %s", metabolite_name, e)
+                # Without the row there is no telling whether a vote is stored, so nothing is written:
+                # a blind write-back of a no-match could overwrite one.
+                logging.warning("RefMet backup store read failed for %r (store not updated): %s", metabolite_name, e)
+                return live
+            keep_vote = (
+                live.status == AVAILABILITY_NO_MATCH
+                and hit is not None
+                and hit.status == AVAILABILITY_VOTED
+                and bool(hit.refmet_id)
+            )
+            if self._store_write_due(hit, live.status, refmet_id):
+                try:
+                    kind = refmet_store.apply_live_answer(metabolite_name, live.status, refmet_id=refmet_id)
+                except Exception as e:  # noqa: BLE001 — backup store is best-effort; a failure is not fatal
+                    logging.warning("RefMet backup store write failed for %r (ignored): %s", metabolite_name, e)
+                    kind = None
+                if kind == refmet_store.CHANGE_VOTE_KEPT and hit is not None:
+                    # Once per query (the store records the change once), not once per request.
+                    logging.warning(
+                        "RefMet live /match no longer matches %r; kept stored vote %s (source=%s)",
+                        metabolite_name,
+                        hit.refmet_id,
+                        REFMET_SOURCE_KEPT_LIVE_NO_MATCH,
+                    )
+            if keep_vote and hit is not None:
+                return RefMetResult(
+                    AVAILABILITY_VOTED,
+                    {"refmet_id": hit.refmet_id},
+                    source=REFMET_SOURCE_KEPT_LIVE_NO_MATCH,
+                    version=hit.snapshot_version,
+                )
             return live
         # Live UNAVAILABLE: fall back to the last-known-good store value. A store READ failure likewise
         # degrades to UNAVAILABLE rather than aborting the mapping.
@@ -412,6 +446,28 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         if hit is not None:
             return self._result_from_store_hit(hit)
         return RefMetResult(AVAILABILITY_UNAVAILABLE, source=REFMET_SOURCE_UNAVAILABLE)
+
+    @staticmethod
+    def _store_write_due(hit: refmet_store.StoreHit | None, live_status: str, live_refmet_id: str | None) -> bool:
+        """Whether a live answer needs any store write, given the row read for its query.
+
+        False only when the row already says everything the answer would write: its vote columns need
+        no write-back and its last-recorded live answer is the same answer. The store function
+        re-checks all of this inside its own transaction; this only spares the write on a repeat.
+        """
+        if hit is None:
+            return True
+        has_vote = hit.status == AVAILABILITY_VOTED and bool(hit.refmet_id)
+        if not has_vote and hit.status != AVAILABILITY_NO_MATCH:
+            return True  # an `unavailable` row or a vote without an id: no last-known-good, overwrite it
+        answer = (live_status, live_refmet_id if live_status == AVAILABILITY_VOTED else None)
+        stored = (hit.status, hit.refmet_id if has_vote else None)
+        # Empty live columns mean "live last said what the row says" (see refmet_store's docstring).
+        last_live = stored
+        if hit.live_status is not None:
+            last_live = (hit.live_status, hit.live_refmet_id if hit.live_status == AVAILABILITY_VOTED else None)
+        keeps_vote = live_status == AVAILABILITY_NO_MATCH and has_vote
+        return last_live != answer or (not keeps_vote and stored != answer)
 
     @staticmethod
     def _result_from_store_hit(hit: refmet_store.StoreHit) -> RefMetResult:
