@@ -36,6 +36,9 @@ The API is deployed to the same Lightsail instance as kraken-backend:
    (keyless), which reports `kg_version`, `kraken_package_version`, `biolink_version`, the build
    `git_commit` and the ingested `sources`; `/metagraph` alone does not identify the build.
 
+   Add `KESTREL_API_KEY` with a key issued for that endpoint. Public-endpoint keys start with
+   `kp_`; a key from another endpoint is withheld from the public one.
+
 3. **Install uv and dependencies:**
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh

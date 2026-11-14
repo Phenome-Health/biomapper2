@@ -31,6 +31,7 @@ from .config import (
     KESTREL_REQUEST_TIMEOUT_S,
     LOG_LEVEL,
     PUBLIC_KESTREL_API_URL,
+    PUBLIC_KESTREL_KEY_PREFIX,
     get_kestrel_api_key,
     get_kestrel_api_url,
 )
@@ -289,7 +290,7 @@ class _KestrelCachedSession(requests_cache.CachedSession):
     ``requests`` strips only ``Authorization`` when a redirect changes origin (see
     ``SessionRedirectMixin.rebuild_auth``); a custom credential header is replayed verbatim to the
     new host. So a 301 from the internal endpoint to the public one — the obvious way to retire the
-    internal host — would hand the internal key to a third party even though
+    internal host — would hand the internal key to a different host even though
     :func:`kestrel_host_accepts_credentials` cleared the *configured* URL. Scrub it at the transport layer,
     where the actual destination is known.
     """
@@ -310,11 +311,16 @@ def _normalized_host(url: str) -> str | None:
     return host.rstrip(".") if host else None
 
 
-def kestrel_host_accepts_credentials(url: str) -> bool:
-    """False for the public Kestrel, which needs no key and must never receive one.
+def kestrel_host_accepts_credentials(url: str, api_key: str | None = None) -> bool:
+    """Whether ``api_key`` may be sent to the host in ``url``.
 
-    Compared by normalized hostname, so none of a trailing slash, a different path, a trailing FQDN
-    dot, or an embedded ``user@`` can smuggle the credential to the public host.
+    The public Kestrel receives only keys it issued itself, recognised by
+    ``PUBLIC_KESTREL_KEY_PREFIX``. Any other key is withheld from it: an environment that set
+    KESTREL_API_KEY for the internal endpoint and never set KESTREL_API_URL must not hand that
+    internal credential to a different host. Every other host receives whatever key is configured.
+
+    The host is compared by normalized hostname, so none of a trailing slash, a different path, a
+    trailing FQDN dot, or an embedded ``user@`` changes which rule applies.
 
     Fails CLOSED: a URL with no parseable host (e.g. a missing scheme) withholds the key rather than
     sending it, since we cannot prove where it would go.
@@ -322,7 +328,9 @@ def kestrel_host_accepts_credentials(url: str) -> bool:
     host = _normalized_host(url)
     if host is None:
         return False
-    return host != _normalized_host(PUBLIC_KESTREL_API_URL)
+    if host != _normalized_host(PUBLIC_KESTREL_API_URL):
+        return True
+    return bool(api_key) and str(api_key).startswith(PUBLIC_KESTREL_KEY_PREFIX)
 
 
 def _warn_key_withheld_once(url: str) -> None:
@@ -337,10 +345,10 @@ def _warn_key_withheld_once(url: str) -> None:
         return
     _key_withheld_warned = True
     logging.warning(
-        f"KESTREL_API_KEY is set but KESTREL_API_URL points at the public endpoint "
-        f"({url}), which needs no key — withholding the credential rather than "
-        "sending it to a public host. Unset KESTREL_API_KEY, or set KESTREL_API_URL to the "
-        "endpoint the key was issued for."
+        f"KESTREL_API_KEY is set but was not issued by the public endpoint ({url}): its keys "
+        f"start with '{PUBLIC_KESTREL_KEY_PREFIX}'. Withholding the credential rather than sending "
+        "it to a host it does not belong to. Set KESTREL_API_KEY to a key issued for the public "
+        "endpoint, or set KESTREL_API_URL to the endpoint this key was issued for."
     )
 
 
@@ -425,7 +433,7 @@ def bulk_kestrel_request(
     headers: dict[str, str] = {}
     api_key = get_kestrel_api_key() if auth_required else None
     if api_key:
-        if kestrel_host_accepts_credentials(base_url):
+        if kestrel_host_accepts_credentials(base_url, api_key):
             headers[_KESTREL_KEY_HEADER] = api_key
         else:
             _warn_key_withheld_once(base_url)
@@ -460,15 +468,19 @@ def bulk_kestrel_request(
                 continue
             if status is not None and 500 <= status < 600:
                 bump(endpoint, "terminal_5xx")
-            # Remediation hint for the keyless-default misconfiguration, appended rather than
-            # branched so the auth path keeps the exception text and traceback.
+            # Remediation hint for an auth rejection, appended rather than branched so the auth path
+            # keeps the exception text and traceback. Three distinct causes, three different fixes.
             hint = ""
-            if status in (401, 403) and not api_key:
-                hint = (
-                    f" No KESTREL_API_KEY is set and {base_url} requires authentication; "
-                    f"set it, or point KESTREL_API_URL at the public endpoint "
-                    f"({PUBLIC_KESTREL_API_URL}), which needs no key."
-                )
+            if status in (401, 403):
+                if _KESTREL_KEY_HEADER in headers:
+                    hint = f" {base_url} rejected the configured KESTREL_API_KEY; check that it is current."
+                elif api_key:
+                    hint = (
+                        f" KESTREL_API_KEY is set but was withheld from {base_url} because it was not "
+                        f"issued by that endpoint (its keys start with '{PUBLIC_KESTREL_KEY_PREFIX}')."
+                    )
+                else:
+                    hint = f" No KESTREL_API_KEY is set and {base_url} requires authentication; set one."
             logging.error(f"Kestrel API HTTP error ({endpoint}): {e}{hint}", exc_info=True)
             raise
         except transient as e:

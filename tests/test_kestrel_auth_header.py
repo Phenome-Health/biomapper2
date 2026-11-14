@@ -2,9 +2,10 @@
 
 Two distinct leak paths are pinned here:
 
-1. **On the wire.** The default endpoint is the public keyless Kestrel. Environments provisioned
-   from the old deploy template set KESTREL_API_KEY and never set KESTREL_API_URL, so without a
-   host guard those upgrades would send an internal credential to a public third-party host.
+1. **On the wire.** The default endpoint is the public Kestrel, which issues its own ``kp_`` keys.
+   Environments provisioned from the old deploy template set an INTERNAL KESTREL_API_KEY and never
+   set KESTREL_API_URL, so without a guard those upgrades would send an internal credential to a
+   different host. The guard therefore sends the public host only keys it issued.
 2. **At rest.** ``requests_cache`` redacts a default list of secret-ish parameter names, but matches
    them CASE-SENSITIVELY -- its "X-API-KEY" entry never matched the "X-API-Key" we send, so the
    credential was persisted in cleartext into every cached record. A mock-based test cannot catch
@@ -23,6 +24,7 @@ from biomapper2.config import CACHE_IGNORED_PARAMETERS, PUBLIC_KESTREL_API_URL
 
 INTERNAL_URL = "https://kestrel.nathanpricelab.com/api"
 SECRET = "internal-secret-value-do-not-transmit"
+PUBLIC_KEY = "kp_public-issued-key-for-tests"
 
 
 @pytest.fixture(autouse=True)
@@ -90,13 +92,88 @@ def test_key_is_withheld_from_the_public_endpoint():
     assert "X-API-Key" not in _capture_headers(PUBLIC_KESTREL_API_URL, SECRET)
 
 
+def test_public_issued_key_is_sent_to_the_public_endpoint():
+    """A key the public endpoint issued must reach it, or the endpoint cannot enforce auth."""
+    assert _capture_headers(PUBLIC_KESTREL_API_URL, PUBLIC_KEY)["X-API-Key"] == PUBLIC_KEY
+
+
+def test_public_issued_key_is_sent_by_default_with_no_url_configured(monkeypatch):
+    """The deployed shape: KESTREL_API_KEY set, KESTREL_API_URL unset. Nothing is mocked but the
+    transport, so this fails if the default URL, the key reader and the guard ever stop agreeing."""
+    monkeypatch.delenv("KESTREL_API_URL", raising=False)
+    monkeypatch.setenv("KESTREL_API_KEY", PUBLIC_KEY)
+    session = MagicMock()
+    session.request.return_value.json.return_value = {}
+    session.request.return_value.raise_for_status.return_value = None
+
+    utils.bulk_kestrel_request("POST", "hybrid-search", session=session, json={})
+
+    url = session.request.call_args.args[1]
+    assert url.startswith(PUBLIC_KESTREL_API_URL)
+    assert session.request.call_args.kwargs["headers"]["X-API-Key"] == PUBLIC_KEY
+
+
+@pytest.mark.parametrize("key", ["KP_uppercase-prefix", "xkp_prefix-not-at-start", "kp", " kp_leading-space"])
+def test_near_miss_prefixes_are_withheld_from_the_public_endpoint(key):
+    """Only the exact issued prefix binds a key to the public host."""
+    assert "X-API-Key" not in _capture_headers(PUBLIC_KESTREL_API_URL, key)
+
+
+def test_public_issued_key_is_sent_to_every_spelling_of_the_public_host():
+    for url in (
+        "https://kestrel.krakenkg.com/api/",
+        "https://KESTREL.KRAKENKG.COM/api",
+        "https://kestrel.krakenkg.com./api",
+    ):
+        assert _capture_headers(url, PUBLIC_KEY)["X-API-Key"] == PUBLIC_KEY
+
+
+def test_unparseable_url_withholds_even_a_public_issued_key():
+    assert "X-API-Key" not in _capture_headers("kestrel.krakenkg.com/api", PUBLIC_KEY)
+
+
+def test_no_warning_when_a_public_issued_key_is_sent():
+    with patch.object(utils.logging, "warning") as warn:
+        _capture_headers(PUBLIC_KESTREL_API_URL, PUBLIC_KEY)
+    assert warn.call_count == 0
+
+
+def _auth_failure_log(url: str, api_key: str | None, status: int = 401) -> str:
+    """Drive one rejected request and return the logged error text."""
+    response = MagicMock()
+    response.status_code = status
+    response.raise_for_status.side_effect = requests.exceptions.HTTPError(f"{status} Unauthorized", response=response)
+    session = MagicMock()
+    session.request.return_value = response
+    with (
+        patch.object(utils, "get_kestrel_api_url", return_value=url),
+        patch.object(utils, "get_kestrel_api_key", return_value=api_key),
+        patch.object(utils.logging, "error") as err,
+        pytest.raises(requests.exceptions.HTTPError),
+    ):
+        utils.bulk_kestrel_request("POST", "hybrid-search", session=session, json={})
+    return err.call_args.args[0]
+
+
+def test_auth_failure_hint_names_the_actual_cause():
+    """An operator must be able to tell 'no key', 'key withheld' and 'key rejected' apart."""
+    assert "No KESTREL_API_KEY is set" in _auth_failure_log(PUBLIC_KESTREL_API_URL, None)
+    assert "was withheld" in _auth_failure_log(PUBLIC_KESTREL_API_URL, SECRET)
+    assert "rejected the configured KESTREL_API_KEY" in _auth_failure_log(PUBLIC_KESTREL_API_URL, PUBLIC_KEY, 403)
+
+
+def test_auth_failure_hint_never_contains_the_key():
+    for key in (SECRET, PUBLIC_KEY):
+        assert key not in _auth_failure_log(PUBLIC_KESTREL_API_URL, key)
+
+
 def test_key_is_sent_to_the_internal_endpoint():
     """The guard must not break the endpoint that actually requires authentication."""
     assert _capture_headers(INTERNAL_URL, SECRET)["X-API-Key"] == SECRET
 
 
 def test_no_key_configured_sends_no_header():
-    """Keyless operation against the public endpoint is the new default path."""
+    """With no key configured nothing is sent; the endpoint decides whether that is acceptable."""
     assert "X-API-Key" not in _capture_headers(PUBLIC_KESTREL_API_URL, None)
 
 
@@ -117,7 +194,7 @@ def test_auth_required_false_sends_no_header():
     ],
 )
 def test_public_host_variants_all_withhold_the_key(url):
-    """The guard matches on normalized host, so no spelling of the public host receives the key."""
+    """The guard matches on normalized host, so no spelling of the public host receives a key it did not issue."""
     assert "X-API-Key" not in _capture_headers(url, SECRET)
 
 

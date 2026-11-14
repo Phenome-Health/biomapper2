@@ -317,13 +317,14 @@ scripts/                        # Development scripts (check.sh, fix.sh)
 
 Environment variables (set in `.env`):
 - `KESTREL_API_URL` - Knowledge graph API endpoint. Defaults to the public Kestrel
-  (`https://kestrel.krakenkg.com/api`), which requires no key. Point it at
+  (`https://kestrel.krakenkg.com/api`). Point it at
   `https://kestrel.nathanpricelab.com/api` for the internal endpoint, which serves a
   different KRAKEN build. Pin the build from `GET $KESTREL_API_URL/health` (keyless), which reports
   `kg_version`, `kraken_package_version`, `biolink_version`, the build `git_commit` and the ingested
   `sources`; `/metagraph` alone does not identify the build.
-- `KESTREL_API_KEY` - API key for the Kestrel API (required only by the internal endpoint;
-  the public one ignores it)
+- `KESTREL_API_KEY` - API key for the Kestrel API. A key issued by the public endpoint (prefix
+  `kp_`) is sent to it; any other key is sent only to a non-public endpoint and is withheld from the
+  public one. `GET $KESTREL_API_URL/health` reports `auth_required`
 
 Additional settings in `src/biomapper2/config.py`:
 - `BIOLINK_VERSION_DEFAULT` - Default Biolink model version
