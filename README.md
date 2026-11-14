@@ -326,6 +326,48 @@ Environment variables (set in `.env`):
   `kp_`) is sent to it; any other key is sent only to a non-public endpoint and is withheld from the
   public one. `GET $KESTREL_API_URL/health` reports `auth_required`
 
+- `REFMET_FREEZE_MODE` - Where RefMet name matches come from: `off` (live Metabolomics Workbench
+  `/match` only), `frozen` (a pinned freeze TSV at `REFMET_SNAPSHOT_PATH`, no network) or
+  `live_backup` (live first, with a SQLite store at `REFMET_STORE_PATH` as backup). See
+  [RefMet in `live_backup` mode](#refmet-in-live_backup-mode).
+
+#### RefMet in `live_backup` mode
+
+Live `/match` is asked first and its answer is written to the store at `REFMET_STORE_PATH`. Each
+result says which source served it in `refmet_source`:
+
+| `refmet_source` | Meaning |
+|---|---|
+| `live_api` | Live `/match` answered (a match or a no-match). |
+| `freeze_backup` | Live was unreachable; the store's last-known value was served. |
+| `kept_live_no_match` | Live answered no-match, but the store holds an earlier vote for this exact query. The stored vote was served and the store row was left alone. |
+| `unavailable` | Live was unreachable and the store has no row for the query. |
+
+`kept_live_no_match` exists because RefMet `/match` has stopped matching names it used to match
+(for example `docosahexaenoate (dha; 22:6n3)`, around 2026-11-12) while the RefMet entries
+themselves still exist. A kept vote has `refmet_availability` `voted`, raises no review flag, and is
+counted under its own label in a batch's `refmet_source_counts`, so a run summary shows how many
+votes were kept. A live match with a different id still replaces the stored vote. The stored vote is
+kept until its store row is deleted or edited; it does not expire, and nothing checks that the id
+still exists in RefMet. Live answers are cached over HTTP for 7 days, so a change upstream can take
+up to a week to show.
+
+Every change in what live says for a query is recorded once in the store. List the changes, back up
+the store, or restore rows that an earlier release overwrote with `scripts/refmet_store_admin.py`,
+run from the repository root as the user the API runs as:
+
+```bash
+uv run python scripts/refmet_store_admin.py history --limit 50
+uv run python scripts/refmet_store_admin.py backup /path/to/refmet_store.backup.sqlite
+uv run python scripts/refmet_store_admin.py repair --freeze /path/to/freeze.tsv --since 2026-11-12
+uv run python scripts/refmet_store_admin.py repair --freeze /path/to/freeze.tsv --since 2026-11-12 --apply --expect-count 5
+```
+
+`repair` lists store rows that are a no-match where the freeze file has a vote for the same exact
+query. It writes nothing without `--apply`, and `--apply` refuses to run unless the list has exactly
+`--expect-count` rows, the number reviewed in the dry run. `backup` uses SQLite's online backup; do
+not copy a store file the API is writing to with `cp`.
+
 Additional settings in `src/biomapper2/config.py`:
 - `BIOLINK_VERSION_DEFAULT` - Default Biolink model version
 - `LOG_LEVEL` - Logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)

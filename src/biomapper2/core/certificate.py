@@ -577,8 +577,9 @@ def issue(
             unavailable / not_queried). A runtime availability input like ``equivalent_ids_lookup_ok``,
             recorded on the certificate; it does not affect the state machine.
         refmet_source: WHICH RefMet source served the row (local_snapshot / not_in_snapshot /
-            live_api / freeze_backup / kept_live_no_match / unavailable / not_queried). A provenance tag on a parallel axis to
-            ``refmet_availability``; like it, recorded but not part of the state machine.
+            live_api / freeze_backup / kept_live_no_match / unavailable / not_queried). A provenance
+            tag on a parallel axis to ``refmet_availability``; like it, recorded but not part of the
+            state machine.
         refmet_snapshot_version: Version of the freeze that served (or was consulted for) the row,
             else None. Recorded, not part of the state machine.
         lipid_structure: A STRUCTURE-FREE lipid verdict, pre-computed upstream (this function never

@@ -212,3 +212,137 @@ def test_route_armed_deadline_survives_nested_fetch_all():
     assert ann.arm_batch_deadline() is False  # still armed
     ann.disarm_batch_deadline()
     assert ann._batch_deadline is None
+
+
+# --------------------------------------------------------------------------------------------
+# Kept vote (source ``kept_live_no_match``): the label flows annotator -> engine ->
+# mapper -> certificate -> batch counts with no change in shape.
+# --------------------------------------------------------------------------------------------
+
+KEPT = "kept_live_no_match"
+
+
+def test_engine_surfaces_a_kept_vote_as_voted_with_the_kept_label(monkeypatch, tmp_path):
+    from biomapper2.core.annotators import refmet_store
+
+    monkeypatch.setenv("REFMET_STORE_PATH", str(tmp_path / "store.sqlite"))
+    monkeypatch.delenv("REFMET_SNAPSHOT_PATH", raising=False)
+    refmet_store.upsert("docosahexaenoate (dha; 22:6n3)", "voted", refmet_id="RM0153631")
+    ann = MetabolomicsWorkbenchAnnotator(freeze_mode="live_backup")
+    ann._request_once = lambda metabolite_name: None  # live /match now says no-match
+
+    engine = _engine()
+    engine.annotator_registry[REFMET_ANNOTATOR] = ann
+    result = engine.annotate(
+        item={"name": "docosahexaenoate (dha; 22:6n3)"},
+        name_field="name",
+        provided_id_fields=[],
+        category=CATEGORY,
+        prefixes=[],
+        mode="all",
+        annotators=[REFMET_ANNOTATOR],
+    )
+    assert isinstance(result, pd.Series)
+    assert result["annotator_availability"][REFMET_ANNOTATOR] == "voted"
+    assert result["annotator_source"][REFMET_ANNOTATOR] == KEPT
+    assert result["assigned_ids"][REFMET_ANNOTATOR] == {"refmet_id": {"RM0153631": {}}}
+
+
+def _offline_mapper_with_refmet_source(refmet_source: str):
+    """Real ``map_entity_to_kg`` + real Resolver over mocked stages (as in test_source_weighting_e2e).
+
+    The engine reports a RefMet vote with the given source; the linker puts that vote on its own node.
+    """
+    from biomapper2.mapper import Mapper
+
+    m = Mapper.__new__(Mapper)
+    m.biolink_client = MagicMock()
+    m.biolink_client.standardize_entity_type = lambda t: CATEGORY
+    m.biolink_client.get_descendants = lambda c: {CATEGORY}
+    m.annotation_engine = MagicMock()
+    m.annotation_engine.annotate = lambda **k: pd.Series(
+        {
+            "annotator_availability": {REFMET_ANNOTATOR: "voted"},
+            "annotator_source": {REFMET_ANNOTATOR: refmet_source},
+        }
+    )
+    m.normalizer = MagicMock()
+    m.normalizer.get_standard_prefix = lambda v: None
+    m.normalizer.normalize = lambda **k: pd.Series(dtype=object)
+    m.linker = MagicMock()
+    m.linker.link = lambda s: pd.Series({"kg_ids": KG_IDS, "kg_ids_provided": {}, "kg_ids_assigned": REFMET_VOTE})
+    m.linker.get_equivalent_ids_checked = lambda ids, prefixes=None: ({}, True)
+    m.tier_b = None
+    m.resolver = Resolver(linker=m.linker, biolink_client=m.biolink_client)
+    m.resolver.structure_resolver = MagicMock()
+    m.resolver.structure_resolver.connectivity_match.return_value = True  # same molecule: no flag
+    return m
+
+
+def _map_one(refmet_source: str) -> dict:
+    out = _offline_mapper_with_refmet_source(refmet_source).map_entity_to_kg(
+        {"name": "docosahexaenoate (dha; 22:6n3)"}, name_field="name", provided_id_fields=[], entity_type="metabolite"
+    )
+    assert isinstance(out, dict)
+    return out
+
+
+def test_kept_vote_reaches_the_result_and_certificate_and_resolves_like_a_live_vote():
+    kept = _map_one(KEPT)
+    live = _map_one("live_api")
+
+    assert kept["refmet_availability"] == "voted"
+    assert kept["refmet_source"] == KEPT
+    certificate = kept["resolution_certificate"]
+    assert certificate["refmet_availability"] == "voted"
+    assert certificate["refmet_source"] == KEPT
+    # A kept vote is an ordinary RefMet vote to the resolver: same node and same (absent) review flag
+    # as the same row served live, and a certificate that differs in the source label only.
+    assert kept["chosen_kg_id"] == live["chosen_kg_id"] == "CHEBI:refmet"
+    assert kept["chosen_kg_id_review"] is None and live["chosen_kg_id_review"] is None
+    live_certificate = dict(live["resolution_certificate"], refmet_source=KEPT)
+    assert certificate == live_certificate
+
+
+def test_kept_vote_certificate_has_no_snapshot_version_like_a_freeze_backup_row(monkeypatch):
+    from biomapper2.core.annotators import refmet_snapshot
+
+    # Even with a freeze loaded: the mapper stamps the version by source label, and neither label is
+    # in the snapshot-attributable set.
+    monkeypatch.setattr(refmet_snapshot, "version", lambda: "mw_match_fixture")
+    kept = _map_one(KEPT)
+    backup = _map_one("freeze_backup")
+    assert kept["refmet_snapshot_version"] is None and backup["refmet_snapshot_version"] is None
+    assert kept["resolution_certificate"]["refmet_snapshot_version"] is None
+    assert backup["resolution_certificate"]["refmet_snapshot_version"] is None
+    assert _map_one("local_snapshot")["refmet_snapshot_version"] == "mw_match_fixture"  # positive control
+
+
+def test_batch_summary_counts_a_kept_vote_under_its_own_label():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from biomapper2.api.main import app
+
+    sources = ["live_api", KEPT, "live_api"]
+    mapper = MagicMock()
+    mapper.map_entity_to_kg.side_effect = [
+        {"name": f"m{i}", "chosen_kg_id": "CHEBI:1", "refmet_availability": "voted", "refmet_source": source}
+        for i, source in enumerate(sources)
+    ]
+    with TestClient(app) as client:
+        fa = client.app
+        assert isinstance(fa, FastAPI)
+        original = fa.state.mapper
+        fa.state.mapper = mapper
+        try:
+            response = client.post(
+                "/api/v1/map/batch",
+                json={"entities": [{"name": f"m{i}", "entity_type": "metabolite"} for i in range(len(sources))]},
+            )
+        finally:
+            fa.state.mapper = original
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"]["refmet_source_counts"] == {"live_api": 2, KEPT: 1}
+    assert [r["refmet_source"] for r in body["results"]] == sources

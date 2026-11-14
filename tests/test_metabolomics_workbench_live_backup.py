@@ -3,7 +3,8 @@
 Fixture + monkeypatch only; NEVER a live call. Proves the write-through design:
 - live VOTED -> source=live_api, written back to the store when the stored value differs (D7);
 - live VOTED identical to the store -> NO write-back (no write amplification);
-- live NO_MATCH -> written back as a negative cache (D6);
+- live NO_MATCH with no stored vote -> written back as a negative cache (D6);
+- live NO_MATCH with a stored vote -> the vote is kept, source=kept_live_no_match, logged once;
 - live DOWN (breaker open) + store hit -> source=freeze_backup (the flip-killing backup, D3);
 - live DOWN + store miss -> unavailable;
 - modes ``off`` / ``frozen`` still dispatch to the untouched live / snapshot paths.
@@ -143,7 +144,7 @@ def test_store_failure_is_best_effort_never_aborts(store_db: Path, monkeypatch):
 
 
 # --------------------------------------------------------------------------------------------
-# Keep the last-known-good vote against a live no-match (issue #159)
+# Keep the last-known-good vote against a live no-match
 # --------------------------------------------------------------------------------------------
 
 DHA = "docosahexaenoate (dha; 22:6n3)"

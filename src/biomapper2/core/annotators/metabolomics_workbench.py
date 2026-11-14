@@ -382,7 +382,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
 
         Try live ``/match`` first. A live answer (VOTED or NO_MATCH) is returned as source=live_api
         and written back to the store when it differs from what is stored (D7 — no write on an
-        identical hit, avoiding write amplification), with ONE exception (issue #159): a live NO_MATCH
+        identical hit, avoiding write amplification), with ONE exception (see refmet_store): a live NO_MATCH
         for a query whose stored row is a vote with an id. RefMet ``/match`` has stopped matching names
         it used to match, so that vote is kept: it is returned as source=kept_live_no_match, the store
         row is not overwritten, and the change in the live answer is recorded once in the store's

@@ -30,7 +30,7 @@ AVAILABILITY_NOT_QUERIED = "not_queried"
 #   kept_live_no_match : mode ``live_backup`` only — live ANSWERED with a no-match, but the store holds
 #                     a last-known-good vote for this exact query, so that vote is served instead
 #                     (availability ``voted``). Not ``freeze_backup``: live was up. RefMet /match has
-#                     stopped matching names it used to match (issue #159), so a new no-match is more
+#                     stopped matching names it used to match (see refmet_store), so a new no-match is more
 #                     likely upstream drift than a retired entry. Deleting the store row clears it.
 #   unavailable     : the live service did not answer (breaker open / transport error / timeout).
 #   not_queried     : RefMet was not selected for the row.
