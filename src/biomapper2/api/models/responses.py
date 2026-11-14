@@ -88,9 +88,11 @@ class ResolutionCertificateModel(BaseModel):
         default="not_queried",
         description="WHICH RefMet source served the row, on a parallel axis to 'refmet_availability': "
         "'local_snapshot' (the pinned freeze answered) | 'not_in_snapshot' (freeze loaded, name absent, "
-        "deterministic no-match, no network) | 'live_api' (live /match answered) | 'unavailable' (live "
-        "service did not answer) | 'not_queried'. With a freeze present the circuit breaker is out of "
-        "the default path.",
+        "deterministic no-match, no network) | 'live_api' (live /match answered) | 'freeze_backup' (live "
+        "was down; the backup store's last-known-good value was served) | 'kept_live_no_match' (live "
+        "answered no-match but the backup store holds an earlier vote for this exact query, which was "
+        "kept) | 'unavailable' (live service did not answer) | 'not_queried'. With a freeze present the "
+        "circuit breaker is out of the default path.",
     )
     refmet_snapshot_version: str | None = Field(
         default=None,
@@ -295,7 +297,8 @@ class EntityMappingResult(BaseModel):
     refmet_source: str = Field(
         default="not_queried",
         description="Per-row RefMet source, mirrored from the certificate: 'local_snapshot' | "
-        "'not_in_snapshot' | 'live_api' | 'unavailable' | 'not_queried'. Always present (never None).",
+        "'not_in_snapshot' | 'live_api' | 'freeze_backup' | 'kept_live_no_match' | 'unavailable' | "
+        "'not_queried'. Always present (never None).",
     )
     refmet_snapshot_version: str | None = Field(
         default=None,

@@ -93,6 +93,12 @@ Live `NO_MATCH` is a real, authoritative result → write it back (store `status
 stored `no_match` deterministically returns NO_MATCH. Prevents re-hammering `/match` for known-absent names
 and keeps backup behavior correct.
 
+> **Narrowed 2026-11-13 (Phenome-Health/biomapper2#159).** A live `NO_MATCH` is authoritative only for a
+> query with no stored vote. When the store row for the exact query is a vote with an id, the no-match
+> is not written back: the vote is kept and served as source `kept_live_no_match`, and the change in
+> the live answer is recorded once in the store's change log. See
+> `docs/plans/2026-11-13-001-fix-refmet-keep-vote-on-live-no-match-plan.md`.
+
 ### D7 — "Different" definition
 Write back when `store.get(name)` is **absent** OR its `(status, refmet_id)` **differs** from the live
 result. No-op when identical (avoids write amplification).
