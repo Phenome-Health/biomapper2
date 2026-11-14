@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.5.0](https://github.com/Phenome-Health/biomapper2/compare/v1.4.1...v1.5.0) (2026-11-14)
+
+
+### Features
+
+* **kestrel:** send public-issued kp_ keys to the public Kestrel endpoint ([e9ec8f3](https://github.com/Phenome-Health/biomapper2/commit/e9ec8f3c7431e0bdff8d142cbbf4d27f5778caac))
+
+
+### Bug Fixes
+
+* **kestrel:** require https for public keys; redirect-aware auth hint ([b47e47f](https://github.com/Phenome-Health/biomapper2/commit/b47e47f917d184cdc074791a0ad5d0b86f3fc126))
+* **refmet:** add store admin script with history, repair and backup ([4433e6c](https://github.com/Phenome-Health/biomapper2/commit/4433e6c0c1a4a6a5bdc54aee32b45c7b6b0df343))
+* **refmet:** carry the kept-vote label through docs and plumbing tests ([e0e0a96](https://github.com/Phenome-Health/biomapper2/commit/e0e0a9638587ec5d4614b32bfdfd2c3e00814f8e))
+* **refmet:** keep query_name padding when keying freeze votes for repair ([75aa1bf](https://github.com/Phenome-Health/biomapper2/commit/75aa1bfec5882dbc3d42c855319e45d07e847400))
+* **refmet:** keep the stored vote when live /match turns into a no-match ([45f471d](https://github.com/Phenome-Health/biomapper2/commit/45f471d134f4b3a7c698fd73c2c3f20a7cba70a7))
+* **refmet:** skip ROLLBACK when SQLite already rolled the transaction back ([eff48a9](https://github.com/Phenome-Health/biomapper2/commit/eff48a917fd2e952ab94ca1c214e70501e7f06b2))
+
 ## [1.4.1](https://github.com/Phenome-Health/biomapper2/compare/v1.4.0...v1.4.1) (2026-11-12)
 
 
