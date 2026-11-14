@@ -360,7 +360,8 @@ def apply_live_answer(
             kind = _apply_live_answer(conn, name, status, refmet_id)
             conn.execute("COMMIT")
         except BaseException:
-            conn.execute("ROLLBACK")
+            if conn.in_transaction:  # SQLite already rolled back on some errors (full disk, I/O)
+                conn.execute("ROLLBACK")
             raise
         return kind
     finally:
@@ -762,7 +763,8 @@ def restore_from_freeze(tsv_path: Path, queries: list[str], *, path: Path | None
                 restored.append(query)
             conn.execute("COMMIT")
         except BaseException:
-            conn.execute("ROLLBACK")
+            if conn.in_transaction:  # SQLite already rolled back on some errors (full disk, I/O)
+                conn.execute("ROLLBACK")
             raise
     finally:
         conn.close()
