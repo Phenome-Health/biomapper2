@@ -148,7 +148,7 @@ def test_config_path_discovery(monkeypatch, db: Path):
 
 
 # --------------------------------------------------------------------------------------------
-# Last observed live answer + change log (issue #159)
+# Last observed live answer + change log (the kept-vote change)
 # --------------------------------------------------------------------------------------------
 
 _LEGACY_CREATE = (
@@ -165,6 +165,7 @@ _PREVIOUS_RELEASE_SELECT = (
 def _legacy_store(db: Path) -> None:
     """A store file as the previous release created it: no live columns, no change log."""
     conn = sqlite3.connect(str(db))
+    conn.execute("PRAGMA journal_mode=WAL")  # the previous release always opened its store in WAL mode
     conn.execute(_LEGACY_CREATE)
     conn.execute(
         "INSERT INTO refmet_by_query (query, refmet_id, status, source, updated_at) VALUES (?, ?, ?, ?, ?)",

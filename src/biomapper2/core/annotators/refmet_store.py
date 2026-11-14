@@ -10,9 +10,10 @@ freshness while still killing the breaker-driven flip (a frozen name resolves co
 even when live is unreachable).
 
 One live answer is NOT written back: a no-match for a query whose row holds a vote with an id. RefMet
-``/match`` stopped matching names it used to match (2026-11-12, issue #159), so such a no-match is far
-more likely upstream name-matching drift than a retired entry. The vote stays, the annotator serves it
-as ``kept_live_no_match``, and the change is recorded (see "Last live answer and change log").
+``/match`` stopped matching names it used to match around 2026-11-12, so such a no-match is far more
+likely upstream name-matching drift than a retired entry. The vote stays, the annotator serves it as
+``kept_live_no_match``, and the change is recorded (see "Last live answer and change log"). Issue:
+https://github.com/Phenome-Health/biomapper2/issues/159
 
 Storage / concurrency choice
 -----------------------------
@@ -111,7 +112,7 @@ CREATE TABLE IF NOT EXISTS refmet_by_query (
 )
 """
 
-# Added by the #159 change; ``_connect`` adds each one to a store file that predates it.
+# Added with the kept-vote change; ``_connect`` adds each one to a store file that predates it.
 _LIVE_COLUMNS = ("live_status", "live_refmet_id", "live_changed_at")
 
 _CREATE_CHANGE_LOG = """
@@ -496,7 +497,9 @@ def list_changes(*, limit: int | None = None, path: Path | None = None) -> list[
             "SELECT query, old_status, old_refmet_id, new_status, new_refmet_id, kind, old_basis, changed_at "
             "FROM refmet_change_log ORDER BY id DESC"
         )
-        rows = conn.execute(sql + " LIMIT ?", (limit,)).fetchall() if limit is not None else conn.execute(sql).fetchall()
+        rows = (
+            conn.execute(sql + " LIMIT ?", (limit,)).fetchall() if limit is not None else conn.execute(sql).fetchall()
+        )
     finally:
         conn.close()
     return [ChangeRecord(**dict(row)) for row in rows]
@@ -583,3 +586,205 @@ def seed_from_tsv(tsv_path: Path, *, path: Path | None = None) -> int:
         return inserted
     finally:
         conn.close()
+
+
+# --------------------------------------------------------------------------------------------
+# Operator functions (scripts/refmet_store_admin.py): inspect, back up, and repair a store.
+#
+# Unlike the mapping-path functions above these RAISE ``StoreAdminError`` instead of no-op'ing: an
+# operator pointed at the wrong path must get an error, never a fresh empty store and a falsely
+# clean result. The read-only ones open the file read-only and never create or migrate it.
+# --------------------------------------------------------------------------------------------
+
+
+class StoreAdminError(Exception):
+    """An operator command cannot run: no store configured, store file missing, or unusable freeze."""
+
+
+@dataclass(frozen=True)
+class Contradiction:
+    """A store row that is a no-match while the freeze has a vote with an id for the same exact query."""
+
+    query: str
+    freeze_refmet_id: str
+    updated_at: str | None
+
+
+def _require_store(path: Path | None) -> Path:
+    """The store file an operator command works on. It must be configured and must already exist."""
+    resolved = _resolve_path(path)
+    if resolved is None:
+        raise StoreAdminError("no RefMet store configured: REFMET_STORE_PATH is not set")
+    if not resolved.is_file():
+        raise StoreAdminError(f"RefMet store file does not exist: {resolved}")
+    return resolved
+
+
+def store_info(*, path: Path | None = None) -> tuple[Path, int]:
+    """The resolved store path and its row count. Read-only."""
+    resolved = _require_store(path)
+    conn = _connect_readonly(resolved)
+    try:
+        if not _has_table(conn, "refmet_by_query"):
+            raise StoreAdminError(f"not a RefMet store (no refmet_by_query table): {resolved}")
+        return resolved, conn.execute("SELECT COUNT(*) FROM refmet_by_query").fetchone()[0]
+    finally:
+        conn.close()
+
+
+def _read_freeze_votes(tsv_path: Path) -> dict[str, dict[str, str | None]]:
+    """Freeze rows that are a vote with an id, keyed by the exact ``query_name``.
+
+    Reads the TSV directly, the way ``seed_from_tsv`` does (first valid occurrence of a query wins),
+    and never through ``refmet_snapshot.lookup``, which falls back to a case-folded key.
+    """
+    try:
+        handle = tsv_path.open("r", encoding="utf-8", newline="")
+    except OSError as exc:
+        raise StoreAdminError(f"could not read freeze {tsv_path}: {exc}") from exc
+    first: dict[str, dict[str, str | None]] = {}
+    with handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        if reader.fieldnames is None or "query_name" not in reader.fieldnames or "status" not in reader.fieldnames:
+            raise StoreAdminError(f"freeze {tsv_path} has no query_name/status header")
+        for row in reader:
+            query_name = (row.get("query_name") or "").strip()
+            status = (row.get("status") or "").strip()
+            if not query_name or query_name in first:
+                continue
+            values: dict[str, str | None] = {f: ((row.get(f) or "").strip() or None) for f in _SEED_FIELDS}
+            if status not in _VALID_STATUSES or (status == AVAILABILITY_VOTED and not values["refmet_id"]):
+                continue  # malformed, as in seed_from_tsv: a valid later occurrence can still win
+            values["status"] = status
+            first[query_name] = values
+    return {query: values for query, values in first.items() if values["status"] == AVAILABILITY_VOTED}
+
+
+def _parse_utc(value: str) -> datetime:
+    """An ISO date or timestamp as an aware UTC datetime (a value without an offset is taken as UTC)."""
+    parsed = datetime.fromisoformat(value)
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+
+
+def find_contradictions(tsv_path: Path, *, since: str | None = None, path: Path | None = None) -> list[Contradiction]:
+    """Store rows that are a no-match where the freeze has a vote with an id for the same exact query.
+
+    Read-only. No case or whitespace folding: a freeze row that differs from the store row only by
+    case is a different query. ``since`` (an ISO date or timestamp, UTC) keeps only rows last updated
+    on or after it; a row with no usable ``updated_at`` is then left out. Sorted by query.
+    """
+    resolved = _require_store(path)
+    votes = _read_freeze_votes(tsv_path)
+    try:
+        cutoff = _parse_utc(since) if since is not None else None
+    except ValueError as exc:
+        raise StoreAdminError(f"--since is not an ISO date or timestamp: {since!r}") from exc
+    conn = _connect_readonly(resolved)
+    try:
+        if not _has_table(conn, "refmet_by_query"):
+            raise StoreAdminError(f"not a RefMet store (no refmet_by_query table): {resolved}")
+        rows = conn.execute(
+            "SELECT query, updated_at FROM refmet_by_query WHERE status = ? ORDER BY query", (AVAILABILITY_NO_MATCH,)
+        ).fetchall()
+    finally:
+        conn.close()
+    found: list[Contradiction] = []
+    for row in rows:
+        vote = votes.get(row["query"])
+        if vote is None:
+            continue
+        if cutoff is not None:
+            try:
+                if row["updated_at"] is None or _parse_utc(row["updated_at"]) < cutoff:
+                    continue
+            except ValueError:
+                continue
+        found.append(Contradiction(row["query"], str(vote["refmet_id"]), row["updated_at"]))
+    return found
+
+
+def restore_from_freeze(tsv_path: Path, queries: list[str], *, path: Path | None = None) -> list[str]:
+    """Restore the given exact queries to the freeze's vote; return the ones actually restored.
+
+    One write transaction. A query is restored only if the freeze has a vote with an id for it AND
+    its store row is still a no-match at write time, so a row that changed since the operator's dry
+    run is left alone. A restored row looks like a seeded one (``source=local_snapshot``, the freeze's
+    version) and its live answer is set to no-match: that is what live last said, so the next request
+    keeps the vote without logging a second change. Each restored row gets one ``repair`` log row.
+    """
+    resolved = _require_store(path)
+    votes = _read_freeze_votes(tsv_path)
+    snapshot_version = config.derive_refmet_snapshot_version(tsv_path)
+    restored: list[str] = []
+    conn = _connect(resolved)
+    try:
+        conn.isolation_level = None
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            now = _now()
+            for query in queries:
+                vote = votes.get(query)
+                if vote is None:
+                    continue
+                updated = conn.execute(
+                    """
+                    UPDATE refmet_by_query
+                       SET refmet_id = ?, refmet_name = ?, inchi_key = ?, formula = ?, exactmass = ?,
+                           status = ?, source = ?, snapshot_version = ?,
+                           live_changed_at = CASE WHEN live_status = 'no_match' THEN live_changed_at
+                                                  WHEN live_status IS NULL THEN updated_at
+                                                  ELSE ? END,
+                           live_status = 'no_match', live_refmet_id = NULL,
+                           updated_at = ?
+                     WHERE query = ? AND status = 'no_match'
+                    """,
+                    (
+                        *(vote[f] for f in _SEED_FIELDS),
+                        AVAILABILITY_VOTED,
+                        REFMET_SOURCE_LOCAL,
+                        snapshot_version,
+                        now,
+                        now,
+                        query,
+                    ),
+                ).rowcount
+                if updated != 1:
+                    continue
+                _log_change(
+                    conn,
+                    query=query,
+                    old=(AVAILABILITY_NO_MATCH, None),
+                    new=(AVAILABILITY_VOTED, vote["refmet_id"]),
+                    kind=CHANGE_REPAIR,
+                    old_basis=BASIS_STORED_ROW,
+                    changed_at=now,
+                )
+                restored.append(query)
+            conn.execute("COMMIT")
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
+    return restored
+
+
+def backup(dest: Path, *, path: Path | None = None) -> int:
+    """Write a consistent copy of the store to ``dest``; return the copy's row count.
+
+    Uses SQLite's online backup, which is safe while the API workers are writing. A plain file copy of
+    a live WAL database is not: it can miss pages still in the ``-wal`` file. Never overwrites ``dest``.
+    """
+    resolved = _require_store(path)
+    if dest.exists():
+        raise StoreAdminError(f"backup destination already exists: {dest}")
+    source = _connect_readonly(resolved)
+    try:
+        target = sqlite3.connect(str(dest))
+        try:
+            source.backup(target)
+            return target.execute("SELECT COUNT(*) FROM refmet_by_query").fetchone()[0]
+        finally:
+            target.close()
+    finally:
+        source.close()
