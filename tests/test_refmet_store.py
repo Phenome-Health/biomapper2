@@ -145,3 +145,234 @@ def test_config_path_discovery(monkeypatch, db: Path):
     refmet_store.upsert("caffeine", "voted", refmet_id="RM7")
     hit = refmet_store.get("caffeine")
     assert hit is not None and hit.refmet_id == "RM7"
+
+
+# --------------------------------------------------------------------------------------------
+# Last observed live answer + change log (issue #159)
+# --------------------------------------------------------------------------------------------
+
+_LEGACY_CREATE = (
+    "CREATE TABLE refmet_by_query (query TEXT PRIMARY KEY, refmet_id TEXT, refmet_name TEXT, inchi_key TEXT, "
+    "formula TEXT, exactmass TEXT, status TEXT NOT NULL, source TEXT, updated_at TEXT, snapshot_version TEXT)"
+)
+# The exact statement the previous release's ``get`` runs: it must keep working on a migrated file.
+_PREVIOUS_RELEASE_SELECT = (
+    "SELECT status, refmet_id, refmet_name, inchi_key, formula, exactmass, source, "
+    "updated_at, snapshot_version FROM refmet_by_query WHERE query = ?"
+)
+
+
+def _legacy_store(db: Path) -> None:
+    """A store file as the previous release created it: no live columns, no change log."""
+    conn = sqlite3.connect(str(db))
+    conn.execute(_LEGACY_CREATE)
+    conn.execute(
+        "INSERT INTO refmet_by_query (query, refmet_id, status, source, updated_at) VALUES (?, ?, ?, ?, ?)",
+        ("dha", "RM0153631", "voted", "live_api", "2026-11-06T00:00:00+00:00"),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _columns(db: Path) -> list[str]:
+    conn = sqlite3.connect(str(db))
+    try:
+        return [row[1] for row in conn.execute("PRAGMA table_info(refmet_by_query)")]
+    finally:
+        conn.close()
+
+
+def _tables(db: Path) -> set[str]:
+    conn = sqlite3.connect(str(db))
+    try:
+        return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    finally:
+        conn.close()
+
+
+def test_fresh_store_has_live_columns_and_change_log(db: Path):
+    refmet_store.upsert("caffeine", "voted", refmet_id="RM7", path=db)
+    columns = _columns(db)
+    for column in ("live_status", "live_refmet_id", "live_changed_at"):
+        assert columns.count(column) == 1
+    assert "refmet_change_log" in _tables(db)
+    hit = refmet_store.get("caffeine", path=db)
+    assert hit is not None and (hit.status, hit.refmet_id) == ("voted", "RM7")
+    assert (hit.live_status, hit.live_refmet_id, hit.live_changed_at) == (None, None, None)
+    assert refmet_store.list_changes(path=db) == []
+
+
+def test_previous_release_store_is_migrated_with_rows_intact(db: Path):
+    _legacy_store(db)
+    hit = refmet_store.get("dha", path=db)
+    assert hit is not None and (hit.status, hit.refmet_id) == ("voted", "RM0153631")
+    assert hit.updated_at == "2026-11-06T00:00:00+00:00"
+    assert "live_status" in _columns(db) and "refmet_change_log" in _tables(db)
+    # Rollback safety: the previous release names its columns, so its read still works.
+    conn = sqlite3.connect(str(db))
+    try:
+        assert conn.execute(_PREVIOUS_RELEASE_SELECT, ("dha",)).fetchone()[:2] == ("voted", "RM0153631")
+    finally:
+        conn.close()
+
+
+def test_two_threads_migrate_the_same_legacy_store(db: Path):
+    _legacy_store(db)
+    errors: list[BaseException] = []
+    barrier = threading.Barrier(8)
+
+    def worker() -> None:
+        try:
+            barrier.wait()
+            refmet_store.get("dha", path=db)
+        except BaseException as exc:  # noqa: BLE001 - the test reports any failure
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    columns = _columns(db)
+    for column in ("live_status", "live_refmet_id", "live_changed_at"):
+        assert columns.count(column) == 1
+
+
+def test_no_match_against_a_vote_is_logged_once_and_keeps_the_vote(db: Path):
+    refmet_store.upsert("dha", "voted", refmet_id="RM0153631", path=db)
+    before = refmet_store.get("dha", path=db)
+    assert before is not None
+
+    assert refmet_store.apply_live_answer("dha", "no_match", path=db) == "vote_kept"
+
+    after = refmet_store.get("dha", path=db)
+    assert after is not None
+    assert (after.status, after.refmet_id, after.updated_at) == ("voted", "RM0153631", before.updated_at)
+    assert (after.live_status, after.live_refmet_id) == ("no_match", None)
+    assert after.live_changed_at is not None
+    changes = refmet_store.list_changes(path=db)
+    assert len(changes) == 1
+    record = changes[0]
+    assert record.query == "dha"
+    assert (record.old_status, record.old_refmet_id) == ("voted", "RM0153631")
+    assert (record.new_status, record.new_refmet_id) == ("no_match", None)
+    assert record.kind == "vote_kept"
+    assert record.old_basis == "assumed"  # live columns were empty: the old value is the row itself
+    assert record.changed_at.endswith("+00:00")
+
+    # The same observation again: no change, no second record.
+    assert refmet_store.apply_live_answer("dha", "no_match", path=db) is None
+    assert len(refmet_store.list_changes(path=db)) == 1
+
+
+def test_match_again_after_a_kept_vote_is_logged_as_recovered(db: Path):
+    refmet_store.upsert("dha", "voted", refmet_id="RM0153631", path=db)
+    refmet_store.apply_live_answer("dha", "no_match", path=db)
+
+    assert refmet_store.apply_live_answer("dha", "voted", refmet_id="RM0153631", path=db) == "live_recovered"
+
+    hit = refmet_store.get("dha", path=db)
+    assert hit is not None and (hit.live_status, hit.live_refmet_id) == ("voted", "RM0153631")
+    newest = refmet_store.list_changes(path=db)[0]
+    assert newest.kind == "live_recovered"
+    assert (newest.old_status, newest.new_status, newest.new_refmet_id) == ("no_match", "voted", "RM0153631")
+    assert newest.old_basis == "observed"  # the old value came from the live columns
+
+
+def test_confirming_a_vote_with_the_same_id_logs_nothing(db: Path):
+    refmet_store.upsert("dha", "voted", refmet_id="RM0153631", path=db)
+    assert refmet_store.apply_live_answer("dha", "voted", refmet_id="RM0153631", path=db) is None
+    assert refmet_store.list_changes(path=db) == []
+
+
+def test_observation_for_an_unknown_query_logs_nothing_and_creates_no_vote(db: Path):
+    assert refmet_store.apply_live_answer("never seen", "no_match", path=db) is None
+    hit = refmet_store.get("never seen", path=db)
+    assert hit is not None and (hit.status, hit.refmet_id) == ("no_match", None)
+    assert refmet_store.list_changes(path=db) == []
+    # A first match for an unknown query is written back (as before) and is not a "change".
+    assert refmet_store.apply_live_answer("novel", "voted", refmet_id="RM1", path=db) is None
+    novel = refmet_store.get("novel", path=db)
+    assert novel is not None and (novel.status, novel.refmet_id, novel.source) == ("voted", "RM1", "live_api")
+    assert refmet_store.list_changes(path=db) == []
+
+
+def test_two_connections_recording_the_same_change_log_it_once(db: Path):
+    refmet_store.upsert("dha", "voted", refmet_id="RM0153631", path=db)
+    results: list[str | None] = []
+
+    def worker() -> None:
+        results.append(refmet_store.apply_live_answer("dha", "no_match", path=db))
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(r for r in results if r is not None) == ["vote_kept"]
+    assert len(refmet_store.list_changes(path=db)) == 1
+
+
+def test_no_match_never_replaces_a_vote_even_without_a_prior_read(db: Path):
+    # R4 lives in the store function itself, not only in the annotator's read-then-decide.
+    refmet_store.upsert("dha", "voted", refmet_id="RM0153631", path=db)
+    refmet_store.apply_live_answer("dha", "no_match", path=db)
+    refmet_store.apply_live_answer("dha", "no_match", path=db)
+    hit = refmet_store.get("dha", path=db)
+    assert hit is not None and (hit.status, hit.refmet_id) == ("voted", "RM0153631")
+
+
+def test_different_id_replaces_the_vote_and_logs_id_changed(db: Path):
+    refmet_store.upsert("dha", "voted", refmet_id="RM0153631", path=db)
+    assert refmet_store.apply_live_answer("dha", "voted", refmet_id="RM9", path=db) == "id_changed"
+    hit = refmet_store.get("dha", path=db)
+    assert hit is not None and (hit.status, hit.refmet_id, hit.source) == ("voted", "RM9", "live_api")
+    changes = refmet_store.list_changes(path=db)
+    assert [c.kind for c in changes] == ["id_changed"]
+    assert (changes[0].old_refmet_id, changes[0].new_refmet_id) == ("RM0153631", "RM9")
+
+
+def test_match_for_a_stored_no_match_logs_match_appeared(db: Path):
+    refmet_store.upsert("x", "no_match", path=db)
+    assert refmet_store.apply_live_answer("x", "voted", refmet_id="RM2", path=db) == "match_appeared"
+    hit = refmet_store.get("x", path=db)
+    assert hit is not None and (hit.status, hit.refmet_id) == ("voted", "RM2")
+    assert [c.kind for c in refmet_store.list_changes(path=db)] == ["match_appeared"]
+    # A stored no-match that stays a no-match writes nothing.
+    refmet_store.upsert("y", "no_match", path=db)
+    assert refmet_store.apply_live_answer("y", "no_match", path=db) is None
+    assert len(refmet_store.list_changes(path=db)) == 1
+
+
+def test_unusable_rows_are_overwritten_without_a_log_row(db: Path):
+    # An `unavailable` row and a `voted` row with no id carry no last-known-good: treated as no row.
+    refmet_store.upsert("a", "unavailable", path=db)
+    refmet_store.upsert("b", "voted", refmet_id=None, path=db)
+    assert refmet_store.apply_live_answer("a", "no_match", path=db) is None
+    assert refmet_store.apply_live_answer("b", "no_match", path=db) is None
+    for query in ("a", "b"):
+        hit = refmet_store.get(query, path=db)
+        assert hit is not None and hit.status == "no_match"
+    assert refmet_store.list_changes(path=db) == []
+
+
+def test_a_match_without_an_id_is_never_applied(db: Path):
+    refmet_store.upsert("dha", "voted", refmet_id="RM0153631", path=db)
+    assert refmet_store.apply_live_answer("dha", "voted", refmet_id=None, path=db) is None
+    hit = refmet_store.get("dha", path=db)
+    assert hit is not None and hit.refmet_id == "RM0153631" and hit.live_status is None
+
+
+def test_recording_and_listing_are_no_ops_without_a_store(monkeypatch):
+    monkeypatch.delenv("REFMET_STORE_PATH", raising=False)
+    assert refmet_store.apply_live_answer("dha", "no_match") is None
+    assert refmet_store.list_changes() == []
+
+
+def test_listing_is_newest_first_and_honors_the_limit(db: Path):
+    for query in ("a", "b", "c"):
+        refmet_store.upsert(query, "voted", refmet_id="RM1", path=db)
+        refmet_store.apply_live_answer(query, "no_match", path=db)
+    assert [c.query for c in refmet_store.list_changes(path=db)] == ["c", "b", "a"]
+    assert [c.query for c in refmet_store.list_changes(limit=2, path=db)] == ["c", "b"]
