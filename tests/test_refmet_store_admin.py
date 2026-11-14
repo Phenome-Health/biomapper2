@@ -147,6 +147,24 @@ def test_restore_ignores_queries_the_freeze_does_not_vote_for(db: Path, freeze: 
     assert refmet_store.list_changes(path=db) == []
 
 
+@pytest.mark.parametrize("padded", [" dha", "dha "], ids=["leading-space", "trailing-space"])
+def test_padded_and_unpadded_queries_are_different_queries(db: Path, tmp_path: Path, padded: str):
+    """A freeze vote for a padded query repairs only the store row with that exact padded query."""
+    freeze = tmp_path / "refmet_freeze_mw_match_20261022T164109Z.tsv"
+    freeze.write_text(HEADER + f"{padded}\tvoted\tRM_PAD\tDHA\t\t\t\n", encoding="utf-8")
+    refmet_store.upsert("dha", "no_match", path=db)  # the unpadded twin: not what the freeze voted for
+    refmet_store.upsert(padded, "no_match", path=db)
+
+    assert [c.query for c in refmet_store.find_contradictions(freeze, path=db)] == [padded]
+    assert refmet_store.restore_from_freeze(freeze, ["dha", padded], path=db) == [padded]
+
+    twin = refmet_store.get("dha", path=db)
+    assert twin is not None and (twin.status, twin.refmet_id) == ("no_match", None)
+    hit = refmet_store.get(padded, path=db)
+    assert hit is not None and (hit.status, hit.refmet_id) == ("voted", "RM_PAD")
+    assert [c.query for c in refmet_store.list_changes(path=db)] == [padded]
+
+
 def test_live_no_match_after_a_repair_keeps_the_vote_without_a_second_record(db: Path, freeze: Path):
     _overwritten_store(db)
     refmet_store.restore_from_freeze(freeze, [DHA], path=db)
