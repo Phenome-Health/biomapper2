@@ -128,6 +128,33 @@ def test_public_issued_key_is_sent_to_every_spelling_of_the_public_host():
         assert _capture_headers(url, PUBLIC_KEY)["X-API-Key"] == PUBLIC_KEY
 
 
+@pytest.mark.parametrize("url", ["http://kestrel.krakenkg.com/api", "HTTP://kestrel.krakenkg.com/api"])
+def test_public_issued_key_is_never_sent_over_plain_http(url):
+    """An http:// URL would expose the key before any redirect to https could happen."""
+    assert "X-API-Key" not in _capture_headers(url, PUBLIC_KEY)
+
+
+def test_fetch_categories_sends_the_public_issued_key(monkeypatch):
+    """GET /categories must carry the key, or discovery breaks once the endpoint enforces auth.
+
+    Goes through the real ``fetch_categories`` and ``bulk_kestrel_request`` with only the transport
+    replaced, so restoring ``auth_required=False`` at the call site fails here.
+    """
+    from biomapper2.api import kestrel_discovery
+
+    monkeypatch.delenv("KESTREL_API_URL", raising=False)
+    monkeypatch.setenv("KESTREL_API_KEY", PUBLIC_KEY)
+    session = MagicMock()
+    session.request.return_value.json.return_value = ["biolink:SmallMolecule"]
+    session.request.return_value.raise_for_status.return_value = None
+
+    with patch.object(utils, "get_session", return_value=session):
+        assert kestrel_discovery.fetch_categories() == ["biolink:SmallMolecule"]
+
+    assert session.request.call_args.args[1].endswith("/categories")
+    assert session.request.call_args.kwargs["headers"]["X-API-Key"] == PUBLIC_KEY
+
+
 def test_unparseable_url_withholds_even_a_public_issued_key():
     assert "X-API-Key" not in _capture_headers("kestrel.krakenkg.com/api", PUBLIC_KEY)
 
@@ -138,10 +165,18 @@ def test_no_warning_when_a_public_issued_key_is_sent():
     assert warn.call_count == 0
 
 
-def _auth_failure_log(url: str, api_key: str | None, status: int = 401) -> str:
-    """Drive one rejected request and return the logged error text."""
+def _auth_failure_log(url: str, api_key: str | None, status: int = 401, *, answered_by: str | None = None) -> str:
+    """Drive one rejected request and return the logged error text.
+
+    ``answered_by`` simulates a cross-origin redirect: the rejection comes from that URL, on a
+    request the session has already stripped the key from.
+    """
     response = MagicMock()
     response.status_code = status
+    if answered_by is not None:
+        response.request = requests.Request("POST", answered_by).prepare()
+    else:
+        response.request = None
     response.raise_for_status.side_effect = requests.exceptions.HTTPError(f"{status} Unauthorized", response=response)
     session = MagicMock()
     session.request.return_value = response
@@ -160,6 +195,32 @@ def test_auth_failure_hint_names_the_actual_cause():
     assert "No KESTREL_API_KEY is set" in _auth_failure_log(PUBLIC_KESTREL_API_URL, None)
     assert "was withheld" in _auth_failure_log(PUBLIC_KESTREL_API_URL, SECRET)
     assert "rejected the configured KESTREL_API_KEY" in _auth_failure_log(PUBLIC_KESTREL_API_URL, PUBLIC_KEY, 403)
+
+
+def test_auth_failure_after_a_cross_origin_redirect_does_not_blame_the_key():
+    """The key was stripped on the way, so 'rejected' would send operators to replace a valid key."""
+    elsewhere = "https://elsewhere.example.org/api/hybrid-search"
+    log = _auth_failure_log(PUBLIC_KESTREL_API_URL, PUBLIC_KEY, answered_by=elsewhere)
+    assert "rejected the configured" not in log
+    assert "redirected to" in log and elsewhere in log
+
+
+def test_auth_failure_names_the_host_that_answered_when_the_key_was_delivered():
+    final = requests.Request("POST", f"{PUBLIC_KESTREL_API_URL}/hybrid-search", headers={"X-API-Key": PUBLIC_KEY})
+    response = MagicMock()
+    response.status_code = 401
+    response.request = final.prepare()
+    response.raise_for_status.side_effect = requests.exceptions.HTTPError("401", response=response)
+    session = MagicMock()
+    session.request.return_value = response
+    with (
+        patch.object(utils, "get_kestrel_api_url", return_value=PUBLIC_KESTREL_API_URL),
+        patch.object(utils, "get_kestrel_api_key", return_value=PUBLIC_KEY),
+        patch.object(utils.logging, "error") as err,
+        pytest.raises(requests.exceptions.HTTPError),
+    ):
+        utils.bulk_kestrel_request("POST", "hybrid-search", session=session, json={})
+    assert "rejected the configured KESTREL_API_KEY" in err.call_args.args[0]
 
 
 def test_auth_failure_hint_never_contains_the_key():
