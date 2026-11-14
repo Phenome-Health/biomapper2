@@ -1,5 +1,94 @@
 # Changelog
 
+## [1.4.1](https://github.com/Phenome-Health/biomapper2/compare/v1.4.0...v1.4.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* **resolver:** don't commit a structure-less RefMet twin over its annotated node ([19010b2](https://github.com/Phenome-Health/biomapper2/commit/19010b2a64e76eb235f3d839ee0a0d9f3b320e1f))
+
+
+### Performance Improvements
+
+* **resolver:** read both nodes' structure in the connectivity check's cached request ([5940e29](https://github.com/Phenome-Health/biomapper2/commit/5940e292f027a9a8de2b46c697fee08984c1ada6))
+
+## [1.4.0](https://github.com/Phenome-Health/biomapper2/compare/v1.3.1...v1.4.0) (2026-11-11)
+
+
+### Features
+
+* **icd10cm:** packaged CDC FY2027 hierarchy snapshot, build script and loader (Unit 4) ([f5b2bb8](https://github.com/Phenome-Health/biomapper2/commit/f5b2bb8cf7263f5178acf80f854262dd7b583b7a))
+* **icd10cm:** parent walk-up when the ICD10: twin misses (Unit 5) ([3135284](https://github.com/Phenome-Health/biomapper2/commit/31352845aff06fa2fd85ddad0197e59aa9705d19))
+* **linker:** ICD-10-CM same-code ICD10: twin retry (Unit 3) ([af51193](https://github.com/Phenome-Health/biomapper2/commit/af511938e2fc62305ed53e76abcb465fcd2d899e))
+* **mapping:** entity-general mapping_relation, mapping_predicate, icd10cm_route, kg_build (Unit 2) ([27b3de3](https://github.com/Phenome-Health/biomapper2/commit/27b3de34f179553a6e0266884cabe9cc01f09333))
+* **study:** ICD-10-CM twin control gate, regression list and denylist (Unit 1) ([9e0f40c](https://github.com/Phenome-Health/biomapper2/commit/9e0f40c545dfa0be2210cfa280b11b25eedd90f5))
+
+
+### Bug Fixes
+
+* **icd10cm:** preserve colliding input columns; retry failed KG build lookup ([e62ad65](https://github.com/Phenome-Health/biomapper2/commit/e62ad654281c09a74e578ddea4dba98e5e86c7d6))
+* **icd10cm:** treat an omitted twin as a lookup error before the walk-up ([ba35e04](https://github.com/Phenome-Health/biomapper2/commit/ba35e04972aeb21c18721b8e7ae735b4fb72cda9))
+* **icd10cm:** treat an omitted walk-up candidate as a lookup error, not a miss ([ae6138d](https://github.com/Phenome-Health/biomapper2/commit/ae6138d78af226287a4d1ed73887d1f659a57a62))
+* **mapper:** fail fast on unresolvable input/output column collision ([ebd73b8](https://github.com/Phenome-Health/biomapper2/commit/ebd73b8a88b25d6832d4d468300ac8fb3a791676))
+* **refmet:** backfill refmet_id from /name when /match omits it ([dd191d4](https://github.com/Phenome-Health/biomapper2/commit/dd191d4dd4884670c5de58e00e058644817ce972))
+* **refmet:** cap the id backfill by the batch deadline; canary bypasses the HTTP cache ([829c8d3](https://github.com/Phenome-Health/biomapper2/commit/829c8d3fb361b33a43026ba3da28a44915b544a1))
+
+## [1.3.1](https://github.com/Phenome-Health/biomapper2/compare/v1.3.0...v1.3.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **api:** derive primary_curie from the chosen node; add per-source CURIE provenance ([9cadb54](https://github.com/Phenome-Health/biomapper2/commit/9cadb54cd56c423bc09456a3ab423847cf9449c0))
+* **lipids:** read lower-case ether prefixes on every parenthetical alternative ([ad38644](https://github.com/Phenome-Health/biomapper2/commit/ad3864411843c7ceaaccd5a0acc71216fff79c0d))
+* **lipids:** route Metabolon-style names through Goslin from their chain parenthetical ([12637ab](https://github.com/Phenome-Health/biomapper2/commit/12637abffd1ad16a0645ad183bd5ab8238c1d4c9))
+
+## [1.3.0](https://github.com/Phenome-Health/biomapper2/compare/v1.2.1...v1.3.0) (2026-11-06)
+
+
+### Features
+
+* **normalizer:** add ICD10CM as its own vocabulary ([fe93ef6](https://github.com/Phenome-Health/biomapper2/commit/fe93ef6203884226ae126185c50a812f00f799c6))
+* **normalizer:** add ICD10CM as its own vocabulary ([c2360ee](https://github.com/Phenome-Health/biomapper2/commit/c2360ee75d957c3f4380d095bbecee2e743a8446))
+
+
+### Bug Fixes
+
+* **normalizer:** fuzzy tier prefers the more specific vocab ([6fad77f](https://github.com/Phenome-Health/biomapper2/commit/6fad77f7da0e5fb3ce3a921f8c1b9135cc244c75))
+
+## [1.2.1](https://github.com/Phenome-Health/biomapper2/compare/v1.2.0...v1.2.1) (2026-11-05)
+
+
+### Bug Fixes
+
+* **lipids:** API reuses the mapper's lipid_resolution; rule (c) defers to connectivity for a specific isomer ([00e792e](https://github.com/Phenome-Health/biomapper2/commit/00e792e22b6b7ea0e8ea5e7fa3458d9c6b800eea))
+* **lipids:** stop coarsening single-chain lipids; class-guard and RefMet precedence in resolution ([1c02964](https://github.com/Phenome-Health/biomapper2/commit/1c02964be0a8a3e1a93a9146d13fc5e7893bfe78))
+
+## [1.2.0](https://github.com/Phenome-Health/biomapper2/compare/v1.1.1...v1.2.0) (2026-11-05)
+
+
+### Features
+
+* **deploy:** bind uvicorn to 127.0.0.1; correct rate-limit README to the live host ([d6e1a1a](https://github.com/Phenome-Health/biomapper2/commit/d6e1a1a1e3cc06850defb6426b2dcaa711fa3582))
+* **deploy:** nginx rate limit for the mapping endpoints ([d2f8b27](https://github.com/Phenome-Health/biomapper2/commit/d2f8b27d6bd094d5bf7f9df123d56c25625409f3))
+
+
+### Bug Fixes
+
+* **deploy:** hold limit_conn slot until upstream finishes; pin rate policy in tests ([8e83e38](https://github.com/Phenome-Health/biomapper2/commit/8e83e38b7d519932477dbf49c20b11bee6d7bbc1))
+* **resolution:** a raw-spelling outage after a canonical miss is UNAVAILABLE, not NO_MATCH ([e5ed99a](https://github.com/Phenome-Health/biomapper2/commit/e5ed99a8a24c4a04c2860e61fe188b901089b499))
+* **resolution:** case-robust RefMet/Goslin name lookup; key the RefMet backup store by exact query ([5cc14fb](https://github.com/Phenome-Health/biomapper2/commit/5cc14fbf05447e1e858a557cdfc0080f20ffb187))
+
+## [1.1.1](https://github.com/Phenome-Health/biomapper2/compare/v1.1.0...v1.1.1) (2026-10-29)
+
+
+### Features
+
+* **annotators:** keep only chain-spec slashes literal; encode mixture slashes (port of fork [#93](https://github.com/Phenome-Health/biomapper2/issues/93)) ([ee5d5f8](https://github.com/Phenome-Health/biomapper2/commit/ee5d5f83199d84b8ae6619b334c7f20ca6187e96))
+* **annotators:** send slash-bearing names to the Workbench and LIPID MAPS with a literal slash (port of fork [#92](https://github.com/Phenome-Health/biomapper2/issues/92)) ([33e2456](https://github.com/Phenome-Health/biomapper2/commit/33e245685c4d801a1d8749d562ff60f608a1de04))
+* **docs,chore:** pin the build from Kestrel /health; stop tracking .memdb/ (port of fork [#91](https://github.com/Phenome-Health/biomapper2/issues/91)) ([09b9f32](https://github.com/Phenome-Health/biomapper2/commit/09b9f32ba985af42f3f70c4ebe92742e23b22a29))
+* **docs:** REST API tutorial notebook (port of fork [#90](https://github.com/Phenome-Health/biomapper2/issues/90)) ([679478e](https://github.com/Phenome-Health/biomapper2/commit/679478e8d8a9fc4c8cf1ed7459ffa1ebf6a1a69b))
+* **structure:** treat a PubChem Not-Found as a clean miss so the lipid hop still runs (port of fork [#94](https://github.com/Phenome-Health/biomapper2/issues/94)) ([bb74fdf](https://github.com/Phenome-Health/biomapper2/commit/bb74fdf43a06da19de0fb3f20d474fbace7d228b))
+
 ## [1.1.0](https://github.com/Phenome-Health/biomapper2/compare/v1.0.1...v1.1.0) (2026-09-23)
 
 
