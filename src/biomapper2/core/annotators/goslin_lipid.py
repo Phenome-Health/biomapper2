@@ -182,7 +182,10 @@ class GoslinLipidAnnotator(BaseAnnotator):
                     ),
                     skip_levels=already_hit,
                 )
-            except Exception:  # noqa: BLE001 — Kestrel is best-effort; a failure must not lose other votes
+            except Exception as exc:  # noqa: BLE001 — Kestrel is best-effort; a failure must not lose other votes
+                from ..fault_tracking import record_kestrel_fault
+
+                record_kestrel_fault(entity, f"goslin-lipid Kestrel cascade failed: {exc}")
                 logging.warning("goslin-lipid Kestrel cascade failed for %r (ignored, other votes kept)", name)
                 kestrel_votes, kestrel_level = {}, None
 

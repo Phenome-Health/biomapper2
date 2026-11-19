@@ -14,11 +14,11 @@ from urllib.parse import quote
 import requests_cache
 
 from ..config import (
-    CACHE_DIR,
     CACHE_IGNORED_PARAMETERS,
     MW_INCHIKEY_URL,
     PUBCHEM_INCHIKEY_URL,
     STRUCTURE_LOOKUP_TIMEOUT_S,
+    get_cache_dir,
 )
 from ..utils import MW_UNPARSEABLE_PATH_PREFIX, quote_name_path_segment
 from .annotators import refmet_snapshot
@@ -31,7 +31,7 @@ class StructureResolver:
     def __init__(self, linker: Linker, lipid_resolver: Any | None = None) -> None:
         self.linker = linker
         self._session = requests_cache.CachedSession(
-            str(CACHE_DIR / "structure_http"),
+            str(get_cache_dir() / "structure_http"),
             ignored_parameters=CACHE_IGNORED_PARAMETERS,
         )
         self._name_cache: dict[str, str | None] = {}  # inchikey block by node name (per process)

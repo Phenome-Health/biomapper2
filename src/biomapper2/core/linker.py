@@ -63,6 +63,14 @@ class Linker:
             result_type="expand",  # Expands Series into columns
         )
 
+    @staticmethod
+    def empty_dataframe_links(df: pd.DataFrame) -> pd.DataFrame:
+        """Build empty per-row linking columns when bulk canonicalize fails at the API dataset boundary."""
+        return pd.DataFrame(
+            [{"kg_ids": {}, "kg_ids_provided": {}, "kg_ids_assigned": {}} for _ in range(len(df))],
+            index=df.index,
+        )
+
     def _fetch_with_fallback_candidates(self, curies: list[str]) -> tuple[dict[str, str], frozenset[str]]:
         """One batched /canonicalize for ``curies`` plus every ICD-10-CM twin candidate.
 
@@ -131,22 +139,30 @@ class Linker:
         Returns:
             Dictionary mapping curies to canonical KG node IDs
         """
-        if budget is None:
+        try:
+            if budget is None:
+                return kestrel_request(
+                    method="POST",
+                    endpoint="canonicalize",
+                    batch_field="curies",
+                    batch_items=curies,
+                    batch_size=KESTREL_BATCH_SIZE_CANONICALIZE,
+                )
             return kestrel_request(
                 method="POST",
                 endpoint="canonicalize",
                 batch_field="curies",
                 batch_items=curies,
                 batch_size=KESTREL_BATCH_SIZE_CANONICALIZE,
+                budget=budget,
             )
-        return kestrel_request(
-            method="POST",
-            endpoint="canonicalize",
-            batch_field="curies",
-            batch_items=curies,
-            batch_size=KESTREL_BATCH_SIZE_CANONICALIZE,
-            budget=budget,
-        )
+        except Exception as exc:
+            from .fault_tracking import record_kestrel_fault
+
+            # Records on the active single-entity row context; bulk dataset callers catch at the
+            # dataset boundary in Mapper.map_dataset_to_kg and attribute faults per affected row.
+            record_kestrel_fault(None, f"canonicalize: {exc}")
+            raise
 
     @staticmethod
     def get_node_records(kg_node_ids: list[str]) -> dict[str, dict[str, Any]]:
@@ -167,8 +183,11 @@ class Linker:
                 batch_size=KESTREL_BATCH_SIZE_CANONICALIZE,
                 json={"slim": False, "truncate_long_fields": False},
             )
-        except Exception:
-            logging.warning("Failed to fetch node records from Kestrel /get-nodes; returning empty", exc_info=True)
+        except Exception as exc:
+            logging.warning("Failed to fetch node records from Kestrel /get-nodes; returning empty: %s", exc)
+            from .fault_tracking import record_kestrel_fault
+
+            record_kestrel_fault(None, f"get-nodes: {exc}")
             return {}
 
         result: dict[str, dict[str, Any]] = {}
@@ -240,8 +259,11 @@ class Linker:
                 batch_size=KESTREL_BATCH_SIZE_CANONICALIZE,
                 json={"slim": False, "truncate_long_fields": False},
             )
-        except Exception:
-            logging.warning("Failed to fetch equivalent IDs from Kestrel /get-nodes; returning empty", exc_info=True)
+        except Exception as exc:
+            logging.warning("Failed to fetch equivalent IDs from Kestrel /get-nodes; returning empty: %s", exc)
+            from .fault_tracking import record_kestrel_fault
+
+            record_kestrel_fault(None, f"get-nodes: {exc}")
             return {}, False
 
         result: dict[str, dict[str, list[str]]] = {}
