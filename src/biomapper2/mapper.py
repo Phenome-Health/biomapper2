@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import requests
 
 from . import config
 from .biolink_client import BiolinkClient
@@ -33,6 +34,16 @@ from .core.certificate import (
     issue,
     node_blocks_from_equivalent_ids,
 )
+from .core.fault_tracking import (
+    KestrelFaultError,
+    end_dataset_fault_recording,
+    end_row_fault_recording,
+    get_kestrel_faults,
+    has_kestrel_fault,
+    record_kestrel_fault,
+    start_dataset_fault_recording,
+    start_row_fault_recording,
+)
 from .core.linker import Linker
 from .core.normalizer import Normalizer
 from .core.resolver import (
@@ -49,9 +60,37 @@ from .core.resolver import (
 )
 from .models import Entity
 from .provenance import build_run_provenance
-from .utils import AnnotationMode, setup_logging
+from .utils import AnnotationMode, get_current_api_context, setup_logging
 
 setup_logging()
+
+
+def _has_non_kestrel_resolution(
+    committed_id: str | None,
+    kg_ids_provided: Any,
+    chosen_kg_id_provided: Any,
+    kg_ids_assigned: Any,
+    faults: list[str] | None = None,
+) -> bool:
+    """Return True if committed_id is supported by a non-Kestrel vote."""
+    if committed_id is None:
+        return False
+    # Check provided IDs
+    if chosen_kg_id_provided is not None and chosen_kg_id_provided == committed_id:
+        return True
+    if isinstance(kg_ids_provided, dict) and committed_id in kg_ids_provided:
+        return True
+    # Check non-Kestrel annotators
+    if isinstance(kg_ids_assigned, dict):
+        mw = kg_ids_assigned.get("metabolomics-workbench")
+        if isinstance(mw, dict) and committed_id in mw:
+            return True
+        goslin = kg_ids_assigned.get("goslin-lipid")
+        if isinstance(goslin, dict) and committed_id in goslin:
+            fault_strs = [str(f).lower() for f in (faults or [])]
+            if not any("goslin" in f for f in fault_strs):
+                return True
+    return False
 
 
 def _scalar_or_none(value: Any) -> Any:
@@ -623,149 +662,183 @@ class Mapper:
             Mapped entity with added fields: curies, kg_ids, chosen_kg_id, etc.
         """
         logging.debug(f"Item at beginning of map_entity_to_kg() is {item}")
-        array_delimiters = array_delimiters if array_delimiters is not None else [",", ";"]
-        input_is_series = isinstance(item, pd.Series)
-        entity = Entity.from_input(item, name_field=name_field)
+        faults, token = start_row_fault_recording()
+        try:
+            array_delimiters = array_delimiters if array_delimiters is not None else [",", ";"]
+            input_is_series = isinstance(item, pd.Series)
+            entity = Entity.from_input(item, name_field=name_field)
 
-        # Validate/standardize the input entity type and vocab(s) on Biolink
-        entity_type = self.biolink_client.standardize_entity_type(entity_type)
-        prefixes = self.normalizer.get_standard_prefix(vocab)
+            # Validate/standardize the input entity type and vocab(s) on Biolink
+            entity_type = self.biolink_client.standardize_entity_type(entity_type)
+            prefixes = self.normalizer.get_standard_prefix(vocab)
 
-        # Do Step 1: annotate with vocab IDs
-        annotation_result = self.annotation_engine.annotate(
-            item=entity.to_series(),
-            name_field=name_field,
-            provided_id_fields=provided_id_fields,
-            category=entity_type,
-            prefixes=prefixes,
-            mode=annotation_mode,
-            annotators=annotators,
-            prefer_human=prefer_human,
-            prefer_canonical=prefer_canonical,
-            candidate_limit=candidate_limit,
-        )
-        assert isinstance(annotation_result, pd.Series)
-        entity = entity.update_from(annotation_result)
-        # Kestrel endpoints the annotation step ACTUALLY invoked for this entity ([] when it skipped
-        # or used no Kestrel annotator). Read here for the raw-passthrough plan; never feeds selection.
-        kestrel_endpoints_used = list(annotation_result.get("kestrel_endpoints_used") or [])
-        # RefMet availability for the row, read from the engine's TOTAL availability map (present on
-        # every path, including skips). Threaded into the certificate and mirrored on the output.
-        annotator_availability = annotation_result.get("annotator_availability") or {}
-        refmet_availability = annotator_availability.get(REFMET_ANNOTATOR, "not_queried")
-        # WHICH RefMet source served the row, from the engine's TOTAL source map (parallel provenance
-        # channel). The snapshot version is derived from the source so it pins only freeze-served rows.
-        annotator_source = annotation_result.get("annotator_source") or {}
-        refmet_source = annotator_source.get(REFMET_ANNOTATOR, REFMET_SOURCE_NOT_QUERIED)
-        refmet_snapshot_version = _refmet_snapshot_version_for(refmet_source)
-
-        # Do Step 2: normalize vocab IDs to form proper curies
-        normalization_result = self.normalizer.normalize(
-            item=entity.to_series(),
-            provided_id_fields=provided_id_fields,
-            array_delimiters=array_delimiters,
-            stop_on_invalid_id=stop_on_invalid_id,
-        )
-        assert isinstance(normalization_result, pd.Series)
-        entity = entity.update_from(normalization_result)
-
-        # Do Step 3: link curies to KG nodes
-        linked_result = self.linker.link(entity.to_series())
-        assert isinstance(linked_result, pd.Series)
-        # The ICD-10-CM fallback side-map is internal provenance, not an output field: pop it before the
-        # row update so the mapped entity gains no new key from it.
-        icd10cm_map = linked_result.get(icd10cm_fallback.SIDE_MAP_FIELD) or {}
-        linked_result = linked_result.drop(labels=[icd10cm_fallback.SIDE_MAP_FIELD], errors="ignore")
-        entity = entity.update_from(linked_result)
-
-        # Do Step 4: resolve one-to-many KG matches
-        resolved_result = self.resolver.resolve(entity.to_series(), category=entity_type)
-        assert isinstance(resolved_result, pd.Series)
-        entity = entity.update_from(resolved_result)
-
-        # Do Step 5: enrich with equivalent IDs from the chosen KG node
-        kg_equivalent_ids: dict[str, list[str]] = {}
-        equivalent_ids_lookup_ok = True
-        if entity.chosen_kg_id is not None:
-            equiv_ids, equivalent_ids_lookup_ok = self.linker.get_equivalent_ids_checked([entity.chosen_kg_id])
-            kg_equivalent_ids = equiv_ids.get(entity.chosen_kg_id, {})
-            entity = entity.update_from(pd.Series({"kg_equivalent_ids": kg_equivalent_ids}))
-
-        # Do Step 6 (+ optional Step 6.5 re-resolution): issue the resolution certificate.
-        #
-        # Deliberately OUTSIDE the null guard above: the rows the certificate most needs to describe
-        # are the ones with no committed node. When re-resolution is enabled and the certificate
-        # contradicts, the committed node and its equivalent ids may be swapped for the correct
-        # distinct candidate (default-off; today's behavior otherwise).
-        #
-        # Unit 5: the additive lipid_resolution object is built INSIDE, against whichever node the
-        # certificate commits, so a swap never emits the replaced node's level or mapping relation and
-        # the certificate provenance mirror stays consistent with it. None off the lipid path.
-        certificate, chosen_kg_id, kg_equivalent_ids, lipid_resolution = self._certify_and_reresolve(
-            query_name=entity.name,
-            category=entity_type,
-            chosen_kg_id=entity.chosen_kg_id,
-            kg_equivalent_ids=kg_equivalent_ids,
-            equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
-            selection_conflict=entity.chosen_kg_id_review,
-            kg_ids=entity.kg_ids,
-            kg_ids_assigned=entity.kg_ids_assigned,
-            refmet_availability=refmet_availability,
-            refmet_source=refmet_source,
-            refmet_snapshot_version=refmet_snapshot_version,
-            lipid_row=entity.to_series(),
-            icd10cm_fallback_map=icd10cm_map,
-        )
-        row_mapping = mapping_fields(
-            lipid_resolution=lipid_resolution,
-            icd10cm=_icd10cm_fields_for(chosen_kg_id, entity.kg_ids, icd10cm_map),
-        )
-        # Emitted as a plain dict, not the dataclass: pydantic rejects a raw dataclass at the
-        # response model, and the NDJSON endpoint json.dumps's this value outside its try/except.
-        # ``refmet_availability`` is mirrored on the row (per R2) as well as on the certificate.
-        entity = entity.update_from(
-            pd.Series(
-                {
-                    "chosen_kg_id": chosen_kg_id,
-                    "kg_equivalent_ids": kg_equivalent_ids or {},
-                    "resolution_certificate": certificate.to_api_dict(),
-                    "chosen_kg_id_review": derive_chosen_kg_id_review(certificate),
-                    "lipid_resolution": lipid_resolution,
-                    "refmet_availability": refmet_availability,
-                    "refmet_source": refmet_source,
-                    "refmet_snapshot_version": refmet_snapshot_version,
-                    # Mirrored from the certificate (a first-class field) so the row surface carries the
-                    # Tier B freeze version too, parallel to refmet_snapshot_version.
-                    "tier_b_snapshot_version": certificate.tier_b_snapshot_version,
-                    # Entity-general relation + ICD-10-CM fallback route/build; null off both paths.
-                    **row_mapping,
-                }
+            # Do Step 1: annotate with vocab IDs
+            annotation_result = self.annotation_engine.annotate(
+                item=entity.to_series(),
+                name_field=name_field,
+                provided_id_fields=provided_id_fields,
+                category=entity_type,
+                prefixes=prefixes,
+                mode=annotation_mode,
+                annotators=annotators,
+                prefer_human=prefer_human,
+                prefer_canonical=prefer_canonical,
+                candidate_limit=candidate_limit,
             )
-        )
+            assert isinstance(annotation_result, pd.Series)
+            entity = entity.update_from(annotation_result)
+            # Kestrel endpoints the annotation step ACTUALLY invoked for this entity ([] when it skipped
+            # or used no Kestrel annotator). Read here for the raw-passthrough plan; never feeds selection.
+            kestrel_endpoints_used = list(annotation_result.get("kestrel_endpoints_used") or [])
+            # RefMet availability for the row, read from the engine's TOTAL availability map (present on
+            # every path, including skips). Threaded into the certificate and mirrored on the output.
+            annotator_availability = annotation_result.get("annotator_availability") or {}
+            refmet_availability = annotator_availability.get(REFMET_ANNOTATOR, "not_queried")
+            # WHICH RefMet source served the row, from the engine's TOTAL source map (parallel provenance
+            # channel). The snapshot version is derived from the source so it pins only freeze-served rows.
+            annotator_source = annotation_result.get("annotator_source") or {}
+            refmet_source = annotator_source.get(REFMET_ANNOTATOR, REFMET_SOURCE_NOT_QUERIED)
+            refmet_snapshot_version = _refmet_snapshot_version_for(refmet_source)
 
-        # Raw Kestrel passthrough (opt-in): attach a PRIVATE plan the route layer executes AFTER the
-        # RefMet-armed batch-deadline window closes. Recording (not executing) here keeps selection
-        # byte-identical across any kestrel_top_n (R4) — the plan never enters AssignedIDsDict, the
-        # resolver, or the certificate. ``Entity`` is extra="allow", so the plan survives to_series()/
-        # to_dict(). Attached ONLY when the feature is on, so a default run is byte-unchanged (R2).
-        if kestrel_top_n is not None:
+            # Do Step 2: normalize vocab IDs to form proper curies
+            normalization_result = self.normalizer.normalize(
+                item=entity.to_series(),
+                provided_id_fields=provided_id_fields,
+                array_delimiters=array_delimiters,
+                stop_on_invalid_id=stop_on_invalid_id,
+            )
+            assert isinstance(normalization_result, pd.Series)
+            entity = entity.update_from(normalization_result)
+
+            # Do Step 3: link curies to KG nodes
+            linked_result = self.linker.link(entity.to_series())
+            assert isinstance(linked_result, pd.Series)
+            # The ICD-10-CM fallback side-map is internal provenance, not an output field: pop it before the
+            # row update so the mapped entity gains no new key from it.
+            icd10cm_map = linked_result.get(icd10cm_fallback.SIDE_MAP_FIELD) or {}
+            linked_result = linked_result.drop(labels=[icd10cm_fallback.SIDE_MAP_FIELD], errors="ignore")
+            entity = entity.update_from(linked_result)
+
+            # Do Step 4: resolve one-to-many KG matches
+            resolved_result = self.resolver.resolve(entity.to_series(), category=entity_type)
+            assert isinstance(resolved_result, pd.Series)
+            entity = entity.update_from(resolved_result)
+
+            # Do Step 5: enrich with equivalent IDs from the chosen KG node
+            kg_equivalent_ids: dict[str, list[str]] = {}
+            equivalent_ids_lookup_ok = True
+            if entity.chosen_kg_id is not None:
+                equiv_ids, equivalent_ids_lookup_ok = self.linker.get_equivalent_ids_checked([entity.chosen_kg_id])
+                kg_equivalent_ids = equiv_ids.get(entity.chosen_kg_id, {})
+                entity = entity.update_from(pd.Series({"kg_equivalent_ids": kg_equivalent_ids}))
+
+            # Do Step 6 (+ optional Step 6.5 re-resolution): issue the resolution certificate.
+            #
+            # Deliberately OUTSIDE the null guard above: the rows the certificate most needs to describe
+            # are the ones with no committed node. When re-resolution is enabled and the certificate
+            # contradicts, the committed node and its equivalent ids may be swapped for the correct
+            # distinct candidate (default-off; today's behavior otherwise).
+            #
+            # Unit 5: the additive lipid_resolution object is built INSIDE, against whichever node the
+            # certificate commits, so a swap never emits the replaced node's level or mapping relation and
+            # the certificate provenance mirror stays consistent with it. None off the lipid path.
+            certificate, chosen_kg_id, kg_equivalent_ids, lipid_resolution = self._certify_and_reresolve(
+                query_name=entity.name,
+                category=entity_type,
+                chosen_kg_id=entity.chosen_kg_id,
+                kg_equivalent_ids=kg_equivalent_ids,
+                equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
+                selection_conflict=entity.chosen_kg_id_review,
+                kg_ids=entity.kg_ids,
+                kg_ids_assigned=entity.kg_ids_assigned,
+                refmet_availability=refmet_availability,
+                refmet_source=refmet_source,
+                refmet_snapshot_version=refmet_snapshot_version,
+                lipid_row=entity.to_series(),
+                icd10cm_fallback_map=icd10cm_map,
+            )
+            row_mapping = mapping_fields(
+                lipid_resolution=lipid_resolution,
+                icd10cm=_icd10cm_fields_for(chosen_kg_id, entity.kg_ids, icd10cm_map),
+            )
+            # Emitted as a plain dict, not the dataclass: pydantic rejects a raw dataclass at the
+            # response model, and the NDJSON endpoint json.dumps's this value outside its try/except.
+            # ``refmet_availability`` is mirrored on the row (per R2) as well as on the certificate.
             entity = entity.update_from(
                 pd.Series(
                     {
-                        "_kestrel_passthrough_plan": {
-                            "category": entity_type,
-                            "prefixes": list(prefixes) if prefixes else [],
-                            "endpoints": kestrel_endpoints_used,
-                            "search_text": entity.name,
-                            "top_n": kestrel_top_n,
-                        }
+                        "chosen_kg_id": chosen_kg_id,
+                        "kg_equivalent_ids": kg_equivalent_ids or {},
+                        "resolution_certificate": certificate.to_api_dict(),
+                        "chosen_kg_id_review": derive_chosen_kg_id_review(certificate),
+                        "lipid_resolution": lipid_resolution,
+                        "refmet_availability": refmet_availability,
+                        "refmet_source": refmet_source,
+                        "refmet_snapshot_version": refmet_snapshot_version,
+                        # Mirrored from the certificate (a first-class field) so the row surface carries the
+                        # Tier B freeze version too, parallel to refmet_snapshot_version.
+                        "tier_b_snapshot_version": certificate.tier_b_snapshot_version,
+                        # Entity-general relation + ICD-10-CM fallback route/build; null off both paths.
+                        **row_mapping,
                     }
                 )
             )
 
-        if input_is_series:
-            return entity.to_series()
-        return entity.to_dict()
+            # Raw Kestrel passthrough (opt-in): attach a PRIVATE plan the route layer executes AFTER the
+            # RefMet-armed batch-deadline window closes. Recording (not executing) here keeps selection
+            # byte-identical across any kestrel_top_n (R4) — the plan never enters AssignedIDsDict, the
+            # resolver, or the certificate. ``Entity`` is extra="allow", so the plan survives to_series()/
+            # to_dict(). Attached ONLY when the feature is on, so a default run is byte-unchanged (R2).
+            if kestrel_top_n is not None:
+                entity = entity.update_from(
+                    pd.Series(
+                        {
+                            "_kestrel_passthrough_plan": {
+                                "category": entity_type,
+                                "prefixes": list(prefixes) if prefixes else [],
+                                "endpoints": kestrel_endpoints_used,
+                                "search_text": entity.name,
+                                "top_n": kestrel_top_n,
+                            }
+                        }
+                    )
+                )
+
+            # Check fault isolation contracts
+            is_faulted = has_kestrel_fault(entity) or bool(faults)
+            if is_faulted:
+                committed_id = entity.chosen_kg_id
+                row_faults = get_kestrel_faults(entity) or (faults or [])
+                if _has_non_kestrel_resolution(
+                    committed_id,
+                    kg_ids_provided=entity.kg_ids_provided,
+                    chosen_kg_id_provided=entity.chosen_kg_id_provided,
+                    kg_ids_assigned=entity.kg_ids_assigned,
+                    faults=row_faults,
+                ):
+                    entity = entity.update_from(pd.Series({"kestrel_degraded": True}))
+                else:
+                    entity = entity.update_from(
+                        pd.Series(
+                            {
+                                "chosen_kg_id": None,
+                                "kg_equivalent_ids": {},
+                                "resolution_certificate": None,
+                                "chosen_kg_id_review": None,
+                                "chosen_kg_id_lipid_hint": None,
+                                "lipid_resolution": None,
+                                **mapping_fields(lipid_resolution=None, icd10cm=None),
+                            }
+                        )
+                    )
+                    fault_msg = "; ".join(row_faults) if row_faults else "Kestrel service fault"
+                    raise KestrelFaultError(f"Entity mapping unresolved due to Kestrel fault: {fault_msg}")
+
+            if input_is_series:
+                return entity.to_series()
+            return entity.to_dict()
+        finally:
+            end_row_fault_recording(token)
 
     def map_dataset_to_kg(
         self,
@@ -805,228 +878,372 @@ class Mapper:
             Tuple of (output_tsv_path, stats_summary)
         """
         logging.info(f"Beginning to map dataset to KG ({dataset})")
-        array_delimiters = array_delimiters if array_delimiters is not None else [",", ";"]
+        fault_map, ds_token = start_dataset_fault_recording()
+        try:
+            array_delimiters = array_delimiters if array_delimiters is not None else [",", ";"]
 
-        # Validate/standardize the input entity type and vocab(s) on Biolink
-        entity_type = self.biolink_client.standardize_entity_type(entity_type)
-        prefixes = self.normalizer.get_standard_prefix(vocab)
+            # Validate/standardize the input entity type and vocab(s) on Biolink
+            entity_type = self.biolink_client.standardize_entity_type(entity_type)
+            prefixes = self.normalizer.get_standard_prefix(vocab)
 
-        # Ensure the results directory for output files exists
-        output_dir = Path(output_dir)
-        logging.info(f"Output dir path is: {output_dir}")
-        output_dir.mkdir(parents=True, exist_ok=True)
+            # Ensure the results directory for output files exists
+            output_dir = Path(output_dir)
+            logging.info(f"Output dir path is: {output_dir}")
+            output_dir.mkdir(parents=True, exist_ok=True)
 
-        # TODO: how to handle other data types, like .txt?
-        # TODO: let file output location be configurable? #11
-        # Issue: if dataset is a pandas df, need to create some default filename
-        # naively create a default output filename (input_df_MAPPED) if output_prefix not provided
+            # TODO: how to handle other data types, like .txt?
+            # TODO: let file output location be configurable? #11
+            # Issue: if dataset is a pandas df, need to create some default filename
+            # naively create a default output filename (input_df_MAPPED) if output_prefix not provided
 
-        output_suffix = "_MAPPED.tsv"
-        if isinstance(dataset, pd.DataFrame):
-            df = dataset
-            output_tsv_name = f"input_df{output_suffix}" if output_prefix is None else f"{output_prefix}{output_suffix}"
-        elif isinstance(dataset, (str, Path)):
-            dataset = str(dataset)
-            # Load tsv into pandas
-            if output_prefix is not None:
-                output_tsv_name = f"{output_prefix}{output_suffix}"
-            else:
-                output_tsv_name = Path(dataset).name.replace(".tsv", output_suffix).replace(".csv", output_suffix)
-            if dataset.endswith(".tsv"):
-                df = pd.read_csv(dataset, sep="\t", dtype={id_col: str for id_col in provided_id_columns}, comment="#")
-            elif dataset.endswith(".csv"):
-                df = pd.read_csv(dataset, dtype={id_col: str for id_col in provided_id_columns}, comment="#")
-            else:
-                raise ValueError(f"Unsupported file extension for dataset: {dataset}")
-        else:
-            raise ValueError(
-                f"Unsupported type of '{type(dataset)}' for 'dataset' parameter; "
-                f"only str, Path, or pd.DataFrame are supported"
-            )
-        logging.info(f"Output tsv name is: {output_tsv_name}")
-        output_tsv_path = output_dir / output_tsv_name
-        logging.info(f"output tsv path is: {output_tsv_path}")
-
-        # Do some basic cleanup to try to ensure empty cells are represented consistently
-        df[provided_id_columns] = df[provided_id_columns].replace("-", np.nan)
-        df[provided_id_columns] = df[provided_id_columns].replace("NO_MATCH", np.nan)
-        # Fail fast on an unresolvable input/output column collision (the rename itself happens at
-        # Step 6) rather than after every annotation/linking/resolution call has already been paid for.
-        _input_column_renames(df, MAPPING_FIELDS)
-        num_rows_start = len(df)
-
-        # Do Step 1: annotate all rows with vocab IDs
-        annotation_df = self.annotation_engine.annotate(
-            item=df,
-            name_field=name_column,
-            provided_id_fields=provided_id_columns,
-            category=entity_type,
-            prefixes=prefixes,
-            mode=annotation_mode,
-            annotators=annotators,
-            prefer_human=prefer_human,
-            prefer_canonical=prefer_canonical,
-            candidate_limit=candidate_limit,
-        )
-        df = df.join(annotation_df)
-        logging.info(f"After step 1 (annotation), df is: \n{df}")
-
-        # Do Step 2: normalize vocab IDs in all rows to form proper curies
-        normalization_df = self.normalizer.normalize(
-            item=df, provided_id_fields=provided_id_columns, array_delimiters=array_delimiters
-        )
-        df = df.join(normalization_df)
-        logging.info(f"After step 2 (normalization), df is: \n{df}")
-
-        # Do Step 3: link curies to KG nodes
-        linked_df = self.linker.link(df)
-        assert isinstance(linked_df, pd.DataFrame)
-        # Internal per-row ICD-10-CM fallback side-map: kept aside, never written to the TSV.
-        if icd10cm_fallback.SIDE_MAP_FIELD in linked_df.columns:
-            icd10cm_maps = linked_df[icd10cm_fallback.SIDE_MAP_FIELD]
-            linked_df = linked_df.drop(columns=[icd10cm_fallback.SIDE_MAP_FIELD])
-        else:
-            icd10cm_maps = pd.Series([{} for _ in range(len(df))], index=df.index, dtype=object)
-        df = df.join(linked_df)
-        logging.info(f"After step 3 (linking), df is: \n{df}")
-
-        # Do Step 4: resolve one-to-many KG matches
-        resolved_df = self.resolver.resolve(df, category=entity_type)
-        df = df.join(resolved_df)
-        logging.info(f"After step 4 (resolution), df is: \n{df}")
-
-        # Do Step 5: enrich with equivalent IDs from chosen KG nodes
-        unique_kg_ids = [kid for kid in df["chosen_kg_id"].dropna().unique()]
-        equivalent_ids_lookup_ok = True
-        if unique_kg_ids:
-            equiv_map, equivalent_ids_lookup_ok = self.linker.get_equivalent_ids_checked(unique_kg_ids)
-            df["kg_equivalent_ids"] = df["chosen_kg_id"].map(lambda kid: {} if pd.isna(kid) else equiv_map.get(kid, {}))
-        else:
-            df["kg_equivalent_ids"] = pd.Series([{} for _ in range(len(df))], index=df.index)
-        logging.info(f"After step 5 (equivalent IDs enrichment), df is: \n{df}")
-
-        # Do Step 6: issue a resolution certificate per row.
-        #
-        # This is the path every published artifact comes from (the audit, the suite arms, the
-        # figure), so it carries the same certificate the single-entity path does — flattened.
-        # Flat scalar columns, assembled as plain dicts: an object column surviving to df.to_csv
-        # would write `ResolutionCertificate(state=...)` and reintroduce exactly the
-        # ast.literal_eval-only column the certificate exists to replace.
-        certificate_rows = []
-        reresolved_ids: list[str | None] = []
-        reresolved_equiv: list[dict[str, list[str]]] = []
-        # Unit 5: per-row lipid_resolution as lipid_-prefixed flat columns (null off the lipid path).
-        lipid_column_rows: list[dict[str, Any]] = []
-        mapping_column_rows: list[dict[str, Any]] = []
-        for index, row in df.iterrows():
-            row_icd10cm_map = icd10cm_maps.get(index) or {}
-            committed = _scalar_or_none(row.get("chosen_kg_id"))
-            equiv = row.get("kg_equivalent_ids") or {}
-            row_availability = row.get("annotator_availability") or {}
-            row_source = row.get("annotator_source") or {}
-            refmet_source = row_source.get(REFMET_ANNOTATOR, REFMET_SOURCE_NOT_QUERIED)
-            # lipid_resolution is built INSIDE, against the committed node, so its lipid_ columns
-            # describe whatever node a re-resolution swap actually commits (never the replaced one).
-            certificate, new_id, new_equiv, lipid_resolution = self._certify_and_reresolve(
-                query_name=_scalar_or_none(row.get(name_column)),
-                category=entity_type,
-                chosen_kg_id=committed,
-                kg_equivalent_ids=equiv,
-                equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
-                selection_conflict=_scalar_or_none(row.get("chosen_kg_id_review")),
-                kg_ids=row.get("kg_ids") or {},
-                kg_ids_assigned=row.get("kg_ids_assigned") or {},
-                refmet_availability=row_availability.get(REFMET_ANNOTATOR, "not_queried"),
-                refmet_source=refmet_source,
-                refmet_snapshot_version=_refmet_snapshot_version_for(refmet_source),
-                lipid_row=row,
-                icd10cm_fallback_map=row_icd10cm_map,
-            )
-            certificate_rows.append(certificate)
-            reresolved_ids.append(new_id)
-            reresolved_equiv.append(new_equiv or {})
-            lipid_column_rows.append(lipid_flat_columns(lipid_resolution))
-            mapping_column_rows.append(
-                mapping_fields(
-                    lipid_resolution=lipid_resolution,
-                    icd10cm=_icd10cm_fields_for(new_id, row.get("kg_ids") or {}, row_icd10cm_map),
+            output_suffix = "_MAPPED.tsv"
+            if isinstance(dataset, pd.DataFrame):
+                df = dataset
+                output_tsv_name = (
+                    f"input_df{output_suffix}" if output_prefix is None else f"{output_prefix}{output_suffix}"
                 )
+            elif isinstance(dataset, (str, Path)):
+                dataset = str(dataset)
+                # Load tsv into pandas
+                if output_prefix is not None:
+                    output_tsv_name = f"{output_prefix}{output_suffix}"
+                else:
+                    output_tsv_name = Path(dataset).name.replace(".tsv", output_suffix).replace(".csv", output_suffix)
+                if dataset.endswith(".tsv"):
+                    df = pd.read_csv(
+                        dataset, sep="\t", dtype={id_col: str for id_col in provided_id_columns}, comment="#"
+                    )
+                elif dataset.endswith(".csv"):
+                    df = pd.read_csv(dataset, dtype={id_col: str for id_col in provided_id_columns}, comment="#")
+                else:
+                    raise ValueError(f"Unsupported file extension for dataset: {dataset}")
+            else:
+                raise ValueError(
+                    f"Unsupported type of '{type(dataset)}' for 'dataset' parameter; "
+                    f"only str, Path, or pd.DataFrame are supported"
+                )
+            logging.info(f"Output tsv name is: {output_tsv_name}")
+            output_tsv_path = output_dir / output_tsv_name
+            logging.info(f"output tsv path is: {output_tsv_path}")
+
+            # Do some basic cleanup to try to ensure empty cells are represented consistently
+            df[provided_id_columns] = df[provided_id_columns].replace("-", np.nan)
+            df[provided_id_columns] = df[provided_id_columns].replace("NO_MATCH", np.nan)
+            # Fail fast on an unresolvable input/output column collision (the rename itself happens at
+            # Step 6) rather than after every annotation/linking/resolution call has already been paid for.
+            _input_column_renames(df, MAPPING_FIELDS)
+            num_rows_start = len(df)
+
+            # Do Step 1: annotate all rows with vocab IDs
+            annotation_df = self.annotation_engine.annotate(
+                item=df,
+                name_field=name_column,
+                provided_id_fields=provided_id_columns,
+                category=entity_type,
+                prefixes=prefixes,
+                mode=annotation_mode,
+                annotators=annotators,
+                prefer_human=prefer_human,
+                prefer_canonical=prefer_canonical,
+                candidate_limit=candidate_limit,
             )
-        # Re-resolution may have swapped the committed node; reflect the correction in the emitted
-        # chosen_kg_id / kg_equivalent_ids columns. Guarded by the flag so a default run's columns
-        # (and their dtypes) are byte-for-byte unchanged.
-        if config.RERESOLUTION_ENABLED:
-            df["chosen_kg_id"] = pd.Series(reresolved_ids, index=df.index, dtype=object)
-            df["kg_equivalent_ids"] = pd.Series(reresolved_equiv, index=df.index, dtype=object)
-        df = df.join(pd.DataFrame([c.to_flat_columns() for c in certificate_rows], index=df.index))
-        # Unit 5: lipid_-prefixed flat columns, one column set for every row (null off the lipid path).
-        df = df.join(pd.DataFrame(lipid_column_rows, index=df.index))
-        # Entity-general relation + ICD-10-CM fallback route/build columns (null off both paths). These are
-        # plain names an input dataset may already carry as its own metadata: keep the input's values
-        # under ``<name>_input`` rather than letting the join abort the run on overlapping columns.
-        df = _preserve_input_columns(df, MAPPING_FIELDS)
-        df = df.join(pd.DataFrame(mapping_column_rows, index=df.index, dtype=object))
-        # The legacy flag is now DERIVED from the certificate (C4/L20) rather than passed through,
-        # so the two can never disagree. Identical for one release; deprecation is a follow-up.
-        # object dtype and an explicit index: the review is str | None per row, and a bare list with
-        # Nones is both rejected by pandas' typed __setitem__ and, at runtime, coerced to a float NaN
-        # column that later identity checks (`is None`) would silently miss.
-        df["chosen_kg_id_review"] = pd.Series(
-            [derive_chosen_kg_id_review(c) for c in certificate_rows], index=df.index, dtype=object
-        )
-        logging.info(f"After step 6 (resolution certificate), df is: \n{df}")
+            df = df.join(annotation_df)
+            logging.info(f"After step 1 (annotation), df is: \n{df}")
 
-        # Do a little validation of results dataframe
-        num_rows_end = len(df)
-        if num_rows_start != num_rows_end:
-            raise ValueError(
-                f"At end of map_dataset_to_kg(), dataframe has {num_rows_end} rows but started with {num_rows_start} "
-                f"rows. Row count should not change."
+            # Do Step 2: normalize vocab IDs in all rows to form proper curies
+            normalization_df = self.normalizer.normalize(
+                item=df, provided_id_fields=provided_id_columns, array_delimiters=array_delimiters
+            )
+            df = df.join(normalization_df)
+            logging.info(f"After step 2 (normalization), df is: \n{df}")
+
+            # Do Step 3: link curies to KG nodes
+            try:
+                linked_df = self.linker.link(df)
+            except (requests.exceptions.RequestException, icd10cm_fallback.Icd10cmFallbackLookupError) as exc:
+                if get_current_api_context() is None:
+                    raise
+                logging.warning("Bulk canonicalize failed during API dataset mapping; marking affected rows: %s", exc)
+                for idx, curies_list in df["curies"].items():
+                    if curies_list:
+                        record_kestrel_fault(idx, f"canonicalize: {exc}")
+                linked_df = self.linker.empty_dataframe_links(df)
+            assert isinstance(linked_df, pd.DataFrame)
+            # Internal per-row ICD-10-CM fallback side-map: kept aside, never written to the TSV.
+            if icd10cm_fallback.SIDE_MAP_FIELD in linked_df.columns:
+                icd10cm_maps = linked_df[icd10cm_fallback.SIDE_MAP_FIELD]
+                linked_df = linked_df.drop(columns=[icd10cm_fallback.SIDE_MAP_FIELD])
+            else:
+                icd10cm_maps = pd.Series([{} for _ in range(len(df))], index=df.index, dtype=object)
+            df = df.join(linked_df)
+            logging.info(f"After step 3 (linking), df is: \n{df}")
+
+            # Do Step 4: resolve one-to-many KG matches
+            resolved_df = self.resolver.resolve(df, category=entity_type)
+            df = df.join(resolved_df)
+            logging.info(f"After step 4 (resolution), df is: \n{df}")
+
+            def _clear_rejected_faulted_matches(frame: pd.DataFrame) -> pd.DataFrame:
+                cleared_ids_local: list[Any] = list(frame["chosen_kg_id"])
+                cleared_reviews_local: list[Any] = list(frame["chosen_kg_id_review"])
+                has_hint = "chosen_kg_id_lipid_hint" in frame.columns
+                cleared_hints_local: list[Any] = list(frame["chosen_kg_id_lipid_hint"]) if has_hint else []
+                has_equiv = "kg_equivalent_ids" in frame.columns
+                cleared_equiv_local: list[Any] = list(frame["kg_equivalent_ids"]) if has_equiv else []
+                any_cleared = False
+                for pos, (r_idx, r_row) in enumerate(frame.iterrows()):
+                    if not has_kestrel_fault(row_idx=r_idx):
+                        continue
+                    c_id = _scalar_or_none(r_row.get("chosen_kg_id"))
+                    if c_id is None:
+                        continue
+                    r_faults = get_kestrel_faults(row_idx=r_idx)
+                    if not _has_non_kestrel_resolution(
+                        c_id,
+                        kg_ids_provided=r_row.get("kg_ids_provided"),
+                        chosen_kg_id_provided=r_row.get("chosen_kg_id_provided"),
+                        kg_ids_assigned=r_row.get("kg_ids_assigned"),
+                        faults=r_faults,
+                    ):
+                        cleared_ids_local[pos] = None
+                        cleared_reviews_local[pos] = None
+                        if has_hint:
+                            cleared_hints_local[pos] = None
+                        if has_equiv:
+                            cleared_equiv_local[pos] = {}
+                        any_cleared = True
+                if any_cleared:
+                    frame["chosen_kg_id"] = pd.Series(cleared_ids_local, index=frame.index, dtype=object)
+                    frame["chosen_kg_id_review"] = pd.Series(cleared_reviews_local, index=frame.index, dtype=object)
+                    if has_hint:
+                        frame["chosen_kg_id_lipid_hint"] = pd.Series(
+                            cleared_hints_local, index=frame.index, dtype=object
+                        )
+                    if has_equiv:
+                        frame["kg_equivalent_ids"] = pd.Series(cleared_equiv_local, index=frame.index, dtype=object)
+                return frame
+
+            df = _clear_rejected_faulted_matches(df)
+
+            # Do Step 5: enrich with equivalent IDs from chosen KG nodes
+            unique_kg_ids = [kid for kid in df["chosen_kg_id"].dropna().unique()]
+            equivalent_ids_lookup_ok = True
+            if unique_kg_ids:
+                equiv_map, equivalent_ids_lookup_ok = self.linker.get_equivalent_ids_checked(unique_kg_ids)
+                if not equivalent_ids_lookup_ok:
+                    for idx, row in df.iterrows():
+                        if pd.notna(row.get("chosen_kg_id")):
+                            record_kestrel_fault(idx, "get-nodes equivalent ids enrichment failed")
+                df["kg_equivalent_ids"] = df["chosen_kg_id"].map(
+                    lambda kid: {} if pd.isna(kid) else equiv_map.get(kid, {})
+                )
+                if not equivalent_ids_lookup_ok:
+                    df = _clear_rejected_faulted_matches(df)
+            else:
+                df["kg_equivalent_ids"] = pd.Series([{} for _ in range(len(df))], index=df.index)
+            logging.info(f"After step 5 (equivalent IDs enrichment), df is: \n{df}")
+
+            # Do Step 6: issue a resolution certificate per row.
+            #
+            # This is the path every published artifact comes from (the audit, the suite arms, the
+            # figure), so it carries the same certificate the single-entity path does — flattened.
+            # Flat scalar columns, assembled as plain dicts: an object column surviving to df.to_csv
+            # would write `ResolutionCertificate(state=...)` and reintroduce exactly the
+            # ast.literal_eval-only column the certificate exists to replace.
+            certificate_rows = []
+            reresolved_ids: list[str | None] = []
+            reresolved_equiv: list[dict[str, list[str]]] = []
+            reresolved_cleared_positions: set[int] = set()
+            # Unit 5: per-row lipid_resolution as lipid_-prefixed flat columns (null off the lipid path).
+            lipid_column_rows: list[dict[str, Any]] = []
+            mapping_column_rows: list[dict[str, Any]] = []
+            for row_pos, (index, row) in enumerate(df.iterrows()):
+                row_icd10cm_map = icd10cm_maps.get(index) or {}
+                committed = _scalar_or_none(row.get("chosen_kg_id"))
+                equiv = row.get("kg_equivalent_ids") or {}
+                row_availability = row.get("annotator_availability") or {}
+                row_source = row.get("annotator_source") or {}
+                refmet_source = row_source.get(REFMET_ANNOTATOR, REFMET_SOURCE_NOT_QUERIED)
+                # lipid_resolution is built INSIDE, against the committed node, so its lipid_ columns
+                # describe whatever node a re-resolution swap actually commits (never the replaced one).
+                certificate, new_id, new_equiv, lipid_resolution = self._certify_and_reresolve(
+                    query_name=_scalar_or_none(row.get(name_column)),
+                    category=entity_type,
+                    chosen_kg_id=committed,
+                    kg_equivalent_ids=equiv,
+                    equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
+                    selection_conflict=_scalar_or_none(row.get("chosen_kg_id_review")),
+                    kg_ids=row.get("kg_ids") or {},
+                    kg_ids_assigned=row.get("kg_ids_assigned") or {},
+                    refmet_availability=row_availability.get(REFMET_ANNOTATOR, "not_queried"),
+                    refmet_source=refmet_source,
+                    refmet_snapshot_version=_refmet_snapshot_version_for(refmet_source),
+                    lipid_row=row,
+                    icd10cm_fallback_map=row_icd10cm_map,
+                )
+                if (
+                    config.RERESOLUTION_ENABLED
+                    and new_id is not None
+                    and new_id != committed
+                    and has_kestrel_fault(row_idx=index)
+                    and not _has_non_kestrel_resolution(
+                        new_id,
+                        kg_ids_provided=row.get("kg_ids_provided"),
+                        chosen_kg_id_provided=row.get("chosen_kg_id_provided"),
+                        kg_ids_assigned=row.get("kg_ids_assigned"),
+                        faults=get_kestrel_faults(row_idx=index),
+                    )
+                ):
+                    certificate, new_id, new_equiv, lipid_resolution = self._certify_and_reresolve(
+                        query_name=_scalar_or_none(row.get(name_column)),
+                        category=entity_type,
+                        chosen_kg_id=None,
+                        kg_equivalent_ids={},
+                        equivalent_ids_lookup_ok=equivalent_ids_lookup_ok,
+                        selection_conflict=None,
+                        kg_ids=row.get("kg_ids") or {},
+                        kg_ids_assigned=row.get("kg_ids_assigned") or {},
+                        refmet_availability=row_availability.get(REFMET_ANNOTATOR, "not_queried"),
+                        refmet_source=refmet_source,
+                        refmet_snapshot_version=_refmet_snapshot_version_for(refmet_source),
+                        lipid_row=row,
+                        icd10cm_fallback_map=row_icd10cm_map,
+                    )
+                    reresolved_cleared_positions.add(row_pos)
+                certificate_rows.append(certificate)
+                reresolved_ids.append(new_id)
+                reresolved_equiv.append(new_equiv or {})
+                lipid_column_rows.append(lipid_flat_columns(lipid_resolution))
+                mapping_column_rows.append(
+                    mapping_fields(
+                        lipid_resolution=lipid_resolution,
+                        icd10cm=_icd10cm_fields_for(new_id, row.get("kg_ids") or {}, row_icd10cm_map),
+                    )
+                )
+            # Re-resolution may have swapped the committed node; reflect the correction in the emitted
+            # chosen_kg_id / kg_equivalent_ids columns. Guarded by the flag so a default run's columns
+            # (and their dtypes) are byte-for-byte unchanged.
+            if config.RERESOLUTION_ENABLED:
+                df["chosen_kg_id"] = pd.Series(reresolved_ids, index=df.index, dtype=object)
+                df["kg_equivalent_ids"] = pd.Series(reresolved_equiv, index=df.index, dtype=object)
+                if reresolved_cleared_positions and "chosen_kg_id_lipid_hint" in df.columns:
+                    cleared_hints = [
+                        None if pos in reresolved_cleared_positions else val
+                        for pos, val in enumerate(df["chosen_kg_id_lipid_hint"])
+                    ]
+                    df["chosen_kg_id_lipid_hint"] = pd.Series(cleared_hints, index=df.index, dtype=object)
+            df = df.join(pd.DataFrame([c.to_flat_columns() for c in certificate_rows], index=df.index))
+            # Unit 5: lipid_-prefixed flat columns, one column set for every row (null off the lipid path).
+            df = df.join(pd.DataFrame(lipid_column_rows, index=df.index))
+            # Entity-general relation + ICD-10-CM fallback route/build columns (null off both paths). These are
+            # plain names an input dataset may already carry as its own metadata: keep the input's values
+            # under ``<name>_input`` rather than letting the join abort the run on overlapping columns.
+            df = _preserve_input_columns(df, MAPPING_FIELDS)
+            df = df.join(pd.DataFrame(mapping_column_rows, index=df.index, dtype=object))
+            # The legacy flag is now DERIVED from the certificate (C4/L20) rather than passed through,
+            # so the two can never disagree. Identical for one release; deprecation is a follow-up.
+            # object dtype and an explicit index: the review is str | None per row, and a bare list with
+            # Nones is both rejected by pandas' typed __setitem__ and, at runtime, coerced to a float NaN
+            # column that later identity checks (`is None`) would silently miss.
+            df["chosen_kg_id_review"] = pd.Series(
+                [derive_chosen_kg_id_review(c) for c in certificate_rows], index=df.index, dtype=object
+            )
+            logging.info(f"After step 6 (resolution certificate), df is: \n{df}")
+
+            # Do a little validation of results dataframe
+            num_rows_end = len(df)
+            if num_rows_start != num_rows_end:
+                raise ValueError(
+                    f"At end of map_dataset_to_kg(), dataframe has {num_rows_end} rows "
+                    f"but started with {num_rows_start} rows. Row count should not change."
+                )
+
+            # Count RefMet-unavailable rows before the availability helper column is dropped. This is a
+            # cold-run metric only: the RefMet HTTP cache serves successes, so a warm rerun understates
+            # unavailability. Any gating use must be attributed to a cold cache.
+            refmet_unavailable_rows = sum(1 for c in certificate_rows if c.refmet_availability == "unavailable")
+
+            # Run-level RefMet SOURCE breakdown (parallel to the unavailable count): how many rows each
+            # source served. With a pinned freeze present this is dominated by local_snapshot /
+            # not_in_snapshot (the breaker is out of the path); without one it is live_api / unavailable.
+            refmet_source_counts: dict[str, int] = {}
+            for c in certificate_rows:
+                refmet_source_counts[c.refmet_source] = refmet_source_counts.get(c.refmet_source, 0) + 1
+
+            # Drop the availability + source helper columns: their per-row values are already emitted as
+            # the flat ``certificate_refmet_availability`` / ``certificate_refmet_source`` columns, so the
+            # TSV keeps no repr'd dict for either.
+            # ``kestrel_endpoints_used`` is a passthrough-plan helper column; the dataset (non-stream) path
+            # does not carry raw passthrough rows (/map/dataset 422s the option), so drop it too rather than
+            # writing a repr'd list column to the TSV.
+            df = df.drop(
+                columns=["annotator_availability", "annotator_source", "kestrel_endpoints_used"], errors="ignore"
             )
 
-        # Count RefMet-unavailable rows before the availability helper column is dropped. This is a
-        # cold-run metric only: the RefMet HTTP cache serves successes, so a warm rerun understates
-        # unavailability. Any gating use must be attributed to a cold cache.
-        refmet_unavailable_rows = sum(1 for c in certificate_rows if c.refmet_availability == "unavailable")
+            # Check fault isolation contracts for dataset (rejected matches were already cleared before
+            # Step 5 and Step 6 so certificates, lipid columns, and mapping fields match chosen_kg_id)
+            row_errors: list[str | None] = []
+            row_degraded: list[bool] = []
+            has_any_error = False
+            has_any_degraded = False
 
-        # Run-level RefMet SOURCE breakdown (parallel to the unavailable count): how many rows each
-        # source served. With a pinned freeze present this is dominated by local_snapshot /
-        # not_in_snapshot (the breaker is out of the path); without one it is live_api / unavailable.
-        refmet_source_counts: dict[str, int] = {}
-        for c in certificate_rows:
-            refmet_source_counts[c.refmet_source] = refmet_source_counts.get(c.refmet_source, 0) + 1
+            for idx, row in df.iterrows():
+                is_faulted = has_kestrel_fault(row_idx=idx)
+                committed_id = _scalar_or_none(row.get("chosen_kg_id"))
+                row_fault_list = get_kestrel_faults(row_idx=idx) if is_faulted else []
+                if is_faulted:
+                    if _has_non_kestrel_resolution(
+                        committed_id,
+                        kg_ids_provided=row.get("kg_ids_provided"),
+                        chosen_kg_id_provided=row.get("chosen_kg_id_provided"),
+                        kg_ids_assigned=row.get("kg_ids_assigned"),
+                        faults=row_fault_list,
+                    ):
+                        row_errors.append(None)
+                        row_degraded.append(True)
+                        has_any_degraded = True
+                    else:
+                        msg = "; ".join(row_fault_list) if row_fault_list else "Kestrel service fault"
+                        row_errors.append(f"Kestrel fault: {msg}")
+                        row_degraded.append(False)
+                        has_any_error = True
+                else:
+                    row_errors.append(None)
+                    row_degraded.append(False)
 
-        # Drop the availability + source helper columns: their per-row values are already emitted as
-        # the flat ``certificate_refmet_availability`` / ``certificate_refmet_source`` columns, so the
-        # TSV keeps no repr'd dict for either.
-        # ``kestrel_endpoints_used`` is a passthrough-plan helper column; the dataset (non-stream) path
-        # does not carry raw passthrough rows (/map/dataset 422s the option), so drop it too rather than
-        # writing a repr'd list column to the TSV.
-        df = df.drop(columns=["annotator_availability", "annotator_source", "kestrel_endpoints_used"], errors="ignore")
+            if has_any_degraded:
+                df = _preserve_input_columns(df, ("kestrel_degraded",))
+                df["kestrel_degraded"] = pd.Series(row_degraded, index=df.index, dtype=bool)
 
-        # Dump the final dataframe to a TSV
+            if has_any_error:
+                df = _preserve_input_columns(df, ("error",))
+                df["error"] = pd.Series([err or "" for err in row_errors], index=df.index, dtype=str)
 
-        logging.info(f"Dumping output TSV to {output_tsv_path}")
-        df.to_csv(output_tsv_path, sep="\t", index=False)
+            # Dump the final dataframe to a TSV
 
-        # Stamp KG build + service versions into the stats file. Hits Kestrel /health
-        # (timeout 5s); degrades to "unknown" and never raises — see build_run_provenance.
-        run_provenance = build_run_provenance(
-            kestrel_url=get_kestrel_api_url(),
-            run_timestamp=datetime.now(timezone.utc).isoformat(),
-        )
-        stats_summary = analyze_dataset_mapping(
-            output_tsv_path, self.linker, annotation_mode, run_provenance=run_provenance.model_dump()
-        )
-        # Run-level RefMet availability metric (D5). Cold-run-attributable only (see the count above).
-        stats_summary["refmet_unavailable_rows"] = refmet_unavailable_rows
-        stats_summary["refmet_total_rows"] = len(certificate_rows)
-        # Run-level RefMet source provenance (counts by source) + which freeze served the run. Stamp the
-        # freeze version ONLY when the run actually used/consulted the snapshot (a snapshot-attributable
-        # source has a nonzero count); otherwise a non-small-molecule or live-fallback run would name a
-        # freeze that served no row, contradicting refmet_source_counts.
-        stats_summary["refmet_source_counts"] = refmet_source_counts
-        snapshot_used = any(refmet_source_counts.get(s, 0) for s in _SNAPSHOT_ATTRIBUTABLE_SOURCES)
-        stats_summary["refmet_snapshot_version"] = refmet_snapshot.version() if snapshot_used else None
+            logging.info(f"Dumping output TSV to {output_tsv_path}")
+            df.to_csv(output_tsv_path, sep="\t", index=False)
 
-        return str(output_tsv_path), stats_summary
+            # Stamp KG build + service versions into the stats file. Hits Kestrel /health
+            # (timeout 5s); degrades to "unknown" and never raises — see build_run_provenance.
+            run_provenance = build_run_provenance(
+                kestrel_url=get_kestrel_api_url(),
+                run_timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+            stats_summary = analyze_dataset_mapping(
+                output_tsv_path, self.linker, annotation_mode, run_provenance=run_provenance.model_dump()
+            )
+            # Run-level RefMet availability metric (D5). Cold-run-attributable only (see the count above).
+            stats_summary["refmet_unavailable_rows"] = refmet_unavailable_rows
+            stats_summary["refmet_total_rows"] = len(certificate_rows)
+            # Run-level RefMet source provenance (counts by source) + which freeze served the run. Stamp the
+            # freeze version ONLY when the run actually used/consulted the snapshot (a snapshot-attributable
+            # source has a nonzero count); otherwise a non-small-molecule or live-fallback run would name a
+            # freeze that served no row, contradicting refmet_source_counts.
+            stats_summary["refmet_source_counts"] = refmet_source_counts
+            snapshot_used = any(refmet_source_counts.get(s, 0) for s in _SNAPSHOT_ATTRIBUTABLE_SOURCES)
+            stats_summary["refmet_snapshot_version"] = refmet_snapshot.version() if snapshot_used else None
+
+            return str(output_tsv_path), stats_summary
+        finally:
+            end_dataset_fault_recording(ds_token)

@@ -12,10 +12,15 @@ a no-op for every other symbol. This is a temporary measure; the durable fix is 
 exact-symbol retrieval / de-conflation). See docs/plans/2026-06-17-001-feat-gene-symbol-fallback-resolver-plan.md.
 """
 
+import contextvars
 import logging
 
 from ..config import HUMAN_MARKER_PREFIXES, KESTREL_BATCH_SIZE_CANONICALIZE
 from ..utils import kestrel_request
+
+_LAST_FAULT_SYMBOLS: contextvars.ContextVar[dict[int, str] | None] = contextvars.ContextVar(
+    "_GENE_RESOLVER_LAST_FAULTS", default=None
+)
 
 # Case-folded human-marker prefixes, matched against the prefix of each equivalent id. Reuses the
 # single source of truth in config (the same set _select_result uses) so the two human-gate paths
@@ -40,6 +45,28 @@ _CURATED = {symbol.casefold(): curie for symbol, curie in CURATED_GENE_SYMBOL_TO
 class GeneSymbolResolver:
     """Resolve a curated gene symbol to its HGNC-verified human NCBIGene CURIE (or None)."""
 
+    @property
+    def _last_fault_symbol(self) -> str | None:
+        mapping = _LAST_FAULT_SYMBOLS.get()
+        return mapping.get(id(self)) if mapping is not None else None
+
+    @_last_fault_symbol.setter
+    def _last_fault_symbol(self, value: str | None) -> None:
+        current = _LAST_FAULT_SYMBOLS.get() or {}
+        updated = dict(current)
+        if value is None:
+            updated.pop(id(self), None)
+        else:
+            updated[id(self)] = value
+        _LAST_FAULT_SYMBOLS.set(updated or None)
+
+    def last_call_faulted(self, symbol: str | None = None) -> bool:
+        """True if the last resolve call in this context encountered a Kestrel transport fault."""
+        last_fault = self._last_fault_symbol
+        if symbol is None:
+            return last_fault is not None
+        return last_fault == str(symbol).strip().casefold()
+
     def resolve(self, symbol: str | None) -> str | None:
         """Return the canonical human NCBIGene CURIE for a curated symbol, else None.
 
@@ -47,12 +74,18 @@ class GeneSymbolResolver:
         does not carry the queried symbol (as its name or a synonym) or lacks an HGNC equivalent —
         never fabricates and never returns a different human gene.
         """
+        curie, _ = self.resolve_checked(symbol)
+        return curie
+
+    def resolve_checked(self, symbol: str | None) -> tuple[str | None, bool]:
+        """Return ``(curie, faulted)`` atomically for the current lookup."""
+        self._last_fault_symbol = None
         if not symbol:
-            return None
+            return None, False
         key = str(symbol).strip().casefold()
         curie = _CURATED.get(key)
         if curie is None:
-            return None  # no-op for everything outside the curated set
+            return None, False  # no-op for everything outside the curated set
 
         try:
             nodes = kestrel_request(
@@ -64,18 +97,16 @@ class GeneSymbolResolver:
                 json={"slim": False, "truncate_long_fields": False},
             )
         except Exception as exc:
-            # Catch-all by design: ANY /get-nodes failure — a Kestrel outage (already logged by the
-            # request layer) or a non-network failure like a malformed/changed response body — is
-            # suppressed here to an honest no-op (the entity falls back to whatever the search step
-            # chose, typically an ortholog). Nothing propagates to the caller, so this warning is the
-            # ONLY signal that a curated gene stopped resolving — there is no exception, test failure,
-            # or alert. (A Kestrel outage therefore silently disables the bridge for all six genes.)
+            self._last_fault_symbol = key
+            from .fault_tracking import record_kestrel_fault
+
+            record_kestrel_fault(None, f"gene-symbol fallback /get-nodes failed for {curie} ({symbol!r}): {exc}")
             logging.warning(f"gene-symbol fallback: get-nodes failed for {curie} ({symbol!r}): {exc}")
-            return None
+            return None, True
 
         node = nodes.get(curie) if isinstance(nodes, dict) else None
         if not isinstance(node, dict):
-            return None
+            return None, False
 
         # Verify identity (queried symbol present on the node), not just humanity (HGNC present). Match
         # on the node `name` OR a synonym, mirroring _select_result._symbol_matches so the two identity
@@ -85,7 +116,7 @@ class GeneSymbolResolver:
         identity = {str(s).strip().casefold() for s in (node.get("synonyms") or [])}
         identity.add(str(node.get("name", "")).strip().casefold())
         if key not in identity:
-            return None
+            return None, False
         # Match on the CURIE prefix, case-insensitively, against the shared human-marker set — a
         # case-sensitive `startswith("HGNC:")` would silently reject a node whose equivalent ids
         # arrive lower-cased (e.g. "hgnc:4261"), dropping a genuinely human curated gene.
@@ -93,6 +124,6 @@ class GeneSymbolResolver:
             str(e).split(":", 1)[0].strip().casefold() in _HUMAN_MARKER_PREFIXES_CF
             for e in (node.get("equivalent_ids") or [])
         ):
-            return None
+            return None, False
 
-        return curie
+        return curie, False

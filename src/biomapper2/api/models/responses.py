@@ -361,6 +361,12 @@ class EntityMappingResult(BaseModel):
         "and are UNTRUSTED external data (see KestrelSearchResult.rows).",
     )
     error: str | None = Field(default=None, description="Error message if mapping failed")
+    kestrel_degraded: Literal[True] | None = Field(
+        default=None,
+        exclude_if=lambda v: v is None,
+        description="True if chosen_kg_id resolved via non-Kestrel evidence while one or more Kestrel calls "
+        "failed; omitted from serialized response when None/healthy.",
+    )
 
 
 class EntityMappingResponse(BaseModel):

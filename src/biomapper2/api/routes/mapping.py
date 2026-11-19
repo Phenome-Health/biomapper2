@@ -1,17 +1,20 @@
 """Entity mapping endpoints."""
 
+import asyncio
 import io
 import logging
 import tempfile
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Any
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
-from ... import config
+from ... import config, utils
 from ...core.annotators.metabolomics_workbench import MetabolomicsWorkbenchAnnotator
 from ...core.kestrel_passthrough import collect as collect_kestrel_passthrough
 from ...core.primary_curie import select_primary_curie
@@ -93,6 +96,36 @@ def _collect_passthrough(mapped_item: dict[str, Any] | pd.Series, kestrel_top_n:
     )
 
 
+def _run_with_api_context(func: Any, *args: Any, _breaker_scope: utils.BreakerScope, **kwargs: Any) -> Any:
+    """Execute mapping callable inside an activated ApiRequestContext.
+
+    ``_breaker_scope`` is created once per HTTP request and shared by every call that request makes,
+    so the request adds at most one failure to the process-wide Kestrel breaker.
+    """
+    token = utils.set_api_context(breaker_scope=_breaker_scope)
+    try:
+        return func(*args, **kwargs)
+    finally:
+        utils.reset_api_context(token)
+
+
+def _get_executor(request: Request, name: str) -> ThreadPoolExecutor | None:
+    """Get executor from app state, recreating if shut down by a prior context."""
+    executor = getattr(request.app.state, name, None)
+    if executor is None or getattr(executor, "_shutdown", False):
+        new_executor = ThreadPoolExecutor(
+            max_workers=(
+                config.KESTREL_API_WORKER_THREADS
+                if name == "kestrel_executor"
+                else config.KESTREL_NON_KESTREL_WORKER_THREADS
+            ),
+            thread_name_prefix="kestrel-worker" if name == "kestrel_executor" else "fast-worker",
+        )
+        setattr(request.app.state, name, new_executor)
+        return new_executor
+    return executor
+
+
 def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_name: str) -> EntityMappingResult:
     """Extract mapping result from mapped item."""
     if isinstance(mapped_item, pd.Series):
@@ -132,6 +165,7 @@ def extract_mapping_result(mapped_item: dict[str, Any] | pd.Series, original_nam
         kg_equivalent_ids=mapped_item.get("kg_equivalent_ids", {}) or {},
         kg_ids=mapped_item.get("kg_ids", {}) or {},
         assigned_ids=mapped_item.get("assigned_ids", {}) or {},
+        kestrel_degraded=True if mapped_item.get("kestrel_degraded") else None,
         error=None,
     )
 
@@ -192,10 +226,19 @@ async def map_entity(
     Takes an entity name, type, and optional identifiers, then runs the full
     biomapper2 pipeline: annotation → normalization → linking → resolution.
     """
+    breaker_scope = utils.BreakerScope()
     start_time = time.time()
     request_id = str(uuid.uuid4())
 
     mapper = get_mapper(request)
+    loop = asyncio.get_running_loop()
+    kestrel_executor = _get_executor(request, "kestrel_executor")
+    fast_executor = _get_executor(request, "fast_executor")
+
+    is_non_kestrel = (
+        body.options.annotation_mode == "none" and not body.identifiers and body.options.kestrel_top_n is None
+    )
+    executor = fast_executor if (is_non_kestrel and fast_executor is not None) else kestrel_executor
 
     try:
         # Build entity dict from request
@@ -213,25 +256,55 @@ async def map_entity(
             provided_id_fields.append(field_name)
 
         # Run mapping
-        mapped_item = mapper.map_entity_to_kg(
-            item=entity,
-            name_field="name",
-            provided_id_fields=provided_id_fields,
-            entity_type=body.entity_type,
-            vocab=body.options.vocab,
-            array_delimiters=body.options.array_delimiters,
-            annotation_mode=body.options.annotation_mode,
-            annotators=body.options.annotators,
-            prefer_human=body.options.prefer_human,
-            prefer_canonical=body.options.prefer_canonical,
-            candidate_limit=body.options.candidate_limit,
-            kestrel_top_n=body.options.kestrel_top_n,
-        )
+        if is_non_kestrel:
+            mapped_item = _run_with_api_context(
+                mapper.map_entity_to_kg,
+                _breaker_scope=breaker_scope,
+                item=entity,
+                name_field="name",
+                provided_id_fields=provided_id_fields,
+                entity_type=body.entity_type,
+                vocab=body.options.vocab,
+                array_delimiters=body.options.array_delimiters,
+                stop_on_invalid_id=False,
+                annotation_mode=body.options.annotation_mode,
+                annotators=body.options.annotators,
+                prefer_human=body.options.prefer_human,
+                prefer_canonical=body.options.prefer_canonical,
+                candidate_limit=body.options.candidate_limit,
+                kestrel_top_n=body.options.kestrel_top_n,
+            )
+        else:
+            mapped_item = await loop.run_in_executor(
+                executor,
+                partial(_run_with_api_context, _breaker_scope=breaker_scope),
+                lambda: mapper.map_entity_to_kg(
+                    item=entity,
+                    name_field="name",
+                    provided_id_fields=provided_id_fields,
+                    entity_type=body.entity_type,
+                    vocab=body.options.vocab,
+                    array_delimiters=body.options.array_delimiters,
+                    stop_on_invalid_id=False,
+                    annotation_mode=body.options.annotation_mode,
+                    annotators=body.options.annotators,
+                    prefer_human=body.options.prefer_human,
+                    prefer_canonical=body.options.prefer_canonical,
+                    candidate_limit=body.options.candidate_limit,
+                    kestrel_top_n=body.options.kestrel_top_n,
+                ),
+            )
 
         result = extract_mapping_result(mapped_item, body.name)
         # Opt-in raw passthrough (single path arms no batch deadline, so per-entity collection is fine).
         if body.options.kestrel_top_n is not None:
-            result.kestrel_results = _collect_passthrough(mapped_item, body.options.kestrel_top_n)
+            result.kestrel_results = await loop.run_in_executor(
+                executor,
+                partial(_run_with_api_context, _breaker_scope=breaker_scope),
+                _collect_passthrough,
+                mapped_item,
+                body.options.kestrel_top_n,
+            )
 
     except Exception as e:
         logger.exception(f"Error mapping entity: {e}")
@@ -263,10 +336,19 @@ async def map_batch(
     Processes each entity through the mapping pipeline and returns results.
     Maximum 1000 entities per request.
     """
+    breaker_scope = utils.BreakerScope()
     start_time = time.time()
     request_id = str(uuid.uuid4())
 
     mapper = get_mapper(request)
+    loop = asyncio.get_running_loop()
+    kestrel_executor = _get_executor(request, "kestrel_executor")
+    fast_executor = _get_executor(request, "fast_executor")
+    is_non_kestrel_batch = all(
+        e.options.annotation_mode == "none" and not e.identifiers and e.options.kestrel_top_n is None
+        for e in body.entities
+    )
+    batch_executor = fast_executor if (is_non_kestrel_batch and fast_executor is not None) else kestrel_executor
 
     # Hard-enforce the passthrough payload cap up front (R9), before any mapping work. Uses each
     # entity's own kestrel_top_n and the worst-case endpoint count.
@@ -274,80 +356,80 @@ async def map_batch(
         sum((e.options.kestrel_top_n or 0) for e in body.entities) * config.KESTREL_PASSTHROUGH_MAX_ENDPOINTS
     )
 
-    results: list[EntityMappingResult] = []
-    # Parallel to ``results``: the (mapped_item, kestrel_top_n) needed to collect passthrough in a
-    # SECOND pass after the RefMet-armed window closes; None for a row whose mapping raised.
-    passthrough_jobs: list[tuple[dict[str, Any] | pd.Series, int] | None] = []
-    successful = 0
-    failed = 0
+    def _process_batch() -> tuple[list[EntityMappingResult], int, int]:
+        results: list[EntityMappingResult] = []
+        passthrough_jobs: list[tuple[dict[str, Any] | pd.Series, int] | None] = []
+        successful = 0
+        failed = 0
 
-    # Arm the shared RefMet per-batch wall-clock deadline across the WHOLE per-entity loop, so a
-    # slow-but-succeeding endpoint cannot make an N-row batch scale unbounded (the single-entity
-    # path never arms it). Disarmed in finally so it never leaks into the next request.
-    mw_annotator = mapper.annotation_engine.annotator_registry.get(MetabolomicsWorkbenchAnnotator.slug)
-    armed_batch_deadline = mw_annotator.arm_batch_deadline() if mw_annotator is not None else False
-    try:
-        for entity_req in body.entities:
-            try:
-                # Build entity dict
-                entity: dict[str, Any] = {"name": entity_req.name}
-                provided_id_fields = []
+        mw_annotator = mapper.annotation_engine.annotator_registry.get(MetabolomicsWorkbenchAnnotator.slug)
+        armed_batch_deadline = mw_annotator.arm_batch_deadline() if mw_annotator is not None else False
+        try:
+            for entity_req in body.entities:
+                try:
+                    # Build entity dict
+                    entity: dict[str, Any] = {"name": entity_req.name}
+                    provided_id_fields = []
 
-                for vocab, ids in entity_req.identifiers.items():
-                    field_name = vocab.lower()
-                    if isinstance(ids, list):
-                        entity[field_name] = ",".join(str(i) for i in ids)
-                    else:
-                        entity[field_name] = str(ids)
-                    provided_id_fields.append(field_name)
+                    for vocab, ids in entity_req.identifiers.items():
+                        field_name = vocab.lower()
+                        if isinstance(ids, list):
+                            entity[field_name] = ",".join(str(i) for i in ids)
+                        else:
+                            entity[field_name] = str(ids)
+                        provided_id_fields.append(field_name)
 
-                # Run mapping
-                mapped_item = mapper.map_entity_to_kg(
-                    item=entity,
-                    name_field="name",
-                    provided_id_fields=provided_id_fields,
-                    entity_type=entity_req.entity_type,
-                    vocab=entity_req.options.vocab,
-                    array_delimiters=entity_req.options.array_delimiters,
-                    annotation_mode=entity_req.options.annotation_mode,
-                    annotators=entity_req.options.annotators,
-                    prefer_human=entity_req.options.prefer_human,
-                    prefer_canonical=entity_req.options.prefer_canonical,
-                    candidate_limit=entity_req.options.candidate_limit,
-                    kestrel_top_n=entity_req.options.kestrel_top_n,
-                )
-
-                result = extract_mapping_result(mapped_item, entity_req.name)
-                results.append(result)
-                if entity_req.options.kestrel_top_n is not None:
-                    passthrough_jobs.append((mapped_item, entity_req.options.kestrel_top_n))
-                else:
-                    passthrough_jobs.append(None)
-                successful += 1
-
-            except Exception as e:
-                logger.exception(f"Error mapping entity '{entity_req.name}': {e}")
-                results.append(
-                    EntityMappingResult(
-                        name=entity_req.name,
-                        error=str(e),
+                    # Run mapping
+                    mapped_item = mapper.map_entity_to_kg(
+                        item=entity,
+                        name_field="name",
+                        provided_id_fields=provided_id_fields,
+                        entity_type=entity_req.entity_type,
+                        vocab=entity_req.options.vocab,
+                        array_delimiters=entity_req.options.array_delimiters,
+                        annotation_mode=entity_req.options.annotation_mode,
+                        annotators=entity_req.options.annotators,
+                        prefer_human=entity_req.options.prefer_human,
+                        prefer_canonical=entity_req.options.prefer_canonical,
+                        candidate_limit=entity_req.options.candidate_limit,
+                        kestrel_top_n=entity_req.options.kestrel_top_n,
                     )
-                )
-                passthrough_jobs.append(None)
-                failed += 1
-    finally:
-        if mw_annotator is not None and armed_batch_deadline:
-            mw_annotator.disarm_batch_deadline()
 
-    # SECOND PASS — AFTER the loop and AFTER disarm_batch_deadline(): collect the raw passthrough here
-    # so its extra Kestrel round trips never enter the armed RefMet wall-clock budget and cannot tip a
-    # late-batch entity past the deadline (which would flip its refmet_availability/certificate and
-    # break selection invariance across kestrel_top_n, R4). Passthrough never raises (R7).
-    for result, job in zip(results, passthrough_jobs):
-        if job is None:
-            continue
-        mapped_item, top_n = job
-        result.kestrel_results = _collect_passthrough(mapped_item, top_n)
+                    result = extract_mapping_result(mapped_item, entity_req.name)
+                    results.append(result)
+                    if entity_req.options.kestrel_top_n is not None:
+                        passthrough_jobs.append((mapped_item, entity_req.options.kestrel_top_n))
+                    else:
+                        passthrough_jobs.append(None)
+                    successful += 1
+
+                except Exception as e:
+                    logger.exception(f"Error mapping entity '{entity_req.name}': {e}")
+                    results.append(
+                        EntityMappingResult(
+                            name=entity_req.name,
+                            error=str(e),
+                        )
+                    )
+                    passthrough_jobs.append(None)
+                    failed += 1
+        finally:
+            if mw_annotator is not None and armed_batch_deadline:
+                mw_annotator.disarm_batch_deadline()
+
+        for result, job in zip(results, passthrough_jobs):
+            if job is None:
+                continue
+            mapped_item, top_n = job
+            result.kestrel_results = _collect_passthrough(mapped_item, top_n)
+
+        return results, successful, failed
+
+    results, successful, failed = await loop.run_in_executor(
+        batch_executor,
+        partial(_run_with_api_context, _breaker_scope=breaker_scope),
+        _process_batch,
+    )
 
     processing_time = (time.time() - start_time) * 1000
 
@@ -394,6 +476,7 @@ async def map_dataset(
 
     Upload a file and specify column mappings. Returns statistics about the mapping.
     """
+    breaker_scope = utils.BreakerScope()
     # This route returns a TSV path + stats, not per-entity JSON, so it has nowhere to carry raw
     # passthrough rows. Reject the option (422) and point callers to the streaming route (R8).
     if kestrel_top_n is not None:
@@ -434,17 +517,23 @@ async def map_dataset(
         annotator_list = [a.strip() for a in annotators.split(",")] if annotators else None
 
         # Run dataset mapping
-        output_path, stats = mapper.map_dataset_to_kg(
-            dataset=tmp_path,
-            entity_type=entity_type,
-            name_column=name_column,
-            provided_id_columns=id_columns,
-            vocab=vocab,
-            annotation_mode=annotation_mode,  # type: ignore
-            annotators=annotator_list,
-            prefer_human=prefer_human,
-            prefer_canonical=prefer_canonical,
-            candidate_limit=candidate_limit,
+        loop = asyncio.get_running_loop()
+        kestrel_executor = _get_executor(request, "kestrel_executor")
+        output_path, stats = await loop.run_in_executor(
+            kestrel_executor,
+            partial(_run_with_api_context, _breaker_scope=breaker_scope),
+            lambda: mapper.map_dataset_to_kg(
+                dataset=tmp_path,
+                entity_type=entity_type,
+                name_column=name_column,
+                provided_id_columns=id_columns,
+                vocab=vocab,
+                annotation_mode=annotation_mode,  # type: ignore
+                annotators=annotator_list,
+                prefer_human=prefer_human,
+                prefer_canonical=prefer_canonical,
+                candidate_limit=candidate_limit,
+            ),
         )
 
     except Exception as e:
@@ -486,6 +575,7 @@ async def map_dataset_stream(
     for full processing. When kestrel_top_n is set, each NDJSON line carries a
     ``kestrel_results`` array of raw passthrough rows (R8).
     """
+    breaker_scope = utils.BreakerScope()
     mapper = get_mapper(request)
 
     # Validate file
@@ -512,6 +602,10 @@ async def map_dataset_stream(
     if kestrel_top_n is not None:
         _enforce_passthrough_cap(len(df) * kestrel_top_n * config.KESTREL_PASSTHROUGH_MAX_ENDPOINTS)
 
+    loop = asyncio.get_running_loop()
+    kestrel_executor = _get_executor(request, "kestrel_executor")
+    fast_executor = _get_executor(request, "fast_executor")
+
     async def generate_ndjson():
         """Generator that yields NDJSON lines."""
         import json
@@ -519,18 +613,31 @@ async def map_dataset_stream(
         for idx, row in df.iterrows():
             try:
                 entity = row.to_dict()
-                mapped = mapper.map_entity_to_kg(
-                    item=entity,
-                    name_field=name_column,
-                    provided_id_fields=id_columns,
-                    entity_type=entity_type,
-                    vocab=vocab,
-                    annotation_mode=annotation_mode,  # type: ignore
-                    annotators=annotator_list,
-                    prefer_human=prefer_human,
-                    prefer_canonical=prefer_canonical,
-                    candidate_limit=candidate_limit,
-                    kestrel_top_n=kestrel_top_n,
+                has_row_identifiers = any(
+                    col
+                    and col in entity
+                    and pd.notna(entity[col])
+                    and str(entity[col]).strip() not in ("", "-", "NO_MATCH")
+                    for col in id_columns
+                )
+                is_non_kestrel_row = annotation_mode == "none" and not has_row_identifiers and kestrel_top_n is None
+                row_executor = fast_executor if (is_non_kestrel_row and fast_executor is not None) else kestrel_executor
+                mapped = await loop.run_in_executor(
+                    row_executor,
+                    partial(_run_with_api_context, _breaker_scope=breaker_scope),
+                    lambda ent=entity: mapper.map_entity_to_kg(
+                        item=ent,
+                        name_field=name_column,
+                        provided_id_fields=id_columns,
+                        entity_type=entity_type,
+                        vocab=vocab,
+                        annotation_mode=annotation_mode,  # type: ignore
+                        annotators=annotator_list,
+                        prefer_human=prefer_human,
+                        prefer_canonical=prefer_canonical,
+                        candidate_limit=candidate_limit,
+                        kestrel_top_n=kestrel_top_n,
+                    ),
                 )
 
                 result = {
@@ -553,13 +660,20 @@ async def map_dataset_stream(
                     # has already been sent and the client sees a truncated body.
                     "resolution_certificate": mapped.get("resolution_certificate"),
                 }
+                if mapped.get("kestrel_degraded"):
+                    result["kestrel_degraded"] = True
                 # Opt-in raw passthrough as JSON-native dicts (model_dump), so json.dumps below — which
                 # runs OUTSIDE this try/except — cannot fail on them mid-stream. The stream path arms no
                 # RefMet batch deadline, so per-row collection here is safe. collect never raises (R7).
                 if kestrel_top_n is not None:
-                    result["kestrel_results"] = [
-                        ksr.model_dump() for ksr in _collect_passthrough(mapped, kestrel_top_n)
-                    ]
+                    passthrough_results = await loop.run_in_executor(
+                        kestrel_executor,
+                        partial(_run_with_api_context, _breaker_scope=breaker_scope),
+                        _collect_passthrough,
+                        mapped,
+                        kestrel_top_n,
+                    )
+                    result["kestrel_results"] = [ksr.model_dump() for ksr in passthrough_results]
 
             except Exception as e:
                 result = {
