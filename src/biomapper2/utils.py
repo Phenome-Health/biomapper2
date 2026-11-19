@@ -4,9 +4,11 @@ Utility functions for biomapper2.
 Provides logging setup and mathematical helpers for metric calculations.
 """
 
+import contextvars
 import json
 import logging
 import re
+import threading
 import time
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
@@ -19,7 +21,6 @@ import requests
 import requests_cache
 
 from .config import (
-    CACHE_DIR,
     CACHE_IGNORED_PARAMETERS,
     KESTREL_BATCHING_ENABLED,
     KESTREL_BISECT_MAX_CONSECUTIVE_FAILURES,
@@ -32,8 +33,16 @@ from .config import (
     LOG_LEVEL,
     PUBLIC_KESTREL_API_URL,
     PUBLIC_KESTREL_KEY_PREFIX,
+    get_cache_dir,
     get_kestrel_api_key,
+    get_kestrel_api_max_retries,
+    get_kestrel_api_request_timeout_s,
+    get_kestrel_api_retry_backoff_s,
+    get_kestrel_api_search_timeout_s,
+    get_kestrel_api_single_search_timeout_s,
     get_kestrel_api_url,
+    get_kestrel_breaker_cooldown_s,
+    get_kestrel_breaker_failure_threshold,
 )
 from .models import AssignedIDsDict as AssignedIDsDict  # Re-export for backward compatibility
 
@@ -45,6 +54,198 @@ CLEANER_PROP = "cleaner"
 ALIASES_PROP = "aliases"
 
 
+class CircuitBreakerOpenError(requests.exceptions.RequestException):
+    """Raised when the Kestrel circuit breaker is OPEN to fail fast."""
+
+    pass
+
+
+class CircuitBreaker:
+    """In-memory circuit breaker for Kestrel API requests."""
+
+    def __init__(self, failure_threshold: int | None = None, cooldown_s: float | None = None) -> None:
+        self._lock = threading.Lock()
+        self._consecutive_failures = 0
+        self._last_failure_time = 0.0
+        self._state: str = "CLOSED"
+        self._failure_threshold = failure_threshold
+        self._cooldown_s = cooldown_s
+
+    @property
+    def state(self) -> str:
+        return self._state.lower()
+
+    def can_attempt(self) -> bool:
+        with self._lock:
+            if self._state == "CLOSED":
+                return True
+            now = time.monotonic()
+            cooldown = self._cooldown_s if self._cooldown_s is not None else get_kestrel_breaker_cooldown_s()
+            if self._state == "OPEN":
+                if now - self._last_failure_time >= cooldown:
+                    self._state = "HALF_OPEN"
+                    return True
+                return False
+            return False
+
+    def record_success(self) -> None:
+        with self._lock:
+            self._consecutive_failures = 0
+            self._state = "CLOSED"
+
+    def record_failure(self) -> None:
+        with self._lock:
+            self._consecutive_failures += 1
+            self._last_failure_time = time.monotonic()
+            threshold = (
+                self._failure_threshold
+                if self._failure_threshold is not None
+                else get_kestrel_breaker_failure_threshold()
+            )
+            if self._state == "HALF_OPEN" or self._consecutive_failures >= threshold:
+                self._state = "OPEN"
+
+    def settle_unsettled(self) -> None:
+        """Reopen ``HALF_OPEN`` on an unsettled exit without counting failures in ``CLOSED``."""
+        with self._lock:
+            if self._state == "HALF_OPEN":
+                self._last_failure_time = time.monotonic()
+                self._state = "OPEN"
+
+    def record_answered(self) -> None:
+        """Settle a probe that Kestrel answered with an error it chose to return.
+
+        A ``HALF_OPEN`` probe closes, because the service responded. In ``CLOSED`` the failure count
+        is left alone: the reply says nothing about availability either way, so it neither counts
+        towards opening nor lets a caller clear failures that other requests recorded.
+        """
+        with self._lock:
+            if self._state == "HALF_OPEN":
+                self._consecutive_failures = 0
+                self._state = "CLOSED"
+
+    def release_cached_probe(self) -> None:
+        """Return ``HALF_OPEN`` to ``OPEN`` without resetting cooldown when a reply came from cache."""
+        with self._lock:
+            if self._state == "HALF_OPEN":
+                self._state = "OPEN"
+
+    def reset(self) -> None:
+        with self._lock:
+            self._consecutive_failures = 0
+            self._last_failure_time = 0.0
+            self._state = "CLOSED"
+
+
+_CIRCUIT_BREAKER = CircuitBreaker()
+
+# Statuses that say Kestrel (or the gateway in front of it) cannot serve requests right now. A plain
+# internal-server-error status is left out on purpose: Kestrel returns it for an input it cannot
+# process, so counting it would let one caller's payload open the shared breaker for every caller.
+_BREAKER_UNAVAILABLE_STATUSES: frozenset[int] = frozenset({429, 502, 503, 504})
+
+
+class BreakerScope:
+    """One API request's share of the shared breaker: it can add at most one failure.
+
+    The breaker is process-wide, so without a scope a single request (a batch, a multi-chunk dataset)
+    could record every failure needed to open it and fail Kestrel calls for all other callers. With a
+    scope, opening the breaker takes failures from ``threshold`` distinct requests.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._failure_counted = False
+
+    def claim_failure(self) -> bool:
+        """Return True the first time this request fails, False afterwards."""
+        with self._lock:
+            if self._failure_counted:
+                return False
+            self._failure_counted = True
+            return True
+
+
+def record_breaker_failure(api_ctx: "ApiRequestContext | None") -> None:
+    """Count one failure for the active request, at most once per request scope.
+
+    A request that has already been counted still settles a ``HALF_OPEN`` probe back to ``OPEN``,
+    so a failed probe is never left half-open.
+    """
+    scope = api_ctx.breaker_scope if api_ctx is not None else None
+    if scope is None or scope.claim_failure():
+        _CIRCUIT_BREAKER.record_failure()
+    else:
+        _CIRCUIT_BREAKER.settle_unsettled()
+
+
+def reset_circuit_breaker() -> None:
+    """Reset the process-level circuit breaker state."""
+    _CIRCUIT_BREAKER.reset()
+
+
+_VECTOR_SEARCH_ENDPOINTS: frozenset[str] = frozenset({"hybrid-search", "vector-search"})
+
+
+@dataclass
+class ApiRequestContext:
+    """Execution context for API and startup Kestrel requests."""
+
+    timeout_s: float
+    single_search_timeout_s: float
+    search_timeout_s: float
+    max_retries: int
+    retry_backoff_base: float
+    use_circuit_breaker: bool = True
+    breaker_scope: BreakerScope | None = None
+
+
+_API_CONTEXT: contextvars.ContextVar[ApiRequestContext | None] = contextvars.ContextVar("_API_CONTEXT", default=None)
+
+
+def set_api_context(
+    timeout_s: float | None = None,
+    max_retries: int | None = None,
+    retry_backoff_base: float | None = None,
+    use_circuit_breaker: bool = True,
+    single_search_timeout_s: float | None = None,
+    search_timeout_s: float | None = None,
+    breaker_scope: BreakerScope | None = None,
+) -> contextvars.Token:
+    """Activate API execution context for Kestrel requests."""
+    resolved_timeout = timeout_s if timeout_s is not None else get_kestrel_api_request_timeout_s()
+    resolved_single_search_timeout = (
+        single_search_timeout_s
+        if single_search_timeout_s is not None
+        else (timeout_s if timeout_s is not None else get_kestrel_api_single_search_timeout_s())
+    )
+    resolved_search_timeout = (
+        search_timeout_s
+        if search_timeout_s is not None
+        else (timeout_s if timeout_s is not None else get_kestrel_api_search_timeout_s())
+    )
+    ctx = ApiRequestContext(
+        timeout_s=resolved_timeout,
+        single_search_timeout_s=resolved_single_search_timeout,
+        search_timeout_s=resolved_search_timeout,
+        max_retries=max_retries if max_retries is not None else get_kestrel_api_max_retries(),
+        retry_backoff_base=retry_backoff_base if retry_backoff_base is not None else get_kestrel_api_retry_backoff_s(),
+        use_circuit_breaker=use_circuit_breaker,
+        breaker_scope=breaker_scope,
+    )
+    return _API_CONTEXT.set(ctx)
+
+
+def reset_api_context(token: contextvars.Token) -> None:
+    """Reset active API execution context."""
+    _API_CONTEXT.reset(token)
+
+
+def get_current_api_context() -> ApiRequestContext | None:
+    """Return the currently active API request context if set."""
+    return _API_CONTEXT.get()
+
+
 # ------------------------------------------------------------------------------------------------
 # One session for the process, built lazily
 # ------------------------------------------------------------------------------------------------
@@ -54,37 +255,48 @@ ALIASES_PROP = "aliases"
 # monkeypatching still work. Process-global state needs an explicit reset, which lives in
 # tests/conftest.py -- without one, a test that primes this leaks into every later test.
 _SESSION: "requests_cache.CachedSession | None" = None
+_thread_local = threading.local()
+_all_sessions: list[requests_cache.CachedSession] = []
+_sessions_lock = threading.Lock()
 
 # Per-entry expiry is measured from insertion, so a longer-lived session does not extend staleness.
 _SESSION_EXPIRE_AFTER = timedelta(hours=1)
 
 
 def get_session() -> "requests_cache.CachedSession":
-    """The process's single cached session, built on first use."""
+    """The thread-safe cached session, built on first use per thread."""
     global _SESSION
-    if _SESSION is None:
-        # ``_KestrelCachedSession`` and ``ignored_parameters`` are NOT optional here. Centralizing
-        # construction moved the only call site that carried them, so building a plain
-        # CachedSession would write the API key into the on-disk cache in cleartext again -- the
-        # defect PR #50 fixed. Any change to this factory has to preserve both.
-        _SESSION = _KestrelCachedSession(
-            CACHE_DIR / "kestrel_http",
+    session = getattr(_thread_local, "session", None)
+    if session is None:
+        session = _KestrelCachedSession(
+            get_cache_dir() / "kestrel_http",
             expire_after=_SESSION_EXPIRE_AFTER,
             allowable_methods=["GET", "POST"],
+            allowable_codes=(200,),
             ignored_parameters=CACHE_IGNORED_PARAMETERS,
         )
-    return _SESSION
+        _thread_local.session = session
+        with _sessions_lock:
+            _all_sessions.append(session)
+    _SESSION = session
+    return session
 
 
 def reset_session() -> None:
-    """Drop the process's session. Called between tests, and available to a long-running driver."""
+    """Drop thread-safe sessions and reset circuit breaker."""
     global _SESSION
-    if _SESSION is not None:
+    with _sessions_lock:
+        sessions_to_close = list(_all_sessions)
+        _all_sessions.clear()
+    for s in sessions_to_close:
         try:
-            _SESSION.close()
+            s.close()
         except Exception:  # noqa: BLE001 - a failure to close must never fail the reset
             logging.debug("closing the cached session raised; dropping it anyway", exc_info=True)
+    if hasattr(_thread_local, "session"):
+        delattr(_thread_local, "session")
     _SESSION = None
+    reset_circuit_breaker()
 
 
 # ------------------------------------------------------------------------------------------------
@@ -366,6 +578,7 @@ def bulk_kestrel_request(
     max_retries: int = 3,
     retry_backoff_base: float = 2.0,
     count_requests: bool = True,
+    batch_item_count: int | None = None,
     **kwargs,
 ) -> Any:
     """
@@ -419,20 +632,37 @@ def bulk_kestrel_request(
     # count_requests=False so its traffic leaves the shared benchmark counters untouched.
     bump = _bump if count_requests else _bump_noop
 
-    # A default, not plumbing: the kwarg already forwarded to the transport, but the mapping-path
-    # callers supply none, so without this a wedged request has no timeout at all. See
-    # ``config.KESTREL_REQUEST_TIMEOUT_S`` for how the value is sized.
-    kwargs.setdefault("timeout", KESTREL_REQUEST_TIMEOUT_S)
+    api_ctx = _API_CONTEXT.get()
+    breaker_active = False
+    if api_ctx is not None:
+        if endpoint in _VECTOR_SEARCH_ENDPOINTS:
+            effective_count = batch_item_count
+            if effective_count is None:
+                json_body = kwargs.get("json")
+                if isinstance(json_body, Mapping):
+                    for key in ("search_text", "search_texts"):
+                        val = json_body.get(key)
+                        if isinstance(val, (list, tuple)):
+                            effective_count = len(val)
+                            break
+            ctx_timeout = (
+                api_ctx.search_timeout_s
+                if (effective_count is not None and effective_count > 1)
+                else api_ctx.single_search_timeout_s
+            )
+        else:
+            ctx_timeout = api_ctx.timeout_s
+        caller_timeout = kwargs.get("timeout")
+        if caller_timeout is None or caller_timeout > ctx_timeout:
+            kwargs["timeout"] = ctx_timeout
+        effective_max_retries = api_ctx.max_retries
+        effective_backoff_base = api_ctx.retry_backoff_base
+        breaker_active = api_ctx.use_circuit_breaker
+    else:
+        kwargs.setdefault("timeout", KESTREL_REQUEST_TIMEOUT_S)
+        effective_max_retries = max_retries
+        effective_backoff_base = retry_backoff_base
 
-    # Resolved per call rather than from the import-time KESTREL_API_URL constant: the
-    # --kestrel-url pytest option used by kg-regression sets os.environ AFTER this module is
-    # imported, so a captured constant would silently ignore the override and the regression job
-    # would report on whichever backend happened to be the default.
-    #
-    # The credential decision below reads this SAME resolved value. Deciding against the import-time
-    # constant while sending to the resolved URL is how the key reaches a host it was withheld from:
-    # override to the public endpoint after import and the constant still names the internal host,
-    # so the guard says "accepts credentials" about a request going somewhere else entirely.
     base_url = get_kestrel_api_url()
 
     headers: dict[str, str] = {}
@@ -444,85 +674,141 @@ def bulk_kestrel_request(
             _warn_key_withheld_once(base_url)
 
     url = f"{base_url}/{endpoint}"
-    transient = (
-        requests.exceptions.ConnectionError,
-        requests.exceptions.Timeout,
-        requests.exceptions.ChunkedEncodingError,
-    )
-    for attempt in range(max_retries + 1):
-        try:
-            bump(endpoint, "requests")
-            response = session.request(method, url, headers=headers, **kwargs)
-            # Cache hit-vs-miss belongs in the manifest: a repeat run that replays a large cache
-            # reports a flip rate near zero and would publish "the backend is perfectly stable"
-            # from an instrument that cannot observe its own failure mode.
-            bump(endpoint, "from_cache_hits" if getattr(response, "from_cache", False) else "from_cache_misses")
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.HTTPError as e:
-            status = getattr(e.response, "status_code", None)
-            # Retry only transient server errors (5xx); 4xx (auth, bad payload) won't self-heal.
-            if status is not None and 500 <= status < 600 and attempt < max_retries:
-                delay = retry_backoff_base**attempt
-                bump(endpoint, "retries")
-                logging.warning(
-                    f"Kestrel API {status} on {endpoint} "
-                    f"(attempt {attempt + 1}/{max_retries + 1}); retrying in {delay:.1f}s"
-                )
-                time.sleep(delay)
-                continue
-            if status is not None and 500 <= status < 600:
-                bump(endpoint, "terminal_5xx")
-            # Remediation hint for an auth rejection, appended rather than branched so the auth path
-            # keeps the exception text and traceback. Three distinct causes, three different fixes.
-            hint = ""
-            if status in (401, 403):
-                # Judge the request that was actually answered, not the one we built: a
-                # cross-origin redirect drops the key (see _KestrelCachedSession) and lands on a
-                # different host, and blaming the key there would send operators to replace a valid
-                # one. When the final request cannot be inspected, fall back to what we sent.
-                final_request = getattr(e.response, "request", None)
-                final_headers = getattr(final_request, "headers", None)
-                final_url = getattr(final_request, "url", None)
-                answered_by = final_url if isinstance(final_url, str) else url
-                key_sent = _KESTREL_KEY_HEADER in headers
-                key_delivered = key_sent and (
-                    not isinstance(final_headers, Mapping) or _KESTREL_KEY_HEADER in final_headers
-                )
-                if key_delivered:
-                    hint = f" {answered_by} rejected the configured KESTREL_API_KEY; check that it is current."
-                elif key_sent:
-                    hint = (
-                        f" The request to {url} was redirected to {answered_by}, and KESTREL_API_KEY "
-                        "is not forwarded across hosts, so it arrived without a key. Point "
-                        "KESTREL_API_URL at the final endpoint; the key itself was not rejected."
-                    )
-                elif api_key:
-                    hint = (
-                        f" KESTREL_API_KEY is set but was withheld from {base_url}: the public endpoint "
-                        f"only receives keys it issued (prefix '{PUBLIC_KESTREL_KEY_PREFIX}'), over https."
-                    )
-                else:
-                    hint = f" No KESTREL_API_KEY is set and {base_url} requires authentication; set one."
-            logging.error(f"Kestrel API HTTP error ({endpoint}): {e}{hint}", exc_info=True)
-            raise
-        except transient as e:
-            if attempt < max_retries:
-                delay = retry_backoff_base**attempt
-                bump(endpoint, "retries")
-                logging.warning(
-                    f"Kestrel API transient error on {endpoint} ({type(e).__name__}) "
-                    f"(attempt {attempt + 1}/{max_retries + 1}); retrying in {delay:.1f}s"
-                )
-                time.sleep(delay)
-                continue
+
+    if breaker_active:
+        if _CIRCUIT_BREAKER.state != "closed" and isinstance(session, requests_cache.CachedSession):
+            cached_resp = session.request(method, url, headers=headers, only_if_cached=True, **kwargs)
+            if getattr(cached_resp, "from_cache", False) and cached_resp.status_code < 400:
+                bump(endpoint, "requests")
+                bump(endpoint, "from_cache_hits")
+                return cached_resp.json()
+        if not _CIRCUIT_BREAKER.can_attempt():
             bump(endpoint, "transient_errors")
-            logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
-            raise
-        except requests.exceptions.RequestException as e:
-            bump(endpoint, "transient_errors")
-            logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
-            raise
+            raise CircuitBreakerOpenError(f"Kestrel circuit breaker is OPEN for {endpoint}; failing fast")
+
+    breaker_settled = False
+    try:
+        transient = (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            requests.exceptions.ChunkedEncodingError,
+        )
+        for attempt in range(effective_max_retries + 1):
+            try:
+                bump(endpoint, "requests")
+                response = session.request(method, url, headers=headers, **kwargs)
+                # Cache hit-vs-miss belongs in the manifest: a repeat run that replays a large cache
+                # reports a flip rate near zero and would publish "the backend is perfectly stable"
+                # from an instrument that cannot observe its own failure mode.
+                from_cache = bool(getattr(response, "from_cache", False))
+                bump(endpoint, "from_cache_hits" if from_cache else "from_cache_misses")
+                response.raise_for_status()
+                parsed = response.json()
+                if breaker_active:
+                    if from_cache:
+                        _CIRCUIT_BREAKER.release_cached_probe()
+                    else:
+                        _CIRCUIT_BREAKER.record_success()
+                    breaker_settled = True
+                return parsed
+            except requests.exceptions.HTTPError as e:
+                status = getattr(e.response, "status_code", None)
+                # Retry only transient server errors (5xx); 4xx (auth, bad payload) won't self-heal.
+                if status is not None and 500 <= status < 600 and attempt < effective_max_retries:
+                    delay = (
+                        effective_backoff_base * (2**attempt)
+                        if api_ctx is not None
+                        else effective_backoff_base**attempt
+                    )
+                    bump(endpoint, "retries")
+                    logging.warning(
+                        f"Kestrel API {status} on {endpoint} "
+                        f"(attempt {attempt + 1}/{effective_max_retries + 1}); retrying in {delay:.1f}s"
+                    )
+                    time.sleep(delay)
+                    continue
+                if status is not None and 500 <= status < 600:
+                    bump(endpoint, "terminal_5xx")
+                if status in _BREAKER_UNAVAILABLE_STATUSES:
+                    if breaker_active:
+                        record_breaker_failure(api_ctx)
+                        breaker_settled = True
+                elif status is not None and 500 <= status < 600:
+                    # Kestrel answered with an error about this request; it is reachable.
+                    if breaker_active:
+                        _CIRCUIT_BREAKER.record_answered()
+                        breaker_settled = True
+                elif status is not None and 400 <= status < 500:
+                    # Non-``429`` ``4xx`` means Kestrel's HTTP service answered promptly; settle as
+                    # reachable so client input/auth errors never trip or wedge the availability breaker.
+                    if breaker_active:
+                        _CIRCUIT_BREAKER.record_success()
+                        breaker_settled = True
+                # Remediation hint for an auth rejection, appended rather than branched so the auth path
+                # keeps the exception text and traceback. Three distinct causes, three different fixes.
+                hint = ""
+                if status in (401, 403):
+                    # Judge the request that was actually answered, not the one we built: a
+                    # cross-origin redirect drops the key (see _KestrelCachedSession) and lands on a
+                    # different host, and blaming the key there would send operators to replace a valid
+                    # one. When the final request cannot be inspected, fall back to what we sent.
+                    final_request = getattr(e.response, "request", None)
+                    final_headers = getattr(final_request, "headers", None)
+                    final_url = getattr(final_request, "url", None)
+                    answered_by = final_url if isinstance(final_url, str) else url
+                    key_sent = _KESTREL_KEY_HEADER in headers
+                    key_delivered = key_sent and (
+                        not isinstance(final_headers, Mapping) or _KESTREL_KEY_HEADER in final_headers
+                    )
+                    if key_delivered:
+                        hint = f" {answered_by} rejected the configured KESTREL_API_KEY; check that it is current."
+                    elif key_sent:
+                        hint = (
+                            f" The request to {url} was redirected to {answered_by}, and KESTREL_API_KEY "
+                            "is not forwarded across hosts, so it arrived without a key. Point "
+                            "KESTREL_API_URL at the final endpoint; the key itself was not rejected."
+                        )
+                    elif api_key:
+                        hint = (
+                            f" KESTREL_API_KEY is set but was withheld from {base_url}: the public endpoint "
+                            f"only receives keys it issued (prefix '{PUBLIC_KESTREL_KEY_PREFIX}'), over https."
+                        )
+                    else:
+                        hint = f" No KESTREL_API_KEY is set and {base_url} requires authentication; set one."
+                logging.error(f"Kestrel API HTTP error ({endpoint}): {e}{hint}", exc_info=True)
+                raise
+            except transient as e:
+                is_timeout = isinstance(e, requests.exceptions.Timeout)
+                should_retry = (not (api_ctx is not None and is_timeout)) and (attempt < effective_max_retries)
+                if should_retry:
+                    delay = (
+                        effective_backoff_base * (2**attempt)
+                        if api_ctx is not None
+                        else effective_backoff_base**attempt
+                    )
+                    bump(endpoint, "retries")
+                    logging.warning(
+                        f"Kestrel API transient error on {endpoint} ({type(e).__name__}) "
+                        f"(attempt {attempt + 1}/{effective_max_retries + 1}); retrying in {delay:.1f}s"
+                    )
+                    time.sleep(delay)
+                    continue
+                bump(endpoint, "transient_errors")
+                if breaker_active:
+                    record_breaker_failure(api_ctx)
+                    breaker_settled = True
+                logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
+                raise
+            except requests.exceptions.RequestException as e:
+                bump(endpoint, "transient_errors")
+                if breaker_active:
+                    record_breaker_failure(api_ctx)
+                    breaker_settled = True
+                logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
+                raise
+    finally:
+        if breaker_active and not breaker_settled:
+            _CIRCUIT_BREAKER.settle_unsettled()
 
 
 def _record_poison(path: "Path | str | None", endpoint: str, batch_field: str, item: Any) -> None:
@@ -578,6 +864,7 @@ def _bisect_chunk(
             session=session,
             json=payload,
             max_retries=KESTREL_BISECT_MAX_RETRIES,
+            batch_item_count=len(chunk),
             **kwargs,
         )
     except requests.exceptions.HTTPError as exc:
@@ -677,7 +964,14 @@ def kestrel_request(
     # If batching is disabled, send all items in a single request
     if not KESTREL_BATCHING_ENABLED:
         full_payload = {**json_payload, batch_field: batch_items}
-        result = bulk_kestrel_request(method, endpoint, session=session, json=full_payload, **kwargs)
+        result = bulk_kestrel_request(
+            method,
+            endpoint,
+            session=session,
+            json=full_payload,
+            batch_item_count=len(batch_items),
+            **kwargs,
+        )
         return result if isinstance(result, dict) else {}
 
     # Batch the request
@@ -698,7 +992,14 @@ def kestrel_request(
     for chunk in chunks:
         chunk_payload = {**json_payload, batch_field: chunk}
         try:
-            chunk_results = bulk_kestrel_request(method, endpoint, session=session, json=chunk_payload, **kwargs)
+            chunk_results = bulk_kestrel_request(
+                method,
+                endpoint,
+                session=session,
+                json=chunk_payload,
+                batch_item_count=len(chunk),
+                **kwargs,
+            )
         except requests.exceptions.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
             if not bisect_on_5xx or status is None or not (500 <= status < 600):

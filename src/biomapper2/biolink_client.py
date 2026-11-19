@@ -13,7 +13,7 @@ import requests
 import yaml
 from bmt import Toolkit
 
-from .config import BIOLINK_VERSION_DEFAULT, CACHE_DIR
+from .config import BIOLINK_VERSION_DEFAULT, get_cache_dir
 from .utils import setup_logging, to_set
 
 setup_logging()
@@ -71,10 +71,15 @@ def _build_toolkit(schema_source: str) -> Toolkit:
     transient reset on that single build. predicate_map is left at bmt's default, unchanged from
     the previous behaviour.
     """
+    predicate_map = os.environ.get("BIOMAPPER2_PREDICATE_MAP_URL", "").strip()
     last_exc: requests.RequestException | None = None
     for attempt in range(1, 4):
         try:
-            return Toolkit(schema=schema_source)
+            return (
+                Toolkit(schema=schema_source, predicate_map=predicate_map)
+                if predicate_map
+                else Toolkit(schema=schema_source)
+            )
         except requests.RequestException as exc:
             last_exc = exc
             if attempt < 3:
@@ -144,11 +149,12 @@ class BiolinkClient:
         """
         file_name = url.split("/")[-1]  # e.g. biolink-model.yaml
         stem, _, ext = file_name.rpartition(".")
-        local_path = CACHE_DIR / f"{stem}_{self.biolink_version}.{ext}"
+        cache_dir = get_cache_dir()
+        local_path = cache_dir / f"{stem}_{self.biolink_version}.{ext}"
         if not local_path.exists():
             try:
                 response = _get_with_retry(url)
-                CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                cache_dir.mkdir(parents=True, exist_ok=True)
                 _atomic_write_text(str(local_path), response.text)
             except requests.RequestException as exc:
                 logging.warning(f"Could not cache Biolink schema from {url} ({exc}); loading from URL this run.")
@@ -167,7 +173,8 @@ class BiolinkClient:
         """
         file_name = url.split("/")[-1]
         file_name_json = file_name.split(".")[0] + f"_{self.biolink_version}" + ".json"
-        local_path = CACHE_DIR / file_name_json
+        cache_dir = get_cache_dir()
+        local_path = cache_dir / file_name_json
         logging.debug(f"Local file path is: {local_path}")
 
         # Download the file if we don't already have it cached
@@ -180,7 +187,7 @@ class BiolinkClient:
                 response_json = response.json()
 
             # Cache the response atomically so a partial write cannot poison the cache.
-            CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            cache_dir.mkdir(parents=True, exist_ok=True)
             _atomic_write_text(str(local_path), json.dumps(response_json, indent=2))
 
         # Read and return the cached JSON

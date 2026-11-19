@@ -18,13 +18,23 @@ logger = logging.getLogger(__name__)
 
 # Set up our general cache directory (e.g., for requests cache, biolink)
 PROJECT_ROOT = Path(__file__).parents[2]
-CACHE_DIR = PROJECT_ROOT / "cache"
-# 0700: the requests_cache databases under here record request headers, so treat the directory as
-# secret-bearing. `mode` only applies when mkdir creates the directory, so chmod an existing one
-# too (best-effort — a read-only mount or foreign owner must not break import).
-CACHE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
-with contextlib.suppress(OSError):
-    CACHE_DIR.chmod(0o700)
+
+
+def get_cache_dir() -> Path:
+    """Return the cache directory, reading BIOMAPPER2_CACHE_DIR on every call.
+
+    If set in the environment, creates it with mode 0o700 and returns Path(raw).
+    Otherwise returns PROJECT_ROOT / "cache" (creating it if needed).
+    """
+    raw = os.environ.get("BIOMAPPER2_CACHE_DIR", "").strip()
+    cache_path = Path(raw) if raw else PROJECT_ROOT / "cache"
+    cache_path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with contextlib.suppress(OSError):
+        cache_path.chmod(0o700)
+    return cache_path
+
+
+CACHE_DIR = get_cache_dir()
 
 # Header and query-parameter names requests_cache must redact before writing a response to disk.
 #
@@ -109,6 +119,63 @@ def get_kestrel_api_key() -> str | None:
 # and asserted against it in the test suite -- a default UNDER the server's own limit is worse than
 # none, because it converts a recoverable server error into a client-side abort.
 KESTREL_REQUEST_TIMEOUT_S = 180
+
+# API-specific Kestrel resilience and fault isolation settings
+# Lexical and metadata endpoints (text-search, get-nodes, canonicalize, health, categories) vs
+# embedding-backed vector endpoints (hybrid-search, vector-search) keyed on batch size
+# (single-item batch_items == 1 vs bulk batch_items > 1); sized from
+# studies/analysis/results/api_request_timeout_derivation.json and asserted in tests.
+KESTREL_API_REQUEST_TIMEOUT_S = float(os.getenv("BIOMAPPER2_KESTREL_API_REQUEST_TIMEOUT_S", "4.0"))
+KESTREL_API_SINGLE_SEARCH_TIMEOUT_S = float(os.getenv("BIOMAPPER2_KESTREL_API_SINGLE_SEARCH_TIMEOUT_S", "24.0"))
+KESTREL_API_SEARCH_TIMEOUT_S = float(os.getenv("BIOMAPPER2_KESTREL_API_SEARCH_TIMEOUT_S", "173.0"))
+KESTREL_API_MAX_RETRIES = int(os.getenv("BIOMAPPER2_KESTREL_API_MAX_RETRIES", "1"))
+KESTREL_API_RETRY_BACKOFF_S = float(os.getenv("BIOMAPPER2_KESTREL_API_RETRY_BACKOFF_S", "0.2"))
+
+KESTREL_STARTUP_REQUEST_TIMEOUT_S = float(os.getenv("BIOMAPPER2_KESTREL_STARTUP_REQUEST_TIMEOUT_S", "2.5"))
+KESTREL_STARTUP_TOTAL_TIMEOUT_S = float(os.getenv("BIOMAPPER2_KESTREL_STARTUP_TOTAL_TIMEOUT_S", "8.0"))
+
+KESTREL_API_WORKER_THREADS = int(os.getenv("BIOMAPPER2_KESTREL_API_WORKER_THREADS", "12"))
+KESTREL_NON_KESTREL_WORKER_THREADS = int(os.getenv("BIOMAPPER2_KESTREL_NON_KESTREL_WORKER_THREADS", "4"))
+
+KESTREL_BREAKER_FAILURE_THRESHOLD = int(os.getenv("BIOMAPPER2_KESTREL_BREAKER_FAILURE_THRESHOLD", "6"))
+KESTREL_BREAKER_COOLDOWN_S = float(os.getenv("BIOMAPPER2_KESTREL_BREAKER_COOLDOWN_S", "5.0"))
+
+
+def get_kestrel_api_request_timeout_s() -> float:
+    return float(os.getenv("BIOMAPPER2_KESTREL_API_REQUEST_TIMEOUT_S", str(KESTREL_API_REQUEST_TIMEOUT_S)))
+
+
+def get_kestrel_api_single_search_timeout_s() -> float:
+    return float(os.getenv("BIOMAPPER2_KESTREL_API_SINGLE_SEARCH_TIMEOUT_S", str(KESTREL_API_SINGLE_SEARCH_TIMEOUT_S)))
+
+
+def get_kestrel_api_search_timeout_s() -> float:
+    return float(os.getenv("BIOMAPPER2_KESTREL_API_SEARCH_TIMEOUT_S", str(KESTREL_API_SEARCH_TIMEOUT_S)))
+
+
+def get_kestrel_api_max_retries() -> int:
+    return int(os.getenv("BIOMAPPER2_KESTREL_API_MAX_RETRIES", str(KESTREL_API_MAX_RETRIES)))
+
+
+def get_kestrel_api_retry_backoff_s() -> float:
+    return float(os.getenv("BIOMAPPER2_KESTREL_API_RETRY_BACKOFF_S", str(KESTREL_API_RETRY_BACKOFF_S)))
+
+
+def get_kestrel_startup_request_timeout_s() -> float:
+    return float(os.getenv("BIOMAPPER2_KESTREL_STARTUP_REQUEST_TIMEOUT_S", str(KESTREL_STARTUP_REQUEST_TIMEOUT_S)))
+
+
+def get_kestrel_startup_total_timeout_s() -> float:
+    return float(os.getenv("BIOMAPPER2_KESTREL_STARTUP_TOTAL_TIMEOUT_S", str(KESTREL_STARTUP_TOTAL_TIMEOUT_S)))
+
+
+def get_kestrel_breaker_failure_threshold() -> int:
+    return int(os.getenv("BIOMAPPER2_KESTREL_BREAKER_FAILURE_THRESHOLD", str(KESTREL_BREAKER_FAILURE_THRESHOLD)))
+
+
+def get_kestrel_breaker_cooldown_s() -> float:
+    return float(os.getenv("BIOMAPPER2_KESTREL_BREAKER_COOLDOWN_S", str(KESTREL_BREAKER_COOLDOWN_S)))
+
 
 # Bisect-on-5xx. Ships DORMANT. Its diagnosis -- that server errors are determined by payload
 # CONTENT rather than by load or timing -- is not yet confirmed by the gated single-request

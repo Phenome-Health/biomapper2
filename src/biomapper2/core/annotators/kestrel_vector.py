@@ -30,12 +30,19 @@ class KestrelVectorSearchAnnotator(BaseAnnotator):
         search_term = entity.get(name_field)
         if text_is_not_empty(search_term):
             # Use cache if available, otherwise make API call. An explicit candidate_limit always wins.
-            if cache:
-                term_results = cache.get(search_term)
+            if cache is not None:
+                term_results = cache.get(search_term) or []
             else:
                 limit = candidate_limit if candidate_limit is not None else HYBRID_SEARCH_LIMIT
-                results = self._kestrel_vector_search(search_term, category, prefixes, limit=limit)
-                term_results = results[search_term]
+                try:
+                    results = self._kestrel_vector_search(search_term, category, prefixes, limit=limit)
+                    term_results = results.get(search_term) or []
+                except Exception as exc:
+                    from ..fault_tracking import record_kestrel_fault
+
+                    record_kestrel_fault(entity, f"kestrel-vector-search: {exc}")
+                    logging.warning("kestrel-vector-search failed for %r: %s", search_term, exc)
+                    term_results = []
 
             # Deterministic candidate order before the first-on-category scan: an exact score tie must
             # not be resolved by Kestrel's run-varying response order (Axis 3).
@@ -89,7 +96,16 @@ class KestrelVectorSearchAnnotator(BaseAnnotator):
         logging.info(f"Getting vector search results from Kestrel API for {len(entities)} entities")
         # An explicit candidate_limit always wins over the default window.
         limit = candidate_limit if candidate_limit is not None else HYBRID_SEARCH_LIMIT
-        results = self._kestrel_vector_search(search_terms, category, prefixes, limit=limit)
+        try:
+            results = self._kestrel_vector_search(search_terms, category, prefixes, limit=limit)
+        except Exception as exc:
+            from ..fault_tracking import record_kestrel_fault
+
+            logging.warning("kestrel-vector-search bulk failed: %s", exc)
+            for _, row in entities.iterrows():
+                if text_is_not_empty(row.get(name_field)):
+                    record_kestrel_fault(row, f"kestrel-vector-search: {exc}")
+            results = {}
 
         # Annotate each entity using the results from the bulk request
         assigned_ids_col = entities.apply(

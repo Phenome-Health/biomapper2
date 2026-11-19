@@ -59,8 +59,8 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
         if text_is_not_empty(search_term):
             # Use cache if available, otherwise make API call. The wider candidate window is needed for
             # either re-ranking policy (the canonical/human node often ranks below the conflated top hit).
-            if cache:
-                term_results = cache.get(search_term)
+            if cache is not None:
+                term_results = cache.get(search_term) or []
             else:
                 # An explicit candidate_limit always wins, overriding both the 20 and the "else 1".
                 limit = (
@@ -68,8 +68,15 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
                     if candidate_limit is not None
                     else (HYBRID_SEARCH_LIMIT if (prefer_human or preferred_prefixes) else 1)
                 )
-                results = self._kestrel_hybrid_search(search_term, category, prefixes, limit=limit)
-                term_results = results[search_term]
+                try:
+                    results = self._kestrel_hybrid_search(search_term, category, prefixes, limit=limit)
+                    term_results = results.get(search_term) or []
+                except Exception as exc:
+                    from ..fault_tracking import record_kestrel_fault
+
+                    record_kestrel_fault(entity, f"kestrel-hybrid-search: {exc}")
+                    logging.warning("kestrel-hybrid-search failed for %r: %s", search_term, exc)
+                    term_results = []
 
             # Deterministic candidate order before any selection: `_select_result`/`_select_canonical`
             # trust the row order (top-1 fallback and `max(..., key=score)` both resolve an exact score
@@ -84,9 +91,18 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
             # empty results, or a best-HGNC paralog). For the curated drug-conflated symbols, the human
             # node is unreachable by search, so resolve it deterministically (non-search) and verify.
             if prefer_human and GENE_SYMBOL_FALLBACK_ENABLED and not matched:
-                resolved_curie = self._resolver.resolve(search_term)
+                if isinstance(self._resolver, GeneSymbolResolver) and "resolve" not in vars(self._resolver):
+                    resolved_curie, resolver_faulted = self._resolver.resolve_checked(search_term)
+                else:
+                    resolved_curie = self._resolver.resolve(search_term)
+                    resolver_faulted = self._resolver.last_call_faulted(search_term) is True
                 if resolved_curie is not None:
                     chosen = {"id": resolved_curie, "score": _FALLBACK_SCORE, "resolved_via": "symbol_fallback"}
+                elif resolver_faulted:
+                    from ..fault_tracking import record_kestrel_fault
+
+                    record_kestrel_fault(entity, f"gene-symbol resolver get-nodes fault for {search_term!r}")
+                    chosen = None  # discard non-human search ortholog
             # Canonical-namespace preference (non-gene categories). Mutual exclusivity with the gene path
             # is enforced by the *engine*, which sets preferred_prefixes only when prefer_human is off for
             # this category — not by this branch structure. (As an `elif` on the gene `if`, a hypothetical
@@ -152,7 +168,16 @@ class KestrelHybridSearchAnnotator(BaseAnnotator):
             if candidate_limit is not None
             else (HYBRID_SEARCH_LIMIT if (prefer_human or preferred_prefixes) else 1)
         )
-        results = self._kestrel_hybrid_search(search_terms, category, prefixes, limit=limit)
+        try:
+            results = self._kestrel_hybrid_search(search_terms, category, prefixes, limit=limit)
+        except Exception as exc:
+            from ..fault_tracking import record_kestrel_fault
+
+            logging.warning("kestrel-hybrid-search bulk failed: %s", exc)
+            for _, row in entities.iterrows():
+                if text_is_not_empty(row.get(name_field)):
+                    record_kestrel_fault(row, f"kestrel-hybrid-search: {exc}")
+            results = {}
 
         # Annotate each entity using the results from the bulk request. The internal re-dispatch MUST
         # forward prefer_human, preferred_prefixes, accepted_categories AND candidate_limit, otherwise

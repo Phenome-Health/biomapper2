@@ -18,7 +18,8 @@ from typing import Any
 
 import requests
 
-from ..config import CACHE_DIR
+from .. import config
+from ..config import CACHE_DIR, get_cache_dir
 from ..utils import bulk_kestrel_request
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,17 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 PRESET_CACHE_PATH = CACHE_DIR / "entity_type_presets.json"
+_INITIAL_PRESET_CACHE_PATH = PRESET_CACHE_PATH
+
+
+def _resolve_preset_cache_path(path: Path | None = None) -> Path:
+    if path is not None:
+        return path
+    if PRESET_CACHE_PATH != _INITIAL_PRESET_CACHE_PATH:
+        return PRESET_CACHE_PATH
+    return get_cache_dir() / "entity_type_presets.json"
+
+
 SCHEMA_VERSION = 1
 MAX_PREFIXES_PER_CATEGORY = 30
 PER_REQUEST_TIMEOUT = 10  # seconds
@@ -81,37 +93,48 @@ STATIC_FALLBACK: dict[str, list[str]] = {
 # ---------------------------------------------------------------------------
 
 
-def fetch_categories() -> list[str]:
+def fetch_categories(*, deadline: float | None = None) -> list[str]:
     """Fetch all Kestrel knowledge graph categories."""
-    result = bulk_kestrel_request("GET", "categories", timeout=PER_REQUEST_TIMEOUT)
-    if isinstance(result, list):
-        return [str(c) for c in result]
+    timeout = config.get_kestrel_startup_request_timeout_s()
+    if deadline is not None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            logger.warning("Startup discovery deadline exceeded before fetching categories")
+            return []
+        timeout = min(timeout, remaining)
+    try:
+        result = bulk_kestrel_request("GET", "categories", timeout=timeout, max_retries=0)
+        if isinstance(result, list):
+            return [str(c) for c in result]
+    except Exception as exc:
+        logger.warning("Failed to fetch categories: %s", exc)
     return []
 
 
-def sample_prefixes_for_category(
+def _sample_prefixes_with_deadline(
     category: str,
     sample_terms: list[str],
     limit: int = 50,
-) -> list[str]:
-    """Sample text-search results for a category and rank prefix frequency.
-
-    For each sample term, runs a text search against the Kestrel API, collects
-    the ``prefixes`` array from each result node, counts frequency across all
-    results, applies a >10% threshold, and returns the top 8 prefixes.
-
-    Args:
-        category: Biolink category string (e.g. ``"biolink:SmallMolecule"``).
-        sample_terms: List of search terms to query.
-        limit: Maximum results per search term.
-
-    Returns:
-        Ranked list of prefix strings (up to ``MAX_PREFIXES_PER_CATEGORY``).
-    """
+    *,
+    deadline: float | None = None,
+) -> tuple[list[str], bool]:
+    """Sample text-search results for a category within an optional wall-clock deadline."""
     prefix_counter: Counter[str] = Counter()
     total_nodes = 0
+    per_request_timeout = config.get_kestrel_startup_request_timeout_s()
+    completed = True
 
     for term in sample_terms:
+        req_timeout = per_request_timeout
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                logger.warning(
+                    "Startup discovery deadline exceeded during category=%s; skipping remaining terms", category
+                )
+                completed = False
+                break
+            req_timeout = min(per_request_timeout, remaining)
         try:
             response = bulk_kestrel_request(
                 "POST",
@@ -122,10 +145,14 @@ def sample_prefixes_for_category(
                     "limit": limit,
                     "category": category,
                 },
-                timeout=PER_REQUEST_TIMEOUT,
+                timeout=req_timeout,
+                max_retries=0,
             )
-        except (requests.exceptions.RequestException, ValueError):
-            logger.warning("Text search failed for term=%s category=%s", term, category)
+        except (requests.exceptions.RequestException, ValueError) as exc:
+            logger.warning("Text search failed for term=%s category=%s: %s", term, category, exc)
+            if deadline is not None and time.monotonic() >= deadline:
+                completed = False
+                break
             continue
 
         # Response is dict keyed by search term, each value is list of result nodes
@@ -146,9 +173,35 @@ def sample_prefixes_for_category(
                             prefix_counter[p] += 1
 
     if total_nodes == 0:
-        return []
+        return [], completed
 
-    return [prefix for prefix, _ in prefix_counter.most_common(MAX_PREFIXES_PER_CATEGORY)]
+    return [prefix for prefix, _ in prefix_counter.most_common(MAX_PREFIXES_PER_CATEGORY)], completed
+
+
+def sample_prefixes_for_category(
+    category: str,
+    sample_terms: list[str],
+    limit: int = 50,
+    *,
+    deadline: float | None = None,
+) -> list[str]:
+    """Sample text-search results for a category and rank prefix frequency.
+
+    For each sample term, runs a text search against the Kestrel API, collects
+    the ``prefixes`` array from each result node, counts frequency across all
+    results, applies a threshold, and returns ranked prefixes.
+
+    Args:
+        category: Biolink category string (e.g. ``"biolink:SmallMolecule"``).
+        sample_terms: List of search terms to query.
+        limit: Maximum results per search term.
+        deadline: Optional monotonic clock deadline bounding total discovery time.
+
+    Returns:
+        Ranked list of prefix strings (up to ``MAX_PREFIXES_PER_CATEGORY``).
+    """
+    prefixes, _ = _sample_prefixes_with_deadline(category, sample_terms, limit=limit, deadline=deadline)
+    return prefixes
 
 
 def derive_all_presets(aliases: dict[str, str] | None = None) -> tuple[dict[str, list[str]], bool]:
@@ -169,9 +222,10 @@ def derive_all_presets(aliases: dict[str, str] | None = None) -> tuple[dict[str,
     if aliases is None:
         aliases = ALIASES
 
-    categories = fetch_categories()
+    deadline = time.monotonic() + config.get_kestrel_startup_total_timeout_s()
+    categories = fetch_categories(deadline=deadline)
     if not categories:
-        return {}, True
+        return {}, time.monotonic() < deadline
 
     sampled_categories = set(aliases.values())
     presets: dict[str, list[str]] = {}
@@ -180,10 +234,8 @@ def derive_all_presets(aliases: dict[str, str] | None = None) -> tuple[dict[str,
     # Only sample aliased categories; others get empty presets
     to_sample = [c for c in categories if c in sampled_categories]
 
-    deadline = time.monotonic() + TOTAL_DERIVE_TIMEOUT
-
     for cat in to_sample:
-        if time.monotonic() > deadline:
+        if time.monotonic() >= deadline:
             logger.warning("Deadline exceeded; skipping remaining categories")
             completed_fully = False
             break
@@ -193,7 +245,11 @@ def derive_all_presets(aliases: dict[str, str] | None = None) -> tuple[dict[str,
             if terms is None:
                 display_name = cat.removeprefix("biolink:")
                 terms = [display_name]
-            presets[cat] = sample_prefixes_for_category(cat, terms)
+            cat_prefixes, cat_completed = _sample_prefixes_with_deadline(cat, terms, deadline=deadline)
+            presets[cat] = cat_prefixes
+            if not cat_completed:
+                completed_fully = False
+                break
         except Exception as exc:
             logger.warning("Sampling failed for %s: %s", cat, exc)
             presets[cat] = []
@@ -214,8 +270,7 @@ def derive_all_presets(aliases: dict[str, str] | None = None) -> tuple[dict[str,
 
 def save_to_disk(presets: dict[str, list[str]], path: Path | None = None) -> None:
     """Persist presets to disk via atomic write (write to .tmp, rename)."""
-    if path is None:
-        path = PRESET_CACHE_PATH
+    path = _resolve_preset_cache_path(path)
 
     data: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
@@ -243,8 +298,7 @@ def save_to_disk(presets: dict[str, list[str]], path: Path | None = None) -> Non
 
 def load_from_disk(path: Path | None = None) -> dict[str, list[str]] | None:
     """Load presets from disk and validate structural integrity."""
-    if path is None:
-        path = PRESET_CACHE_PATH
+    path = _resolve_preset_cache_path(path)
 
     try:
         with open(path) as f:
