@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1](https://github.com/Phenome-Health/biomapper2/compare/v1.5.0...v1.5.1) (2026-11-19)
+
+
+### Features
+
+* **kestrel:** isolate Kestrel faults on the API path (fork [#111](https://github.com/Phenome-Health/biomapper2/issues/111), [#112](https://github.com/Phenome-Health/biomapper2/issues/112)) ([f152200](https://github.com/Phenome-Health/biomapper2/commit/f1522008d4c61874231882bee040291bab44524b))
+* **kestrel:** one caller cannot open the shared breaker (fork [#113](https://github.com/Phenome-Health/biomapper2/issues/113)) ([0631f08](https://github.com/Phenome-Health/biomapper2/commit/0631f082feebaa90c78ddc79f2115aec18baaccf))
+
 ## [1.5.0](https://github.com/Phenome-Health/biomapper2/compare/v1.4.1...v1.5.0) (2026-11-14)
 
 
