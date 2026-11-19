@@ -112,6 +112,18 @@ class CircuitBreaker:
                 self._last_failure_time = time.monotonic()
                 self._state = "OPEN"
 
+    def record_answered(self) -> None:
+        """Settle a probe that Kestrel answered with an error it chose to return.
+
+        A ``HALF_OPEN`` probe closes, because the service responded. In ``CLOSED`` the failure count
+        is left alone: the reply says nothing about availability either way, so it neither counts
+        towards opening nor lets a caller clear failures that other requests recorded.
+        """
+        with self._lock:
+            if self._state == "HALF_OPEN":
+                self._consecutive_failures = 0
+                self._state = "CLOSED"
+
     def release_cached_probe(self) -> None:
         """Return ``HALF_OPEN`` to ``OPEN`` without resetting cooldown when a reply came from cache."""
         with self._lock:
@@ -126,6 +138,45 @@ class CircuitBreaker:
 
 
 _CIRCUIT_BREAKER = CircuitBreaker()
+
+# Statuses that say Kestrel (or the gateway in front of it) cannot serve requests right now. A plain
+# internal-server-error status is left out on purpose: Kestrel returns it for an input it cannot
+# process, so counting it would let one caller's payload open the shared breaker for every caller.
+_BREAKER_UNAVAILABLE_STATUSES: frozenset[int] = frozenset({429, 502, 503, 504})
+
+
+class BreakerScope:
+    """One API request's share of the shared breaker: it can add at most one failure.
+
+    The breaker is process-wide, so without a scope a single request (a batch, a multi-chunk dataset)
+    could record every failure needed to open it and fail Kestrel calls for all other callers. With a
+    scope, opening the breaker takes failures from ``threshold`` distinct requests.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._failure_counted = False
+
+    def claim_failure(self) -> bool:
+        """Return True the first time this request fails, False afterwards."""
+        with self._lock:
+            if self._failure_counted:
+                return False
+            self._failure_counted = True
+            return True
+
+
+def record_breaker_failure(api_ctx: "ApiRequestContext | None") -> None:
+    """Count one failure for the active request, at most once per request scope.
+
+    A request that has already been counted still settles a ``HALF_OPEN`` probe back to ``OPEN``,
+    so a failed probe is never left half-open.
+    """
+    scope = api_ctx.breaker_scope if api_ctx is not None else None
+    if scope is None or scope.claim_failure():
+        _CIRCUIT_BREAKER.record_failure()
+    else:
+        _CIRCUIT_BREAKER.settle_unsettled()
 
 
 def reset_circuit_breaker() -> None:
@@ -146,6 +197,7 @@ class ApiRequestContext:
     max_retries: int
     retry_backoff_base: float
     use_circuit_breaker: bool = True
+    breaker_scope: BreakerScope | None = None
 
 
 _API_CONTEXT: contextvars.ContextVar[ApiRequestContext | None] = contextvars.ContextVar("_API_CONTEXT", default=None)
@@ -158,6 +210,7 @@ def set_api_context(
     use_circuit_breaker: bool = True,
     single_search_timeout_s: float | None = None,
     search_timeout_s: float | None = None,
+    breaker_scope: BreakerScope | None = None,
 ) -> contextvars.Token:
     """Activate API execution context for Kestrel requests."""
     resolved_timeout = timeout_s if timeout_s is not None else get_kestrel_api_request_timeout_s()
@@ -178,6 +231,7 @@ def set_api_context(
         max_retries=max_retries if max_retries is not None else get_kestrel_api_max_retries(),
         retry_backoff_base=retry_backoff_base if retry_backoff_base is not None else get_kestrel_api_retry_backoff_s(),
         use_circuit_breaker=use_circuit_breaker,
+        breaker_scope=breaker_scope,
     )
     return _API_CONTEXT.set(ctx)
 
@@ -675,12 +729,14 @@ def bulk_kestrel_request(
                     continue
                 if status is not None and 500 <= status < 600:
                     bump(endpoint, "terminal_5xx")
+                if status in _BREAKER_UNAVAILABLE_STATUSES:
                     if breaker_active:
-                        _CIRCUIT_BREAKER.record_failure()
+                        record_breaker_failure(api_ctx)
                         breaker_settled = True
-                elif status == 429:
+                elif status is not None and 500 <= status < 600:
+                    # Kestrel answered with an error about this request; it is reachable.
                     if breaker_active:
-                        _CIRCUIT_BREAKER.record_failure()
+                        _CIRCUIT_BREAKER.record_answered()
                         breaker_settled = True
                 elif status is not None and 400 <= status < 500:
                     # Non-``429`` ``4xx`` means Kestrel's HTTP service answered promptly; settle as
@@ -739,14 +795,14 @@ def bulk_kestrel_request(
                     continue
                 bump(endpoint, "transient_errors")
                 if breaker_active:
-                    _CIRCUIT_BREAKER.record_failure()
+                    record_breaker_failure(api_ctx)
                     breaker_settled = True
                 logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
                 raise
             except requests.exceptions.RequestException as e:
                 bump(endpoint, "transient_errors")
                 if breaker_active:
-                    _CIRCUIT_BREAKER.record_failure()
+                    record_breaker_failure(api_ctx)
                     breaker_settled = True
                 logging.error(f"Kestrel API request failed ({endpoint}): {e}", exc_info=True)
                 raise

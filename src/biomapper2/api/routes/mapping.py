@@ -7,6 +7,7 @@ import tempfile
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Any
 
 import pandas as pd
@@ -95,9 +96,13 @@ def _collect_passthrough(mapped_item: dict[str, Any] | pd.Series, kestrel_top_n:
     )
 
 
-def _run_with_api_context(func: Any, *args: Any, **kwargs: Any) -> Any:
-    """Execute mapping callable inside an activated ApiRequestContext."""
-    token = utils.set_api_context()
+def _run_with_api_context(func: Any, *args: Any, _breaker_scope: utils.BreakerScope, **kwargs: Any) -> Any:
+    """Execute mapping callable inside an activated ApiRequestContext.
+
+    ``_breaker_scope`` is created once per HTTP request and shared by every call that request makes,
+    so the request adds at most one failure to the process-wide Kestrel breaker.
+    """
+    token = utils.set_api_context(breaker_scope=_breaker_scope)
     try:
         return func(*args, **kwargs)
     finally:
@@ -221,6 +226,7 @@ async def map_entity(
     Takes an entity name, type, and optional identifiers, then runs the full
     biomapper2 pipeline: annotation → normalization → linking → resolution.
     """
+    breaker_scope = utils.BreakerScope()
     start_time = time.time()
     request_id = str(uuid.uuid4())
 
@@ -253,6 +259,7 @@ async def map_entity(
         if is_non_kestrel:
             mapped_item = _run_with_api_context(
                 mapper.map_entity_to_kg,
+                _breaker_scope=breaker_scope,
                 item=entity,
                 name_field="name",
                 provided_id_fields=provided_id_fields,
@@ -270,7 +277,7 @@ async def map_entity(
         else:
             mapped_item = await loop.run_in_executor(
                 executor,
-                _run_with_api_context,
+                partial(_run_with_api_context, _breaker_scope=breaker_scope),
                 lambda: mapper.map_entity_to_kg(
                     item=entity,
                     name_field="name",
@@ -293,7 +300,7 @@ async def map_entity(
         if body.options.kestrel_top_n is not None:
             result.kestrel_results = await loop.run_in_executor(
                 executor,
-                _run_with_api_context,
+                partial(_run_with_api_context, _breaker_scope=breaker_scope),
                 _collect_passthrough,
                 mapped_item,
                 body.options.kestrel_top_n,
@@ -329,6 +336,7 @@ async def map_batch(
     Processes each entity through the mapping pipeline and returns results.
     Maximum 1000 entities per request.
     """
+    breaker_scope = utils.BreakerScope()
     start_time = time.time()
     request_id = str(uuid.uuid4())
 
@@ -419,7 +427,7 @@ async def map_batch(
 
     results, successful, failed = await loop.run_in_executor(
         batch_executor,
-        _run_with_api_context,
+        partial(_run_with_api_context, _breaker_scope=breaker_scope),
         _process_batch,
     )
 
@@ -468,6 +476,7 @@ async def map_dataset(
 
     Upload a file and specify column mappings. Returns statistics about the mapping.
     """
+    breaker_scope = utils.BreakerScope()
     # This route returns a TSV path + stats, not per-entity JSON, so it has nowhere to carry raw
     # passthrough rows. Reject the option (422) and point callers to the streaming route (R8).
     if kestrel_top_n is not None:
@@ -512,7 +521,7 @@ async def map_dataset(
         kestrel_executor = _get_executor(request, "kestrel_executor")
         output_path, stats = await loop.run_in_executor(
             kestrel_executor,
-            _run_with_api_context,
+            partial(_run_with_api_context, _breaker_scope=breaker_scope),
             lambda: mapper.map_dataset_to_kg(
                 dataset=tmp_path,
                 entity_type=entity_type,
@@ -566,6 +575,7 @@ async def map_dataset_stream(
     for full processing. When kestrel_top_n is set, each NDJSON line carries a
     ``kestrel_results`` array of raw passthrough rows (R8).
     """
+    breaker_scope = utils.BreakerScope()
     mapper = get_mapper(request)
 
     # Validate file
@@ -614,7 +624,7 @@ async def map_dataset_stream(
                 row_executor = fast_executor if (is_non_kestrel_row and fast_executor is not None) else kestrel_executor
                 mapped = await loop.run_in_executor(
                     row_executor,
-                    _run_with_api_context,
+                    partial(_run_with_api_context, _breaker_scope=breaker_scope),
                     lambda ent=entity: mapper.map_entity_to_kg(
                         item=ent,
                         name_field=name_column,
@@ -658,7 +668,7 @@ async def map_dataset_stream(
                 if kestrel_top_n is not None:
                     passthrough_results = await loop.run_in_executor(
                         kestrel_executor,
-                        _run_with_api_context,
+                        partial(_run_with_api_context, _breaker_scope=breaker_scope),
                         _collect_passthrough,
                         mapped,
                         kestrel_top_n,

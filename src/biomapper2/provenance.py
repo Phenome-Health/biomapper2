@@ -10,7 +10,7 @@ import logging
 import requests
 from pydantic import BaseModel, ConfigDict, Field
 
-from .utils import _CIRCUIT_BREAKER, get_current_api_context
+from .utils import _CIRCUIT_BREAKER, get_current_api_context, record_breaker_failure
 
 __all__ = ["KgBuildInfo", "RunProvenance", "fetch_kg_build_info", "build_run_provenance"]
 
@@ -75,13 +75,13 @@ def fetch_kg_build_info(kestrel_url: str) -> tuple[str, KgBuildInfo]:
             if status is not None and 400 <= status < 500 and status != 429:
                 _CIRCUIT_BREAKER.record_success()
             else:
-                _CIRCUIT_BREAKER.record_failure()
+                record_breaker_failure(api_ctx)
             breaker_settled = True
         logging.warning(f"Could not fetch Kestrel /health for run provenance ({kestrel_url}): {e}; recording 'unknown'")
         return "unknown", KgBuildInfo()
     except requests.exceptions.RequestException as e:
         if breaker_active:
-            _CIRCUIT_BREAKER.record_failure()
+            record_breaker_failure(api_ctx)
             breaker_settled = True
         logging.warning(f"Could not fetch Kestrel /health for run provenance ({kestrel_url}): {e}; recording 'unknown'")
         return "unknown", KgBuildInfo()
