@@ -338,10 +338,25 @@ result says which source served it in `refmet_source`:
 
 | `refmet_source` | Meaning |
 |---|---|
-| `live_api` | Live `/match` answered (a match or a no-match). |
+| `live_api` | Live `/match` answered (a match, a no-match, or a match with no id). |
 | `freeze_backup` | Live was unreachable; the store's last-known value was served. |
 | `kept_live_no_match` | Live answered no-match, but the store holds an earlier vote for this exact query. The stored vote was served and the store row was left alone. |
+| `kept_live_matched_no_id` | Live matched the name but returned no id for the match, and the store holds an earlier vote for this exact query. The stored vote was served and the store row was left alone. |
 | `unavailable` | Live was unreachable and the store has no row for the query. |
+
+`refmet_availability` says whether RefMet answered for the row:
+
+| `refmet_availability` | Meaning |
+|---|---|
+| `voted` | RefMet supplied an id for the name. |
+| `no_match` | RefMet answered and has no such metabolite. This includes a `/match` reply that is a message and not a metabolite, such as `'C' is ambiguous:Use 'FA'(fatty acids) or 'CAR'(acylcarnitines)*` for `C0`. |
+| `matched_no_id` | RefMet answered and matched the name, but returned no id for the match, so no vote was cast. This is a property of the name and repeats on a retry. Seen for RefMet names containing an apostrophe, such as `5'-Methylthioadenosine`. Counted as `refmet_matched_no_id` in a batch summary and `refmet_matched_no_id_rows` in dataset stats. |
+| `unavailable` | RefMet did not answer: a 5xx, a timeout, a transport error, or a skip while the circuit breaker was open. A retry later may answer. |
+| `not_queried` | RefMet was not selected for the row. |
+
+Only `unavailable` outcomes count toward the circuit breaker (three failures open it for five
+minutes). A name that gets `no_match` or `matched_no_id` cannot change the result for any other
+name. While the breaker is open, each batch logs one INFO line with the number of names it skipped.
 
 `kept_live_no_match` exists because RefMet `/match` has stopped matching names it used to match
 (for example `docosahexaenoate (dha; 22:6n3)`, around 2026-11-12) while the RefMet entries
