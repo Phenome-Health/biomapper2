@@ -9,8 +9,13 @@ from ...utils import AssignedIDsDict
 # so a consumer can tell a genuine no-match from a service that never answered. Plain strings (not an
 # Enum) so the value passes unchanged through a pandas column, ``Entity.model_extra`` and the JSON
 # API. ``not_queried`` is the total-map default: an annotator that did not run for the row.
+#   matched_no_id : RefMet only. The service ANSWERED and matched the name, but returned no id for the
+#                   match (``/match`` gave a ``refmet_name``, the ``/name`` id lookup gave nothing). A
+#                   per-name answer like ``no_match``: no vote is cast, it is not counted by the
+#                   circuit breaker, and it is never ``unavailable`` (the service did answer).
 AVAILABILITY_VOTED = "voted"
 AVAILABILITY_NO_MATCH = "no_match"
+AVAILABILITY_MATCHED_NO_ID = "matched_no_id"
 AVAILABILITY_UNAVAILABLE = "unavailable"
 AVAILABILITY_NOT_QUERIED = "not_queried"
 
@@ -32,6 +37,11 @@ AVAILABILITY_NOT_QUERIED = "not_queried"
 #                     (availability ``voted``). Not ``freeze_backup``: live was up. RefMet /match has
 #                     stopped matching names it used to match (see refmet_store), so a new no-match is more
 #                     likely upstream drift than a retired entry. Deleting the store row clears it.
+#   kept_live_matched_no_id : mode ``live_backup`` only — live ANSWERED and matched the name but gave no
+#                     id for the match (availability would be ``matched_no_id``), and the store holds a
+#                     last-known-good vote for this exact query, so that vote is served instead
+#                     (availability ``voted``). The store row is left alone and nothing is logged to
+#                     its change log.
 #   unavailable     : the live service did not answer (breaker open / transport error / timeout).
 #   not_queried     : RefMet was not selected for the row.
 REFMET_SOURCE_LOCAL = "local_snapshot"
@@ -39,6 +49,7 @@ REFMET_SOURCE_NOT_IN_SNAPSHOT = "not_in_snapshot"
 REFMET_SOURCE_LIVE = "live_api"
 REFMET_SOURCE_FREEZE_BACKUP = "freeze_backup"
 REFMET_SOURCE_KEPT_LIVE_NO_MATCH = "kept_live_no_match"
+REFMET_SOURCE_KEPT_LIVE_MATCHED_NO_ID = "kept_live_matched_no_id"
 REFMET_SOURCE_UNAVAILABLE = "unavailable"
 REFMET_SOURCE_NOT_QUERIED = "not_queried"
 

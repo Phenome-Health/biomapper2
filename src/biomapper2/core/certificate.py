@@ -357,14 +357,17 @@ class ResolutionCertificate:
     refusal_reason: str | None = None
     # RefMet (Metabolomics Workbench) availability for the row, on the same axis as
     # ``equivalent_ids_lookup_ok``: a runtime input about whether a source answered, NOT a verdict.
-    # ``voted`` | ``no_match`` | ``unavailable`` | ``not_queried``. ``not_queried`` when RefMet was
-    # not selected for the row, so the field is total. Appended after the existing defaulted fields
-    # so the dataclass shape stays additive.
+    # ``voted`` | ``no_match`` | ``matched_no_id`` | ``unavailable`` | ``not_queried``.
+    # ``matched_no_id``: RefMet answered and matched the name but returned no id for the match, so no
+    # vote was cast; a per-name answer, never an outage. ``not_queried`` when RefMet was not selected
+    # for the row, so the field is total. Appended after the existing defaulted fields so the
+    # dataclass shape stays additive.
     refmet_availability: str = "not_queried"
     # WHICH RefMet source served the row, on a parallel axis to ``refmet_availability`` (a provenance
     # tag, not a verdict): ``local_snapshot`` | ``not_in_snapshot`` | ``live_api`` | ``freeze_backup`` |
-    # ``kept_live_no_match`` (live answered no-match, an earlier stored vote was kept) | ``unavailable`` |
-    # ``not_queried``. With a pinned freeze present the default path is ``local_snapshot`` /
+    # ``kept_live_no_match`` (live answered no-match, an earlier stored vote was kept) |
+    # ``kept_live_matched_no_id`` (live matched the name with no id, an earlier stored vote was kept) |
+    # ``unavailable`` | ``not_queried``. With a pinned freeze present the default path is ``local_snapshot`` /
     # ``not_in_snapshot`` (the circuit breaker is OUT of it); without one it is ``live_api`` /
     # ``unavailable``, exactly as before. ``refmet_snapshot_version`` pins WHICH freeze produced a
     # snapshot-served vote (set only when the freeze served or was consulted for the row), else None.
@@ -574,10 +577,11 @@ def issue(
         tier_b: An independent lookup for the query name, when Tier B is enabled.
         committed_node_sources: Annotator slugs that supplied the committed node (L26).
         refmet_availability: Whether the RefMet source answered for this row (voted / no_match /
-            unavailable / not_queried). A runtime availability input like ``equivalent_ids_lookup_ok``,
+            matched_no_id / unavailable / not_queried). A runtime availability input like ``equivalent_ids_lookup_ok``,
             recorded on the certificate; it does not affect the state machine.
         refmet_source: WHICH RefMet source served the row (local_snapshot / not_in_snapshot /
-            live_api / freeze_backup / kept_live_no_match / unavailable / not_queried). A provenance
+            live_api / freeze_backup / kept_live_no_match / kept_live_matched_no_id / unavailable /
+            not_queried). A provenance
             tag on a parallel axis to ``refmet_availability``; like it, recorded but not part of the
             state machine.
         refmet_snapshot_version: Version of the freeze that served (or was consulted for) the row,

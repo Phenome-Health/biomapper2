@@ -1162,6 +1162,9 @@ class Mapper:
             # cold-run metric only: the RefMet HTTP cache serves successes, so a warm rerun understates
             # unavailability. Any gating use must be attributed to a cold cache.
             refmet_unavailable_rows = sum(1 for c in certificate_rows if c.refmet_availability == "unavailable")
+            # Rows RefMet matched by name and returned no id for: a per-name answer, counted apart from
+            # the unavailable rows so it is never read as an outage.
+            refmet_matched_no_id_rows = sum(1 for c in certificate_rows if c.refmet_availability == "matched_no_id")
 
             # Run-level RefMet SOURCE breakdown (parallel to the unavailable count): how many rows each
             # source served. With a pinned freeze present this is dominated by local_snapshot /
@@ -1235,6 +1238,7 @@ class Mapper:
             )
             # Run-level RefMet availability metric (D5). Cold-run-attributable only (see the count above).
             stats_summary["refmet_unavailable_rows"] = refmet_unavailable_rows
+            stats_summary["refmet_matched_no_id_rows"] = refmet_matched_no_id_rows
             stats_summary["refmet_total_rows"] = len(certificate_rows)
             # Run-level RefMet source provenance (counts by source) + which freeze served the run. Stamp the
             # freeze version ONLY when the run actually used/consulted the snapshot (a snapshot-attributable
