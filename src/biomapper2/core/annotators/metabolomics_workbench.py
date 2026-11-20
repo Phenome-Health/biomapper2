@@ -19,11 +19,13 @@ from ...utils import AssignedIDsDict, quote_name_path_segment
 from ..name_case import canonical_query
 from . import refmet_snapshot, refmet_store
 from .base import (
+    AVAILABILITY_MATCHED_NO_ID,
     AVAILABILITY_NO_MATCH,
     AVAILABILITY_NOT_QUERIED,
     AVAILABILITY_UNAVAILABLE,
     AVAILABILITY_VOTED,
     REFMET_SOURCE_FREEZE_BACKUP,
+    REFMET_SOURCE_KEPT_LIVE_MATCHED_NO_ID,
     REFMET_SOURCE_KEPT_LIVE_NO_MATCH,
     REFMET_SOURCE_LIVE,
     REFMET_SOURCE_LOCAL,
@@ -39,8 +41,8 @@ class RefMetResult:
     """One RefMet lookup outcome: availability status, the payload when it VOTED, and provenance.
 
     ``status`` is one of the ``AVAILABILITY_*`` strings. ``data`` is the raw API dict only for a
-    VOTED result; NO_MATCH and UNAVAILABLE carry ``None`` so an UNAVAILABLE outcome can never be
-    mistaken for (or folded into) an empty vote.
+    VOTED result; NO_MATCH, MATCHED_NO_ID and UNAVAILABLE carry ``None`` so an UNAVAILABLE outcome
+    can never be mistaken for (or folded into) an empty vote.
 
     ``source`` is one of the ``REFMET_SOURCE_*`` strings — WHICH source served the row (the pinned
     local freeze, a freeze miss, the live endpoint, or an unreachable service) — on a parallel axis
@@ -54,9 +56,31 @@ class RefMetResult:
     version: str | None = None
 
 
+@dataclass(frozen=True)
+class _MatchedNoId:
+    """What one request returns when /match matched a name and no id could be had for the match.
+
+    A per-name answer, RETURNED from the circuit-decorated call (never raised), so the breaker counts
+    it as a success: RefMet answered. ``refmet_name`` is the matched name, kept for the log line.
+    """
+
+    refmet_name: str
+
+
 _BATCH_DEADLINES: contextvars.ContextVar[dict[int, float] | None] = contextvars.ContextVar(
     "_MW_BATCH_DEADLINES", default=None
 )
+
+# Names skipped with no request because the breaker was open, per armed batch and keyed by instance
+# id like the deadline. The list is created when a batch is armed and only ever MUTATED afterwards,
+# so a nested call (or a worker thread running on a copy of the context) adds to the same list the
+# outermost armer reads when it disarms.
+_BATCH_BREAKER_SKIPS: contextvars.ContextVar[dict[int, list[str]] | None] = contextvars.ContextVar(
+    "_MW_BATCH_BREAKER_SKIPS", default=None
+)
+
+# How many skipped names the per-batch INFO line lists before it stops.
+_BREAKER_SKIP_NAMES_LOGGED = 5
 
 
 class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
@@ -147,6 +171,10 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             # refmet_id == "-") is cached.
         )
         # Injectable so a test can override without a real sleep or wall clock; default to real ones.
+        # The batch deadline and skip list are keyed by id(self), and CPython reuses the id of a
+        # collected object. A new instance must not inherit a deadline an earlier one left armed in
+        # this context (it would read every name as past the deadline: UNAVAILABLE, no request).
+        self.disarm_batch_deadline()
         self._sleep: Callable[[float], None] = sleep if sleep is not None else time.sleep
         self._clock: Callable[[], float] = clock if clock is not None else time.monotonic
         if request_timeout_s is not None:
@@ -191,12 +219,40 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         """
         if self._batch_deadline is None:
             self._batch_deadline = self._clock() + self.BATCH_DEADLINE_S
+            _BATCH_BREAKER_SKIPS.set({**(_BATCH_BREAKER_SKIPS.get() or {}), id(self): []})
             return True
         return False
 
     def disarm_batch_deadline(self) -> None:
-        """Clear the shared per-batch deadline so the next batch (or a single lookup) is unbounded."""
+        """Clear the shared per-batch deadline so the next batch (or a single lookup) is unbounded.
+
+        Also the end of the batch for logging: names skipped because the breaker was open are reported
+        here in ONE INFO line with their count, so collateral from an open breaker is visible in
+        production logs without one line per name.
+        """
         self._batch_deadline = None
+        skips_by_instance = dict(_BATCH_BREAKER_SKIPS.get() or {})
+        skipped = skips_by_instance.pop(id(self), None)
+        _BATCH_BREAKER_SKIPS.set(skips_by_instance or None)
+        if skipped:
+            shown = ", ".join(repr(name) for name in skipped[:_BREAKER_SKIP_NAMES_LOGGED])
+            more = len(skipped) - _BREAKER_SKIP_NAMES_LOGGED
+            logging.info(
+                "RefMet circuit open: skipped %d name(s) in this batch with no request (%s%s)",
+                len(skipped),
+                shown,
+                f", and {more} more" if more > 0 else "",
+            )
+
+    def _note_breaker_skip(self, metabolite_name: str) -> None:
+        """Record one name skipped because the breaker is open (see ``disarm_batch_deadline``)."""
+        skipped = (_BATCH_BREAKER_SKIPS.get() or {}).get(id(self))
+        if skipped is None:
+            # No armed batch (a single lookup): there is no batch end to report at, so say it now.
+            logging.info("RefMet circuit open: skipped %r with no request", metabolite_name)
+            return
+        skipped.append(metabolite_name)
+        logging.debug("RefMet circuit open: skipped %r with no request", metabolite_name)
 
     def _past_batch_deadline(self) -> bool:
         return self._batch_deadline is not None and self._clock() >= self._batch_deadline
@@ -215,8 +271,8 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
     ) -> AssignedIDsDict:
         """Implements BaseAnnotator.get_annotations.
 
-        Emits the vote only. VOTED yields ``{slug: {refmet_id: {...}}}``; NO_MATCH and UNAVAILABLE
-        both yield ``{slug: {}}`` (an empty vote). The NO_MATCH/UNAVAILABLE distinction lives in
+        Emits the vote only. VOTED yields ``{slug: {refmet_id: {...}}}``; NO_MATCH, MATCHED_NO_ID and
+        UNAVAILABLE all yield ``{slug: {}}`` (an empty vote). The distinction between them lives in
         ``get_availability``, never here — folding UNAVAILABLE into a vote is the silent-blanking bug.
         """
 
@@ -250,7 +306,7 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         return {self.slug: annotations}
 
     def get_availability(self, entity: dict | pd.Series, name_field: str, cache: dict | None = None) -> dict[str, str]:
-        """RefMet availability for one row: VOTED / NO_MATCH / UNAVAILABLE (or NOT_QUERIED).
+        """RefMet availability for one row: VOTED / NO_MATCH / MATCHED_NO_ID / UNAVAILABLE (or NOT_QUERIED).
 
         Reads the SAME cache ``get_annotations`` reads, so a degraded row is fetched (and
         breaker-counted) once. With no cache (the single-entity path builds none) it fetches inline.
@@ -354,8 +410,8 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         specific record than ``...-GPC (P-16:0/18:1)*``. When the name carries a recognized notation token
         in non-canonical case, the spelling from :func:`~biomapper2.core.name_case.canonical_query` is
         queried FIRST; the name as given is the fallback, used only when the canonical query is a
-        NO_MATCH (never on UNAVAILABLE, which is an outage, not an answer). Any other name is queried
-        exactly as given, as before.
+        NO_MATCH (never on UNAVAILABLE, which is an outage, not an answer, and never on MATCHED_NO_ID,
+        where the canonical spelling did match). Any other name is queried exactly as given, as before.
         """
         canonical = canonical_query(metabolite_name)
         if canonical is None:
@@ -383,7 +439,8 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         - ``frozen``      : the immutable freeze served first (deterministic; breaker out of the path);
                             a miss is not_in_snapshot NO_MATCH unless ``LIVE_API_FALLBACK`` is on.
         - ``live_backup`` : live-first + write-through store served as backup when live is down; a
-                            stored vote is kept against a live no-match (source=kept_live_no_match).
+                            stored vote is kept against a live no-match (source=kept_live_no_match)
+                            and against a live match with no id (source=kept_live_matched_no_id).
         - ``None`` (legacy, direct construction): the historical snapshot-first-if-present dispatch,
           preserved byte-for-byte so a caller that only sets ``REFMET_SNAPSHOT_PATH`` is unchanged.
         """
@@ -410,10 +467,37 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         change log. A live NO_MATCH with no stored vote is still a real negative and is written back
         (D6). A live match with a different id still wins.
 
+        A live MATCHED_NO_ID (live matched the name and gave no id for the match) is handled like the
+        kept vote, and for the same reason: the name still matches, only the id is missing from the
+        answer. A stored vote with an id for this exact query is served as
+        source=kept_live_matched_no_id. With no stored vote the live answer stands (MATCHED_NO_ID,
+        source=live_api). Either way NOTHING is written: the store's live columns hold only a vote or a
+        no-match, and this answer is neither, so the row and the change log are left as they were.
+
         When live is DOWN (breaker open / timeout / transport → UNAVAILABLE), serve the store's
         last-known-good value as source=freeze_backup (D3: any age); on a store miss, UNAVAILABLE.
         """
         live = self._fetch_live(metabolite_name)
+        if live.status == AVAILABILITY_MATCHED_NO_ID:
+            try:
+                hit = refmet_store.get(metabolite_name)
+            except Exception as e:  # noqa: BLE001 — backup store is best-effort; a failure is not fatal
+                logging.warning("RefMet backup store read failed for %r (treated as miss): %s", metabolite_name, e)
+                return live
+            if hit is not None and hit.status == AVAILABILITY_VOTED and hit.refmet_id:
+                logging.info(
+                    "RefMet live match for %r has no id; served stored vote %s (source=%s)",
+                    metabolite_name,
+                    hit.refmet_id,
+                    REFMET_SOURCE_KEPT_LIVE_MATCHED_NO_ID,
+                )
+                return RefMetResult(
+                    AVAILABILITY_VOTED,
+                    {"refmet_id": hit.refmet_id},
+                    source=REFMET_SOURCE_KEPT_LIVE_MATCHED_NO_ID,
+                    version=hit.snapshot_version,
+                )
+            return live
         if live.status in (AVAILABILITY_VOTED, AVAILABILITY_NO_MATCH):
             # Every store call here is BEST-EFFORT: an unreadable / unwritable / full / corrupt /
             # locked store must NEVER abort a valid live resolution (or the surrounding mapping).
@@ -536,11 +620,16 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         return self._fetch_live(metabolite_name)
 
     def _fetch_live(self, metabolite_name: str) -> RefMetResult:
-        """Live /match fetch, classifying the outcome as VOTED / NO_MATCH / UNAVAILABLE.
+        """Live /match fetch, classifying the outcome as VOTED / NO_MATCH / MATCHED_NO_ID / UNAVAILABLE.
 
         A CircuitBreakerError (breaker open), a transport error, or a timeout is UNAVAILABLE — the
         service did not answer. A 200 whose refmet_id is "-" (or a non-dict body) is NO_MATCH — the
         service answered "no such metabolite". Data is VOTED.
+
+        MATCHED_NO_ID is the third answer: /match matched the name and the id lookup returned no id
+        for the match. It is about the name, not the service, so ``_request_once`` RETURNS it (it is
+        never raised) and the breaker does not count it. It used to be raised, which let three such
+        names open the breaker and mark every other name in the process UNAVAILABLE.
 
         A per-name 404 (a name the Workbench does not know) is a NO_MATCH here, not an outage.
         ``_request_once`` classifies it as NO_MATCH rather than raising, so it never counts toward the
@@ -554,17 +643,25 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         try:
             data = self._do_refmet_request(metabolite_name)
         except CircuitBreakerError:
-            logging.debug(f"RefMet API outage, skipping '{metabolite_name}' (circuit open)")
+            self._note_breaker_skip(metabolite_name)
             return RefMetResult(AVAILABILITY_UNAVAILABLE, source=REFMET_SOURCE_UNAVAILABLE)
         except requests.RequestException as e:
             logging.warning(f"Failed to fetch RefMet data for '{metabolite_name}': {e}")
             return RefMetResult(AVAILABILITY_UNAVAILABLE, source=REFMET_SOURCE_UNAVAILABLE)
         if data is None:
             return RefMetResult(AVAILABILITY_NO_MATCH, source=REFMET_SOURCE_LIVE)
+        if isinstance(data, _MatchedNoId):
+            logging.warning(
+                "RefMet matched %r as %r but returned no refmet_id for it (%s; not a service failure)",
+                metabolite_name,
+                data.refmet_name,
+                AVAILABILITY_MATCHED_NO_ID,
+            )
+            return RefMetResult(AVAILABILITY_MATCHED_NO_ID, source=REFMET_SOURCE_LIVE)
         return RefMetResult(AVAILABILITY_VOTED, data, source=REFMET_SOURCE_LIVE)
 
     @circuit(failure_threshold=3, recovery_timeout=300)
-    def _do_refmet_request(self, metabolite_name: str) -> dict[str, Any] | None:
+    def _do_refmet_request(self, metabolite_name: str) -> dict[str, Any] | _MatchedNoId | None:
         """
         Make the actual HTTP request. Protected by circuit breaker - trips on repeated failures,
         meaning it will skip requests until a cooldown period is over (recovery_timeout).
@@ -586,11 +683,18 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
                 self._sleep(self.RETRY_BACKOFF_S)
         return None  # unreachable: the loop returns or raises
 
-    def _lookup_refmet_id(self, refmet_name: Any) -> str:  # noqa: ANN401 — raw JSON value
+    def _lookup_refmet_id(self, refmet_name: Any) -> str | None:  # noqa: ANN401 — raw JSON value
         """The RefMet id for a ``refmet_name`` /match returned, via ``/refmet/name/{name}/refmet_id``.
 
-        /match said this name matched, so a missing id here is a degraded answer, not a no-match: it
-        raises (UNAVAILABLE, counted by the breaker) rather than recording a vote with no id.
+        Returns None when /name ANSWERED and has no id for this name: a 200 with no usable
+        ``refmet_id`` (live RefMet sends an empty JSON array) or a per-name Bad Request / Not Found.
+        That is an answer about the name, so it is returned, never raised, and the breaker does not
+        count it; the caller reports MATCHED_NO_ID and casts no vote. Observed live on 2026-11-20 for
+        every refmet_name containing an apostrophe (``5'-Methylthioadenosine``): /name returns ``[]``
+        whether the apostrophe is sent literally or as ``%27``.
+
+        A 5xx, a timeout or a transport error still raises: the service did not answer, and that is
+        what the breaker is for.
         """
         if not isinstance(refmet_name, str) or not refmet_name.strip():
             raise requests.RequestException("RefMet /match matched without a refmet_name or refmet_id")
@@ -604,15 +708,30 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             timeout = max(0.1, min(timeout, remaining))
         url = f"{self.NAME_URL}/{quote_name_path_segment(refmet_name)}/refmet_id"
         response = self._session.get(url, timeout=timeout)
+        if response.status_code in (400, 404):
+            return None
         response.raise_for_status()
         body = response.json()
         refmet_id = body.get("refmet_id") if isinstance(body, dict) else None
         if not isinstance(refmet_id, str) or not refmet_id.strip() or refmet_id == "-":
-            raise requests.RequestException(f"RefMet /name returned no refmet_id for {refmet_name!r}")
+            return None
         return refmet_id
 
-    def _request_once(self, metabolite_name: str) -> dict[str, Any] | None:
-        """One HTTP attempt. Returns the data dict, or None for a genuine no-match.
+    @staticmethod
+    def _is_message_reply(data: dict[str, Any]) -> bool:
+        """Whether a /match reply with no id is a message in ``refmet_name``, not a metabolite.
+
+        /match answers some queries with advice instead of a record, for example ``C0`` ->
+        ``'C' is ambiguous:Use 'FA'(fatty acids) or 'CAR'(acylcarnitines)*``. Such a reply describes
+        no compound: every field except ``refmet_name`` is the "-" placeholder (formula, exact mass
+        and the three classes), where a real match fills them in. The test needs at least one such
+        field to be present, so a reply that carries a name and nothing else is not called a message.
+        """
+        others = [value for key, value in data.items() if key not in ("refmet_name", "refmet_id")]
+        return bool(others) and all(value is None or str(value).strip() in ("", "-") for value in others)
+
+    def _request_once(self, metabolite_name: str) -> dict[str, Any] | _MatchedNoId | None:
+        """One HTTP attempt. Returns the data dict, None for a genuine no-match, or a ``_MatchedNoId``.
 
         The name goes through ``quote_name_path_segment``: a slash between lipid chain specs is sent
         literally (the Workbench resolves ``PC 16:0/18:1`` that way and 404s on ``%2F``), and any other
@@ -624,6 +743,10 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
         counts toward the circuit breaker. Only 5xx, timeouts and transport errors should trip it.
         This is what stops an unknown name from tripping the breaker and degrading RefMet for every
         other name in the process.
+
+        Two more answers are about the name and are likewise returned, never raised: a reply whose
+        ``refmet_name`` is a message (a no-match, with no id lookup) and a match the id lookup has no
+        id for (a ``_MatchedNoId``).
         """
         url = f"{self.BASE_URL}/{quote_name_path_segment(metabolite_name)}"
 
@@ -647,8 +770,15 @@ class MetabolomicsWorkbenchAnnotator(BaseAnnotator):
             if data.get("refmet_id") == "-" or data.get("refmet_name") == "-":
                 return None
             if not data.get("refmet_id"):
+                if self._is_message_reply(data):
+                    # refmet_name is advice ("'C' is ambiguous: ..."), not a metabolite: a no-match.
+                    return None
                 # A match without its id: backfill it from /name, keyed by the matched refmet_name.
-                return {**data, "refmet_id": self._lookup_refmet_id(data.get("refmet_name"))}
+                refmet_name = data.get("refmet_name")
+                refmet_id = self._lookup_refmet_id(refmet_name)
+                if refmet_id is None:
+                    return _MatchedNoId(str(refmet_name))
+                return {**data, "refmet_id": refmet_id}
             return data
 
         # A 200 whose body is not a dict (null, an array, a proxy-injected blob) is a DEGRADED

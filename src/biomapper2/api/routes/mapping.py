@@ -447,6 +447,9 @@ async def map_batch(
             # uncovered. Cold-run-attributable only — the RefMet HTTP cache serves successes, so a
             # warm rerun understates this count.
             "refmet_unavailable": sum(1 for r in results if r.refmet_availability == "unavailable"),
+            # Rows RefMet matched by name and returned no id for. A per-name answer, counted apart
+            # from refmet_unavailable so it is never read as an outage.
+            "refmet_matched_no_id": sum(1 for r in results if r.refmet_availability == "matched_no_id"),
             # Run-level RefMet SOURCE provenance: counts by which source served each row. With a
             # pinned freeze present this is dominated by local_snapshot / not_in_snapshot (the
             # circuit breaker is out of the default path); without one it is live_api / unavailable.

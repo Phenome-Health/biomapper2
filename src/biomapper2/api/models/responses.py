@@ -79,10 +79,12 @@ class ResolutionCertificateModel(BaseModel):
     refmet_availability: str = Field(
         default="not_queried",
         description="Whether the RefMet source (Metabolomics Workbench) answered for this row: "
-        "'voted' | 'no_match' | 'unavailable' | 'not_queried'. A runtime availability signal like "
-        "'equivalent_ids_lookup_ok', NOT a verdict — 'unavailable' means the service did not answer, "
-        "distinct from 'no_match' (it answered, no such metabolite). 'not_queried' when RefMet was "
-        "not selected for the row.",
+        "'voted' | 'no_match' | 'matched_no_id' | 'unavailable' | 'not_queried'. A runtime "
+        "availability signal like 'equivalent_ids_lookup_ok', NOT a verdict — 'unavailable' means the "
+        "service did not answer, distinct from 'no_match' (it answered, no such metabolite) and from "
+        "'matched_no_id' (it answered and matched the name, but returned no RefMet id for the match, "
+        "so no vote was cast; a property of the name, the same on a retry). 'not_queried' when RefMet "
+        "was not selected for the row.",
     )
     refmet_source: str = Field(
         default="not_queried",
@@ -91,7 +93,9 @@ class ResolutionCertificateModel(BaseModel):
         "deterministic no-match, no network) | 'live_api' (live /match answered) | 'freeze_backup' (live "
         "was down; the backup store's last-known-good value was served) | 'kept_live_no_match' (live "
         "answered no-match but the backup store holds an earlier vote for this exact query, which was "
-        "kept) | 'unavailable' (live service did not answer) | 'not_queried'. With a freeze present the "
+        "kept) | 'kept_live_matched_no_id' (live matched the name but returned no id, and the backup "
+        "store holds an earlier vote for this exact query, which was kept) | 'unavailable' (live "
+        "service did not answer) | 'not_queried'. With a freeze present the "
         "circuit breaker is out of the default path.",
     )
     refmet_snapshot_version: str | None = Field(
@@ -292,13 +296,14 @@ class EntityMappingResult(BaseModel):
         default="not_queried",
         description="Per-row RefMet (Metabolomics Workbench) availability, mirrored from the "
         "certificate so a consumer can flag/exclude rows a degraded RefMet service left uncovered: "
-        "'voted' | 'no_match' | 'unavailable' | 'not_queried'. Always present (never None).",
+        "'voted' | 'no_match' | 'matched_no_id' | 'unavailable' | 'not_queried'. Always present "
+        "(never None).",
     )
     refmet_source: str = Field(
         default="not_queried",
         description="Per-row RefMet source, mirrored from the certificate: 'local_snapshot' | "
-        "'not_in_snapshot' | 'live_api' | 'freeze_backup' | 'kept_live_no_match' | 'unavailable' | "
-        "'not_queried'. Always present (never None).",
+        "'not_in_snapshot' | 'live_api' | 'freeze_backup' | 'kept_live_no_match' | "
+        "'kept_live_matched_no_id' | 'unavailable' | 'not_queried'. Always present (never None).",
     )
     refmet_snapshot_version: str | None = Field(
         default=None,
@@ -383,7 +388,8 @@ class BatchMappingResponse(BaseModel):
     metadata: RequestMetadata
     summary: dict[str, int | dict[str, int]] = Field(
         default_factory=dict,
-        description="Summary statistics (total, successful, failed, refmet_unavailable) plus "
+        description="Summary statistics (total, successful, failed, refmet_unavailable, "
+        "refmet_matched_no_id) plus "
         "'refmet_source_counts', a per-source tally of which RefMet source served each row.",
     )
 
