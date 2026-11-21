@@ -2,7 +2,7 @@
 
 ``/match`` still answers with ``refmet_name`` (plus formula, mass and classes) but no id; the
 ``/refmet/name/{refmet_name}/refmet_id`` endpoint still returns the id. These tests pin the backfill,
-the no-match shape without the id field, the degraded-answer classification, and that the
+the no-match shape without the id field, the match-with-no-id classification, and that the
 ``live_backup`` store never overwrites a last-known-good id with an id-less vote.
 """
 
@@ -13,6 +13,7 @@ from circuitbreaker import CircuitBreakerMonitor
 
 from biomapper2.core.annotators import refmet_store
 from biomapper2.core.annotators.base import (
+    AVAILABILITY_MATCHED_NO_ID,
     AVAILABILITY_NO_MATCH,
     AVAILABILITY_UNAVAILABLE,
     AVAILABILITY_VOTED,
@@ -104,11 +105,13 @@ def test_a_dash_refmet_name_without_an_id_field_is_a_no_match_and_skips_the_name
 
 @pytest.mark.unit
 @pytest.mark.parametrize("name_body", [[], {}, {"name": "CAR 2:0"}, {"refmet_id": "-"}, None])
-def test_a_match_whose_id_cannot_be_backfilled_is_unavailable_not_a_vote(name_body) -> None:
+def test_a_match_whose_id_cannot_be_backfilled_is_matched_no_id_not_a_vote(name_body) -> None:
+    # Was UNAVAILABLE before: /name answered, so this is about the name, not the service.
     ann, _ = _annotator(MATCH_NO_ID, name_body)
     result = ann._fetch_live("acetylcarnitine (C2)")
-    assert result.status == AVAILABILITY_UNAVAILABLE
+    assert result.status == AVAILABILITY_MATCHED_NO_ID
     assert not result.data
+    assert CircuitBreakerMonitor.get(_BREAKER_NAME).failure_count == 0
 
 
 @pytest.mark.unit
