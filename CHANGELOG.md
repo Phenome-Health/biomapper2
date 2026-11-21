@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.2](https://github.com/Phenome-Health/biomapper2/compare/v1.5.1...v1.5.2) (2026-11-21)
+
+
+### Bug Fixes
+
+* **refmet:** a match with no id is a per-name answer, not a breaker failure ([#169](https://github.com/Phenome-Health/biomapper2/issues/169), [#170](https://github.com/Phenome-Health/biomapper2/issues/170)) ([9244fb9](https://github.com/Phenome-Health/biomapper2/commit/9244fb9370e681d6158f5e975cd7a31a21b9581d))
+* **refmet:** a match with no id is a per-name answer, not a breaker failure ([#169](https://github.com/Phenome-Health/biomapper2/issues/169), [#170](https://github.com/Phenome-Health/biomapper2/issues/170)) ([adffa5e](https://github.com/Phenome-Health/biomapper2/commit/adffa5e42fe7ddbc15c2ea7d72a93eda768ae91e))
+
 ## [1.5.1](https://github.com/Phenome-Health/biomapper2/compare/v1.5.0...v1.5.1) (2026-11-19)
 
 
