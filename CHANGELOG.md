@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.3](https://github.com/Phenome-Health/biomapper2/compare/v1.5.2...v1.5.3) (2026-11-22)
+
+
+### Features
+
+* **api:** report the installed package version from /health (fork [#116](https://github.com/Phenome-Health/biomapper2/issues/116)) ([a5d6638](https://github.com/Phenome-Health/biomapper2/commit/a5d66386d0f015b49f801de180d32320446f4ef3))
+
+
+### Bug Fixes
+
+* **api:** report the installed package version from /health ([#173](https://github.com/Phenome-Health/biomapper2/issues/173)) ([89606d4](https://github.com/Phenome-Health/biomapper2/commit/89606d4b8e2144e2c9f674e52e14980108bca608))
+
 ## [1.5.2](https://github.com/Phenome-Health/biomapper2/compare/v1.5.1...v1.5.2) (2026-11-21)
 
 
