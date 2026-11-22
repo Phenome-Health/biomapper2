@@ -116,6 +116,14 @@ standing **"chore(main): release X.Y.Z"** PR up to date with the next version bu
 publishes it on GitHub, and updates `pyproject.toml` + `.release-please-manifest.json`. If your commit
 messages don't follow Conventional Commits, release-please simply won't pick them up for the changelog.
 
+**When the version changes on prod, check that the API reports it.** `/api/v1/health` and the OpenAPI
+document report the installed package's version
+(`src/biomapper2/api/constants.py`), which comes from `pyproject.toml` as of the last `uv sync`. The
+prod deploy (`deploy-api.yml`) syncs before restarting, so a merged release PR should show its new
+version there. If you bump the version any other way, or deploy without syncing, health keeps
+reporting the old release: after a release deploys, confirm `curl -s <api>/api/v1/health` shows the
+new version. Do not hardcode a version string in the API again.
+
 ---
 
 ## Test files
